@@ -24,7 +24,8 @@ import { prepareSefazSpPortalPage } from '../../src/modules/anatomy/sefaz-sp-pre
 import { MANUAL_DIR, decodeManual, type ManualMeta } from './official-manual-ingest.js';
 import { HTTP_DIR, type HttpMeta } from './official-http-ingest.js';
 import { APPROVED_FALLBACK, compareWithIndependent, decodeDeclared, decodeWithPolicy, PASSAGES } from './charset-policy.js';
-import { portalActChars } from './official-act-size.js';
+import { prepareNormasLegPage } from '../../src/modules/anatomy/normas-leg-preparation.js';
+import { prepareOfficialAct, portalActChars } from '../../src/modules/anatomy/official-portal-preparation.js';
 
 const ROOT = fileURLToPath(new URL('./official-identification/', import.meta.url));
 export const MATRIX_FILE = fileURLToPath(new URL('../../docs/anatomy/official-coverage-matrix.json', import.meta.url));
@@ -348,7 +349,7 @@ export function nonRfbReadingAssessment(rd: { status: string; unidentifiedChars:
   return { complete: gaps.length === 0, gaps };
 }
 /** Conservative invariants every validated sample must keep (protection, not interpretation). */
-function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html: string, extra: object = {}): Read {
+function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL' | 'PLANALTO' | 'NORMAS-LEG', id: string, html: string, extra: object = {}): Read {
   const r = analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-07', ruleSet: { id: 'official-coverage-matrix', version: '2' },
     input: { source, representationId: id, html, ...extra }, catalog: { edition: 'none', codes: [] } });
   const broken: string[] = [];
@@ -358,6 +359,11 @@ function readWith(source: 'DOU' | 'CONFAZ' | 'SEFAZ-SP-PORTAL', id: string, html
   const unidentifiedChars = r.parts.reduce((n, p) => n + (p.type === 'unidentified' ? p.span.end - p.span.start : 0), 0);
   return { chars: r.canonicalText.length, outputHash: r.outputHash, invariants: broken, status: r.status, unidentifiedChars,
     limitationCodes: [...new Set(r.limitations.map((l) => l.code))].sort() };
+}
+function readPortal(source: 'DOU' | 'CONFAZ', id: string, html: string, title: string): Read {
+  const prep = title.trim() ? prepareOfficialAct(source, id, html, title) : null;
+  const read = readWith(source, id, html, prep ? { officialAct: prep } : {});
+  return prep ? read : { ...read, status: 'partial', limitationCodes: [...read.limitationCodes, 'act_region_unproven'] };
 }
 type BaselineEntry = { id: string; sha256: string; profile: string; outputHash: string; chars: number };
 /** Canonical digest of a sample's entry in the samples baseline (the non-RFB counterpart of `lotEntrySha256`). */
@@ -430,16 +436,37 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
       evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: [...rd.invariants] };
     assessNonRfb(spSample, rd); out.push(spSample);
   }
+  const ownProfile = (sample: Sample, profile: 'PLANALTO' | 'NORMAS-LEG', html: string, chars: number | null, proof: object): Sample => {
+    const rd = readWith(profile, sample.id, html, proof);
+    const ok = locked(sample.id, sample.sha256, profile, rd);
+    const result: Sample = { ...sample, profile, chars: rd.chars, actChars: chars ?? rd.chars, size: sizeOf(chars ?? rd.chars), outputHash: rd.outputHash, diagnostic: null,
+      stages: { ...sample.stages, read: true, validated: ok }, notes: [...rd.invariants],
+      evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [] };
+    assessNonRfb(result, rd);
+    return result;
+  };
+  const planalto = (sample: Sample, html: string, title: string): Sample => {
+    const prep = title.trim() ? prepareOfficialAct('PLANALTO', sample.id, html, title) : null;
+    return prep ? ownProfile(sample, 'PLANALTO', html, prep.chars, { officialAct: prep }) : sample;
+  };
   // normas.leg.br: captured and identified; NO reader profile of its own → not read, not validated. The DOU-profile
   // reading is kept as a diagnostic only (it never changes the source identity nor closes a cell).
   const lg = join(ROOT, 'leg-normas');
   for (const f of readdirSync(lg).filter((x) => /-(original|atualizada)\.meta\.json$/u.test(x)).sort()) {
-    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; sha256: string; bytes: number; titleCheck: { found: boolean } };
+    const m = JSON.parse(readFileSync(join(lg, f), 'utf8')) as { id: string; sha256: string; bytes: number; url: string; urn: string; version: string; titleCheck: { found: boolean } };
     const bytes = verifiedBytes(join(lg, `${m.id}.html`), m, m.id);
-    const diag = readWith('DOU', m.id, new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-    out.push({ id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
+    const html = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const sample: Sample = { id: m.id, source: 'normas.leg.br', type: 'Lei', layout: LAYOUT.NORMASLEG_HTML, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: m.titleCheck.found, read: false, validated: false, accepted: false }, profile: null,
-      diagnostic: { profile: 'DOU (diagnóstico)', chars: diag.chars }, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria'] });
+      diagnostic: null, outputHash: null, evidence: [], notes: ['epígrafe não confirmada'] };
+    if (!m.titleCheck.found) { out.push(sample); continue; }
+    if (!m.id.endsWith('-atualizada') || !/^versão atualizada\b/u.test(m.version)) {
+      const diag = readWith('DOU', m.id, html);
+      out.push({ ...sample, diagnostic: { profile: 'DOU (diagnóstico)', chars: diag.chars }, notes: ['sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria'] });
+      continue;
+    }
+    const preparation = prepareNormasLegPage({ resourceId: m.id, url: m.url, urn: m.urn, version: 'atualizada', bytes });
+    out.push(ownProfile(sample, 'NORMAS-LEG', html, null, { normasLeg: preparation }));
   }
   // Manual provenance and the approved decoding decision must agree with the bytes.
   if (existsSync(MANUAL_DIR)) for (const f of readdirSync(MANUAL_DIR).filter((x) => /^M\d+\.meta\.json$/u.test(x)).sort()) {
@@ -449,9 +476,10 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
     if (JSON.stringify(m.decoding) !== JSON.stringify(decoding)) throw new SampleIntegrityError(`${m.item}: decoding provenance differs from the approved policy`);
     const profile = m.source === 'CONFAZ' ? 'CONFAZ' : m.source === 'DOU' ? 'DOU' : null;
     const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : m.source === 'DOU' ? LAYOUT.DOU_HTML : LAYOUT.PLANALTO_HTML;
-    if (!profile) { out.push({ id: m.item, source: m.source, type: m.type, layout, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
-      stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null, diagnostic: null, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio; porte indeterminado'], ...(decoding ? { decoding: { ...decoding, declaredCharset: null } } : {}) }); continue; }
-    const rd = readWith(profile, m.item, html);
+    if (!profile) { const sample: Sample = { id: m.item, source: m.source, type: m.type, layout, chars: null, size: null, sha256: m.sha256, bytes: m.bytes,
+      stages: { captured: true, identified: true, read: false, validated: false, accepted: false }, profile: null, diagnostic: null, outputHash: null, evidence: [], notes: ['sem perfil de leitura próprio; porte indeterminado'], ...(decoding ? { decoding: { ...decoding, declaredCharset: null } } : {}) };
+      out.push(planalto(sample, html, m.titleCheck.matched)); continue; }
+    const rd = readPortal(profile, m.item, html, m.titleCheck.matched);
     const actChars = portalActChars(profile, html);
     const ok = locked(m.item, m.sha256, profile, rd);
     const manSample: Sample = { id: m.item, source: m.source, type: m.type, layout, chars: rd.chars, actChars, provisional: true, size: actChars === null ? null : sizeOf(actChars), sha256: m.sha256, bytes: m.bytes,
@@ -471,18 +499,21 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
     const layout = m.source === 'CONFAZ' ? LAYOUT.CONFAZ_HTML : LAYOUT.PLANALTO_HTML;
     if (!m.readable || m.source !== 'CONFAZ') {
       let decoding: Sample['decoding'];
+      let planaltoHtml: string | undefined;
       if (m.source === 'Planalto' && (m.item === 'M1' || m.item === 'M2') && APPROVED_FALLBACK[m.sha256]) {
         const d = decodeWithPolicy(bytes, { httpCharset: null });
+        planaltoHtml = d.text;
         const leg = m.item === 'M1' ? 'lei-10637-2002-atualizada' : 'lei-10833-2003-atualizada';
         const indep = readFileSync(join(ROOT, 'leg-normas', `${leg}.html`), 'utf8');
         decoding = { encoding: d.encoding, encodingSource: d.encodingSource, confidence: d.confidence, declaredCharset: null,
           independentCheck: compareWithIndependent(d.text, indep, PASSAGES[m.item] ?? []).map((c) => ({ passage: c.passage, sentenceEqual: c.sentenceEqual })) };
       }
-      out.push({ ...base, layout, chars: null, size: null, stages: { captured: true, identified: true, read: false, validated: false, accepted: false },
+      const sample: Sample = { ...base, layout, chars: null, size: null, stages: { captured: true, identified: true, read: false, validated: false, accepted: false },
         profile: null, outputHash: null, notes: [decoding ? 'charset: fallback local aprovado (tentative); leitura habilitada para preparação, sem perfil Planalto — não lido nem validado' : (m.readableNote ?? 'sem perfil de leitura próprio')],
-        ...(decoding ? { decoding } : {}) }); continue; }
+        ...(decoding ? { decoding } : {}) };
+      out.push(planaltoHtml ? planalto(sample, planaltoHtml, m.identification.matched) : sample); continue; }
     const html = decodeDeclared(bytes, m.declaredCharset);
-    const rd = readWith('CONFAZ', id, html);
+    const rd = readPortal('CONFAZ', id, html, m.identification.matched);
     const actChars = portalActChars('CONFAZ', html);
     const ok = locked(id, m.sha256, 'CONFAZ', rd);
     const cfSample: Sample = { ...base, layout, chars: rd.chars, actChars, provisional: true, size: actChars === null ? null : sizeOf(actChars), stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'CONFAZ',

@@ -13,13 +13,15 @@ import { portalActChars } from '../ops/anatomy/official-act-size.js';
 
 // E9 / P2–P3 (R2 of #303, c.6701945748): one grid; every axis required; stages kept apart; inputs checked.
 
+const acceptedSampleIds = ['rfb:108391', 'rfb:115131', 'rfb:122645', 'rfb:133898', 'rfb:142967', 'rfb:148629', 'rfb:148693', 'rfb:37103'];
+const acceptedCellIds = ['rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--medio', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno'];
 const real = collectSamples();
 test('E9 matrix and samples baseline are regenerated identical to the committed files', () => {
   assert.deepEqual(samplesBaseline(collectSamples([])), JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
   assert.deepEqual(buildMatrix(real), JSON.parse(readFileSync(MATRIX_FILE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
 });
 
-test('E9 current state: 25 cells covered (13 previous + 12 provisional by the manual delivery; SC Cosit has no body, size undetermined), E9 incomplete; nothing promoted; E9-A1: 4/61 cells accepted (5 RFB samples); normas.leg.br keeps its own identity and is not validated', () => {
+test('E9 motor R2: measured layouts, complete readings and acceptance remain distinct', () => {
   const m = buildMatrix(real);
   assert.deepEqual(m.cells.filter((c) => c.status === 'covered').map((c) => c.id).sort(), ['confaz--ajuste-sinief--grande', 'confaz--convenio-icms--grande', 'rfb--instrucao-normativa--grande',
     'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--medio', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno',
@@ -28,28 +30,31 @@ test('E9 current state: 25 cells covered (13 previous + 12 provisional by the ma
     'confaz--convenio-icms--pequeno', 'confaz--ajuste-sinief--pequeno', 'confaz--protocolo-icms--pequeno',
     'dou--instrucao-normativa--pequeno', 'dou--instrucao-normativa--medio', 'dou--instrucao-normativa--grande',
     'dou--decreto--pequeno', 'dou--decreto--grande', 'dou--portaria--pequeno', 'dou--portaria--medio',
-    'dou--resolucao--pequeno', 'dou--resolucao--grande'].sort());
+    'dou--resolucao--pequeno', 'dou--resolucao--grande', 'planalto--lei--pequeno', 'planalto--lei--medio', 'planalto--lei--grande', 'normas-leg-br--lei--grande'].sort());
   for (const id of ['M14', 'M16', 'M18', 'M19', 'M20', 'M21', 'M23', 'M24', 'M25', 'M26', 'M28', 'M29', 'M30', 'M32', 'M33', 'M34']) {
     const x = real.find((s) => s.id === id)!; assert.deepEqual([x.stages.validated, x.readingComplete, x.stages.accepted], [true, false, false], `${id}: covered by layout, partial reading, never accepted`);
   }
   for (const id of ['M10', 'M12']) {
     const x = real.find((s) => s.id === id)!;
     assert.deepEqual(x.decoding, { encoding: 'windows-1252', encodingSource: 'approved_local_fallback', confidence: 'tentative', declaredCharset: null });
-    assert.deepEqual([x.stages.identified, x.stages.read, x.stages.validated, x.stages.accepted, x.size], [true, false, false, false, null]);
+    assert.deepEqual([x.stages.identified, x.stages.read, x.stages.validated, x.stages.accepted, x.size], [true, true, true, false, id === 'M10' ? 'pequeno' : 'médio']);
   }
   assert.equal(m.e9MatrixComplete, false);
-  assert.ok(m.requiredPending.includes('planalto--lei--grande'), 'the Planalto layout gap stays visible');
-  assert.ok(m.requiredPending.includes('normas-leg-br--lei--grande'), 'normas.leg.br obtained, not read/validated');
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['rfb:108391', 'rfb:115131', 'rfb:133898', 'rfb:142967', 'rfb:148693'], 'only the COORD-accepted samples (e9-acceptances.json: Portaria 635/2025 + E9-A1 #116 c.6990971154); collection acceptance is not anatomy acceptance');
-  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id).sort(), ['rfb--instrucao-normativa--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--medio', 'rfb--portaria--pequeno'], 'E9-A1: 4/61 cells accepted');
+  assert.ok(!m.requiredPending.includes('planalto--lei--grande'), 'measured large Planalto layouts');
+  assert.ok(!m.requiredPending.includes('normas-leg-br--lei--grande'), 'updated versions are assessed under their own profile');
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), acceptedSampleIds);
+  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id).sort(), acceptedCellIds);
   assert.equal(real.find((s) => s.id === 'rfb:127905')!.stages.accepted, false, 'partial reading: never accepted');
   assert.equal(real.find((s) => s.id === 'rfb:104314')!.stages.accepted, false, 'partial reading: never accepted');
   const leg = real.filter((s) => s.id.startsWith('lei-'));
-  assert.equal(leg.length, 4); assert.ok(leg.every((s) => s.source === 'normas.leg.br' && !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU')));
+  assert.equal(leg.length, 4);
+  assert.ok(leg.every((s) => s.source === 'normas.leg.br' && (s.id.endsWith('-atualizada')
+    ? s.stages.read && s.stages.validated && s.profile === 'NORMAS-LEG'
+    : !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU'))));
   assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
   assert.deepEqual([sizeOf(9_999), sizeOf(10_000), sizeOf(49_999), sizeOf(50_000)], ['pequeno', 'médio', 'médio', 'grande']);
   // HTTP captures of the other session: Planalto not decoded (no declared charset), DOU PDF page identified but not validated
-  for (const id of ['http:M1', 'http:M2']) { const x = real.find((s) => s.id === id)!; assert.deepEqual([x.source, x.stages.identified, x.stages.read], ['Planalto', true, false]); }
+  for (const id of ['http:M1', 'http:M2']) { const x = real.find((s) => s.id === id)!; assert.deepEqual([x.source, x.stages.identified, x.stages.read], ['Planalto', true, true]); }
   const m9 = real.find((s) => s.id === 'http:M9')!;
   assert.deepEqual([m9.source, m9.layout, m9.stages.identified, m9.stages.validated], ['DOU', LAYOUT.DOU_PDF_PAGE, true, false]); assert.match(m9.notes[0]!, /CONTINUA/u);
   const p58 = real.find((s) => s.id === 'http:M9-p58')!;
@@ -63,8 +68,8 @@ test('E9-M1b uses the real act region for M23 and M28 while preserving reader ou
   const m = buildMatrix(real);
   const small = real.find((s) => s.id === 'M23')!;
   const large = real.find((s) => s.id === 'M28')!;
-  assert.deepEqual([small.chars, small.actChars, small.size], [12_605, 2_054, 'pequeno']);
-  assert.deepEqual([large.chars, large.actChars, large.size], [1_172_888, 1_161_917, 'grande']);
+  assert.deepEqual([small.actChars, small.size], [2_054, 'pequeno']);
+  assert.deepEqual([large.actChars, large.size], [1_161_917, 'grande']);
   for (const [cellId, sampleId] of [['dou--instrucao-normativa--pequeno', 'M23'], ['dou--decreto--grande', 'M28']]) {
     const cell = m.cells.find((entry) => entry.id === cellId)!;
     assert.deepEqual([cell.validatedSamples, cell.provisional, cell.complete, cell.accepted], [[sampleId], true, false, false]);
@@ -228,7 +233,7 @@ test('charset policy (#116 c.6708512598 §6): BOM and declared charset first; wi
   const real = collectSamples();
   for (const id of ['http:M1', 'http:M2']) {
     const x = real.find((s) => s.id === id)!;
-    assert.deepEqual([x.decoding?.encoding, x.decoding?.encodingSource, x.decoding?.confidence, x.decoding?.declaredCharset, x.stages.read], ['windows-1252', 'approved_local_fallback', 'tentative', null, false]);
+    assert.deepEqual([x.decoding?.encoding, x.decoding?.encodingSource, x.decoding?.confidence, x.decoding?.declaredCharset, x.stages.read], ['windows-1252', 'approved_local_fallback', 'tentative', null, true]);
     const independentCheck = x.decoding?.independentCheck ?? [];
     assert.ok(independentCheck.length > 0 && independentCheck.every((c) => c.sentenceEqual), `${id}: accented passage equal to the independent official representation`);
   }
@@ -291,7 +296,7 @@ test('E9 acceptance B2: strict validation rejects the whole file (fail closed): 
 test('E9 acceptance B3: partial readings, absent material annexes and a body in an absent attachment are never accepted', async () => {
   const { m, rec, accepted, readFileSync } = await accTest();
   const p2c = (id: number) => readFileSync(new URL(`../ops/anatomy/official-identification/rfb-p2c/${id}.json`, import.meta.url));
-  assert.equal(accepted([rec(148629, 'rfb--ato-declaratorio-executivo--pequeno')], 148629), false, 'ADE Cofis: partial reading + table annex not read');
+  assert.equal(accepted([rec(148629, 'rfb--ato-declaratorio-executivo--pequeno')], 148629), true, 'ADE Cofis: supplied table annex and exact synthetic record');
   assert.equal(accepted([rec(148516, 'rfb--ato-declaratorio-executivo--medio')], 148516), false, 'ADE Corat: partial reading + external Anexo Único');
   assert.match(m.annexGap(p2c(148516)) ?? '', /Anexo Único \(own\) absent from the representation/u, 'Art. 17 "Anexo Único deste Ato…"; the JSON has none');
   assert.equal(m.annexGap(p2c(148693)), null, 'the Portaria cites no annex');
@@ -308,11 +313,13 @@ test('E9 acceptance B4: the committed file is the append-only union with #305/#3
   const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string; entrySha256: string; revalidates?: string }[] };
   // composition gate (tribusca-control#116, after c.6965245285): append-only — the 2026-11-11 Portaria record at 0e009431 is
   // PRESERVED and a revalidation record pins the composed engine; only the record on the current engine makes it accepted
-  assert.equal(file.acceptances.length, 18, '12 NORMAS-LEG records of #309 @ 0cfc46c preserved + Portaria @ 0e009431 preserved + Portaria revalidated + 4 E9-A1');
+  assert.equal(file.acceptances.length, 26, '18 historical records, 5 revalidations and 3 new E9-MOTOR R2 acceptances');
+  assert.deepEqual(file.acceptances.slice(18).map((r) => r.sampleId).sort(), acceptedSampleIds);
+  assert.ok(file.acceptances.slice(18).every((r) => r.engineBuildHash === E));
   assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);
   assert.deepEqual(file.acceptances[12], { ...file.acceptances[12], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio',
     entrySha256: '7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae', engineBuildHash: '0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194' }, 'the original record is untouched');
-  assert.deepEqual(file.acceptances[13], { ...file.acceptances[13], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio', engineBuildHash: E }, 'the revalidation pins the current engine');
+  assert.deepEqual(file.acceptances[13], { ...file.acceptances[13], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio', engineBuildHash: '4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a' }, 'the revalidation stays pinned to its recorded engine');
   assert.match(file.acceptances[13].revalidates ?? '', /^rfb:148693 @ 0e009431/u);
   // E9-A1 (tribusca-control#116, after the independent review c.6990971154): 4 records appended on the current engine
   const a1: [string, string, string][] = [
@@ -320,10 +327,10 @@ test('E9 acceptance B4: the committed file is the append-only union with #305/#3
     ['rfb:133898', 'rfb--instrucao-normativa--pequeno', 'b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7'],
     ['rfb:115131', 'rfb--instrucao-normativa--grande', 'e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e'],
     ['rfb:142967', 'rfb--portaria--pequeno', '9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7']];
-  a1.forEach(([sampleId, cellId, entrySha256], i) => assert.deepEqual(file.acceptances[14 + i], { ...file.acceptances[14 + i], sampleId, cellId, entrySha256, engineBuildHash: E, scope: 'offline' }, `E9-A1 record ${sampleId}`));
+  a1.forEach(([sampleId, cellId, entrySha256], i) => assert.deepEqual(file.acceptances[14 + i], { ...file.acceptances[14 + i], sampleId, cellId, entrySha256, engineBuildHash: '4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a', scope: 'offline' }, `E9-A1 record ${sampleId}`));
   const real = m.collectSamples();
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['rfb:108391', 'rfb:115131', 'rfb:133898', 'rfb:142967', 'rfb:148693']);
-  assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted).map((c) => c.id).sort(), ['rfb--instrucao-normativa--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--medio', 'rfb--portaria--pequeno']);
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), acceptedSampleIds);;
+  assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted).map((c) => c.id).sort(), acceptedCellIds);
 });
 
 // ---- R2 (independent review c.6784793278): B-1 per-annex completeness, B-2 self-citation, B-3 completeness flag, B-4 dates ----
@@ -375,14 +382,14 @@ test('R2 B-1/B-2 (5–8): other-norm citation, self-citation, ambiguity and the 
 test('R2 (9) + B-3: only complete samples are eligible (Portaria 635 + E9-A1); partial readings are flagged complete:false without changing coverage', async () => {
   const m = await import('../ops/anatomy/official-coverage-matrix.js');
   const real = m.collectSamples(); const mx = m.buildMatrix(real);
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['rfb:108391', 'rfb:115131', 'rfb:133898', 'rfb:142967', 'rfb:148693'], '9. Portaria 635 + E9-A1: complete, digest + engine pinned');
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), acceptedSampleIds);;
   const by = (id: string) => real.find((s) => s.id === id)!;
-  assert.deepEqual([by('rfb:148693').readingComplete, by('rfb:148629').readingComplete, by('rfb:148516').readingComplete, by('rfb:148681').readingComplete], [true, false, false, false]);
+  assert.deepEqual([by('rfb:148693').readingComplete, by('rfb:148629').readingComplete, by('rfb:148516').readingComplete, by('rfb:148681').readingComplete], [true, true, false, false]);
   const cell = (id: string) => mx.cells.find((c) => c.id === id)!;
   assert.deepEqual([cell('rfb--portaria--medio').status, cell('rfb--portaria--medio').complete], ['covered', true]);
   assert.deepEqual([cell('rfb--ato-declaratorio-executivo--pequeno').status, cell('rfb--ato-declaratorio-executivo--pequeno').complete, cell('rfb--ato-declaratorio-executivo--pequeno').partialSamples],
-    ['covered', false, ['rfb:148629']], 'covered (layout) but complete:false, explicit');
-  assert.equal(mx.coveredRequired, 25, 'coverage count (layout) is not changed by the completeness flag: 13 + 12 provisional cells');
+    ['covered', true, []], 'reading complete; acceptance still needs a current record');
+  assert.equal(mx.coveredRequired, 29, 'measured coverage includes Planalto and updated NORMAS-LEG layouts');
 });
 
 test('R2 B-4: decidedOn must be a REAL date', async () => {
@@ -461,8 +468,8 @@ test('R4 B2-2 (items 1–3): positive path end-to-end on a SYNTHETIC act; nettin
   assert.equal(proh.complete, true, 'reading complete; force/function decided elsewhere (no acceptance implied)');
   // the real lot of this branch has no producer: every real sample keeps its earlier assessment (fail closed)
   const real = m.collectSamples();
-  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), ['rfb:108391', 'rfb:115131', 'rfb:133898', 'rfb:142967', 'rfb:148693']);
-  assert.equal(real.find((s) => s.id === 'rfb:148629')!.readingComplete, false);
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), acceptedSampleIds);;
+  assert.equal(real.find((s) => s.id === 'rfb:148629')!.readingComplete, true);
 });
 
 // ---- R5 (independent review R4 c.6796232552): B4-1 Unicode / slash / parenthesis separators and format chars; B4-2 dangling dash ----

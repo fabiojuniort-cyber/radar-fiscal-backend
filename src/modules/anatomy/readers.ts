@@ -1,4 +1,6 @@
 import { Parser } from 'htmlparser2';
+import { verifyNormasLegPreparation, type NormasLegBlock, type NormasLegPreparation } from './normas-leg-preparation.js';
+import { PORTAL_MAX_NODES, verifyOfficialAct, type OfficialActPreparation } from './official-portal-preparation.js';
 import type { AnatomyPart, AnatomyResult } from './contract.js';
 import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, type RecoveryDecision, type ShadowContext } from './nfc-recovery.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
@@ -11,11 +13,13 @@ export class SefazSpProvenanceError extends TypeError {
 }
 
 export interface AnatomyReaderInput {
-  source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
+  source: 'NORMAS-LEG' | 'PLANALTO' | 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
   representationId: string;
   html?: string | undefined;
   text?: string | undefined;
   missingResources?: string[];
+  officialAct?: OfficialActPreparation | undefined;
+  normasLeg?: NormasLegPreparation | undefined;
   /** Compiled effective profile for this source; defaults to the shipped DEFAULT_PROFILES. */
   rules?: CompiledRules;
   /**
@@ -196,15 +200,27 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     || !verifySefazSpPortalProvenance(input.sefazSpPortal, input.html, input.representationId))) {
     throw new SefazSpProvenanceError('SEFAZ-SP-PORTAL requires the preparation issued by prepareSefazSpPortalPage for this exact HTML and representationId');
   }
+  if (input.source === 'NORMAS-LEG' && (input.html === undefined
+    || !verifyNormasLegPreparation(input.normasLeg, input.html, input.representationId))) {
+    throw new TypeError('NORMAS-LEG requires the preparation issued by prepareNormasLegPage for this exact HTML and representationId');
+  }
   const result: AnatomyReaderResult = { canonicalText: '', parts: [], sourceMap: [],
     coverage: { unit: 'UTF-16', textLength: 0, accountedLength: 0, recognizedLength: 0, segments: [], missingResources: [...(input.missingResources ?? [])] },
     limitations: [], status: 'complete' };
   const representation = input.html !== undefined ? 'html' : 'text';
-  const raw = input.html ?? input.text ?? '';
+  const full = input.html ?? input.text ?? '';
+  const portal = input.officialAct;
+  if (portal && (!input.html || !verifyOfficialAct(portal, input.source, input.representationId, input.html))) {
+    throw new TypeError('Official act preparation must be issued for this source, representation and HTML');
+  }
+  if (input.source === 'PLANALTO' && !portal) throw new TypeError('PLANALTO requires issued official act preparation');
+  const raw = portal ? full.slice(portal.start, portal.end) : full;
+  const originOffset = portal?.start ?? 0;
+  const maxNodes = portal ? PORTAL_MAX_NODES : ANATOMY_READER_LIMITS.maxNodes;
   const childOrders = new Map<string | null, number>();
   const pointer = (locator: string, start: number | null = null, end: number | null = null): Pointer => ({
     resourceId: input.representationId, representation, locator,
-    sourceSpan: start !== null && end !== null ? { start, end } : null,
+    sourceSpan: start !== null && end !== null ? { start: start + originOffset, end: end + originOffset } : null,
   });
   const limitation = (code: string, message: string, span: { start: number; end: number } | null = null): void => {
     result.limitations.push({ code, message, partId: null, span }); result.status = 'partial';
@@ -241,6 +257,10 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   if (!raw) return fallback('missing_body', 'No readable body supplied.');
   if (representation === 'text') return fallback('plain_text_unidentified', 'Plain text is accounted for without inventing structural markup.');
 
+  // L-LEG-01: the verified plan, keyed by the raw start of each planned block; elements are found by raw offset.
+  const llegPlan = input.source === 'NORMAS-LEG' ? new Map(input.normasLeg!.plan.blocks.map((b) => [b.htmlSpan.start, b])) : null;
+  const nodeAt = new Map<number, Node>();
+  const llegSeen = new Set<NormasLegBlock>();
   const dom: Node = { tag: 'root', attrs: {}, path: '', start: 0, end: raw.length, children: [], text: null, span: { start: 0, end: 0 }, blocked: false };
   const stack = [dom]; let nodeCount = 0; let exceeded = false;
   const childCounts = new Map<Node, Map<string, number>>();
@@ -251,7 +271,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   };
   const parser = new Parser({
     onopentag(tag, attrs) {
-      if (++nodeCount > ANATOMY_READER_LIMITS.maxNodes || stack.length > ANATOMY_READER_LIMITS.maxDepth) { exceeded = true; parser.pause(); return; }
+      if (++nodeCount > maxNodes || stack.length > ANATOMY_READER_LIMITS.maxDepth) { exceeded = true; parser.pause(); return; }
       const parent = stack[stack.length - 1]!;
       // Every decoded attribute name/value is checked (a superset of the class attributes the reader consumes).
       if (!seen.decodedAttributeNonNfc && Object.entries(attrs).some(([k, v]) => isNonNfcText(k) || isNonNfcText(v))) seen.decodedAttributeNonNfc = true;
@@ -259,10 +279,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (parent.path.length + tag.length + 16 > 4096) { exceeded = true; parser.pause(); return; }
       const node: Node = { tag, attrs, path: `${parent.path}/${tag}[${index}]`, start: parser.startIndex,
         end: parser.endIndex + 1, children: [], text: null, span: { start: 0, end: 0 }, blocked: parent.blocked || excluded.has(tag) };
+      if (llegPlan && tag === 'a') nodeAt.set(node.start, node);
       parent.children.push(node); stack.push(node);
     },
     ontext(text) {
-      if (++nodeCount > ANATOMY_READER_LIMITS.maxNodes) { exceeded = true; parser.pause(); return; }
+      if (++nodeCount > maxNodes) { exceeded = true; parser.pause(); return; }
       const parent = stack[stack.length - 1]!;
       parent.children.push({ tag: '#text', attrs: {}, path: `${parent.path}/text()[${childIndex(parent, '#text')}]`,
         start: parser.startIndex, end: parser.endIndex + 1, children: [], text, span: { start: 0, end: 0 }, blocked: parent.blocked });
@@ -474,15 +495,63 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // unidentified. A declared type that contradicts the grammar, a missing/unknown/conflicting type, or the source's own
   // "não identificado" type is recorded as a limitation, never guessed. tachado → context historical
   // (rfb_tachado_source); legalStatus is never touched.
-  type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null };
+  type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null; section: Node };
   const RFB_TYPE: Record<string, Descriptor['type']> = { artigo: 'article', paragrafo: 'paragraph', inciso: 'inciso', alinea: 'alinea',
     item: 'item', ementa: 'summary', fecho: 'signature', capitulo: 'group', secao: 'group', subsecao: 'group', titulo: 'group', livro: 'group', parte: 'group', anexo: 'annex' };
   const RFB_GROUP_WORD: Record<string, string> = { parte: 'PARTE', capitulo: 'CAPITULO', secao: 'SECAO', subsecao: 'SUBSECAO', titulo: 'TITULO', livro: 'LIVRO' };
   const RFB_RANK: Partial<Record<Descriptor['type'], number>> = { article: 3, paragraph: 4, inciso: 5, alinea: 6, item: 7, summary: 100, signature: 100 };
-  const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }): Descriptor => {
+  const rfbSibling = (seg: RfbSeg, step: 1 | -1): string => {
+    let index = dom.children.indexOf(seg.section);
+    if (index < 0) return '';
+    for (index += step; index >= 0 && index < dom.children.length; index += step) {
+      const sibling = dom.children[index]!;
+      if (sibling.attrs['data-rfb-segment'] === undefined || sibling.attrs['data-rfb-tachado'] === 'true') return '';
+      const text = matchText(sibling).trim();
+      if (text) return text;
+    }
+    return '';
+  };
+  const roman = (word: string): number => {
+    if (!/^(?=[IVXLCDM]+$)M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})$/u.test(word)) return 0;
+    const values: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+    return [...word].reduce((total, letter, index) => {
+      const value = values[letter]!;
+      return total + (value < (values[word[index + 1] ?? ''] ?? 0) ? -value : value);
+    }, 0);
+  };
+  const rfbContent = (seg: RfbSeg, word: string, text: string): Descriptor | null => {
+    if (seg.tachado) return null;
+    const hasDevice = logical.some(({ part }) => ['article', 'paragraph', 'clause'].includes(part.type));
+    if (word === 'assinatura' && hasDevice && /^(?:[\p{Lu}][\p{Lu}\p{M}.'’-]*\s+){1,12}[\p{Lu}][\p{Lu}\p{M}.'’-]*$/u.test(text)) {
+      const next = rfbSibling(seg, 1);
+      if (!next || /^(?:ANEXO|Este texto não substitui)\b/iu.test(next)) return { type: 'signature', context: 'prohibited', reason: 'rfb_declared_final_signature', rank: 100 };
+    }
+    if (!word.startsWith('nao identific')) return null;
+    if (!hasDevice && /^(?:O|A)\s+(?:(?:COMITÊ|COORDENADOR(?:A)?(?:-GERAL)?|SECRETÁRI[OA]|PRESIDENTE)(?![\p{L}-]))[\s\S]{0,350},\s+(?:no uso d[ae]s?|no exercício d[ae]s?)/iu.test(text)) {
+      return { type: 'preamble', context: 'prohibited', reason: 'rfb_authority_formula', rank: 100 };
+    }
+    if (!hasDevice && /^(?:DECLARA|RESOLVE)\s*:\s*$/u.test(text) && rules.article.test(rfbSibling(seg, 1))) {
+      return { type: 'preamble', context: 'prohibited', reason: 'rfb_promulgation_before_article', rank: 100 };
+    }
+    const position = /^([IVXLCDM]+)\s+\p{Ll}/u.exec(text)?.[1];
+    if (position && hasDevice) {
+      const before = /^([IVXLCDM]+)(?:\s*[-–—]\s*|\s+)\p{L}/u.exec(rfbSibling(seg, -1))?.[1];
+      const after = /^([IVXLCDM]+)(?:\s*[-–—]\s*|\s+)\p{L}/u.exec(rfbSibling(seg, 1))?.[1];
+      const current = roman(position);
+      if (current > 0 && ((current === 1 && after && roman(after) === 2) || (before && roman(before) === current - 1))) {
+        return { type: 'inciso', context: 'operative_candidate', reason: 'rfb_roman_sequence_under_device', rank: 5 };
+      }
+    }
+    return null;
+  };
+  const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }, text: string): Descriptor => {
     if (seg.issue) { limitation(`rfb_segment_${seg.issue}`, `RFB segment ${seg.pointer ?? '?'}: declared type ${seg.issue.replace(/_/gu, ' ')}; no type was guessed.`, span); return current; }
     const sig = (seg.type ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
     if (!sig) return current;
+    if (current.type === 'unidentified') {
+      const corroborated = rfbContent(seg, sig, text);
+      if (corroborated) return corroborated;
+    }
     if (sig.startsWith('nao identific')) { if (current.type === 'unidentified') limitation('rfb_segment_type_unidentified_by_source', `RFB segment ${seg.pointer ?? '?'}: the source itself declares the type as not identified.`, span); return current; }
     const mapped = RFB_TYPE[sig];
     if (!mapped) { if (current.type === 'unidentified') limitation('rfb_segment_type_unmapped', `RFB segment ${seg.pointer ?? '?'}: declared type "${seg.type}" has no structural mapping.`, span); return current; }
@@ -514,7 +583,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     if (node.blocked || node.text !== null) return;
     if (!spPortal && spPortalWrapper(node)) spPortal = true;
     if (input.source === 'RFB' && node.attrs['data-rfb-segment'] !== undefined) rfbSeg = { type: node.attrs['data-rfb-type'] ?? null, issue: node.attrs['data-rfb-type-issue'] ?? null,
-      tachado: node.attrs['data-rfb-tachado'] === 'true', pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
+      tachado: node.attrs['data-rfb-tachado'] === 'true', section: node, pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
     let context = domContext(node, inheritedContext);
     // D04-R1-01: tables of a tachado segment take the historical zone like any block (prohibited stays prohibited).
     if (node.tag === 'table') {
@@ -541,11 +610,66 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       let descriptor: Descriptor = wasQuoted || openQuotation
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
         : describe(node, rules, markerText);
-      if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span);
+      if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span, text);
       const ownClasses = (node.attrs.class ?? '').split(/\s+/u);
+      if (portal?.source === 'DOU' && descriptor.type === 'unidentified' && !wasQuoted && !openQuotation) {
+        if (/^ANEXO\s+(?:ÚNICO|UNICO|[IVXLCDM]+|\d+)(?:\s|$)/iu.test(text) && ownClasses.includes('anexo')) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'dou_portal_annex', rank: 2 };
+        } else if (ownClasses.includes('dou-paragraph') || ownClasses.includes('subtitulo')) {
+          const heading = ownClasses.includes('subtitulo') && /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O)\s+[IVXLCDM0-9]+\b/iu.exec(text);
+          if (heading) {
+            const [level, rank] = groupLevel(heading[1]!);
+            descriptor = { type: 'group', context: 'operative_candidate', reason: 'dou_portal_' + level, rank };
+          } else {
+            descriptor = { type: 'body', context: 'unknown', reason: 'dou_portal_text_block', rank: 100 };
+          }
+        }
+      }
+      if (portal?.source === 'CONFAZ' && !wasQuoted && !openQuotation) {
+        const classes = classesOf(node);
+        if (classes.includes('A1-1TituloAcordo')) {
+          descriptor = { type: 'epigraph', context: 'prohibited', reason: 'confaz_plone_epigraph', rank: 100 };
+        } else if (classes.includes('A3Ementa')) {
+          descriptor = { type: 'summary', context: 'prohibited', reason: 'confaz_plone_summary', rank: 100 };
+        } else if (classes.includes('A5-2NovaRedacao')) {
+          descriptor = { type: 'quoted_text', context: 'prohibited', reason: 'confaz_plone_cited_wording', rank: 100 };
+        } else if (classes.includes('A4AcordoTipo') && /^(CONVÊNIO|AJUSTE|PROTOCOLO)(?:SINIEF|ICMS)?$/iu.test(text.replace(/\s/gu, ''))) {
+          descriptor = { type: 'epigraph', context: 'prohibited', reason: 'confaz_plone_act_kind', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'confaz_plone_sole_annex', rank: 2 };
+        } else if (descriptor.type === 'unidentified' && classes.some((c) => c === 'A6-1Subtitulo' || c === 'A7-1TabelaSubtitulo' || c === 'A9-1TabelaSubtituloverde')) {
+          descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_subheading', rank: 100 };
+        }
+      }
+      if (portal?.source === 'PLANALTO' && !wasQuoted && !openQuotation) {
+        if (node.start === 0 && /^LEI\s+N/iu.test(text)) descriptor = { type: 'epigraph', context: 'prohibited', reason: 'planalto_epigraph', rank: 100 };
+        else if (/^(?:Este texto não substitui|Mensagem de Veto|Conversão da MPv|Produção de efeitos?|Vigência|Vide\b|Regulamento\s*$)/iu.test(text)) {
+          descriptor = { type: 'editorial_note', context: 'prohibited', reason: 'planalto_notice', rank: 100 };
+        } else if (descriptor.type !== 'unidentified' && node.tag === 'p' && /<(?:strike|s|del)\b/iu.test(raw.slice(node.start, node.end))) {
+          descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_historical_markup' };
+        } else if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'planalto_sole_annex', rank: 2 };
+        }
+      }
+      if (spPortal && !markerText(node).trim()) return;
       const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(leadingZwsp ? markerText(node).trim() : text));
       if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
       const spEarlier = spPortal && !spNote && ownClasses.some((c) => SP_HISTORICAL_CLASSES.includes(c));
+      if (spPortal && !wasQuoted && !openQuotation && descriptor.type === 'unidentified') {
+        const heading = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O)\s+(?:[IVXLCDM]+|\d+|ÚNIC[OA])(?:\s|$)/iu.exec(text.replace(/^[\s\u200B]+/u, ''));
+        if (heading && !spEarlier) {
+          const [level, rank] = groupLevel(heading[1]!);
+          descriptor = { type: 'group', context: 'prohibited', reason: 'sefaz_sp_portal_context_' + level, rank };
+        } else if (spEarlier && /^(?:\(\s*)?revogad[oa]s?\s*[).]?$/iu.test(text)) {
+          descriptor = { type: 'editorial_note', context: 'historical', reason: 'sefaz_sp_portal_revoked_placeholder', rank: 100 };
+        } else if (spEarlier && /^(?:Art\.|§|Parágrafo|NOTA|Redação)\s/iu.test(text)) {
+          descriptor = { type: 'body', context: 'historical', reason: 'sefaz_sp_portal_earlier_wording', rank: 100 };
+        } else if (!spEarlier && logical.at(-1)?.part.type === 'annex'
+          && (ownClasses.includes('centro') && /^\((?:Relação|isenções) a que se refere o artigo \d/iu.test(text)
+          || /^[\p{Lu}\p{M}0-9 ()/,–—-]{4,220}$/u.test(text) && /\p{Lu}{3}/u.test(text))) {
+          descriptor = { type: 'body', context: 'prohibited', reason: 'sefaz_sp_portal_annex_subtitle', rank: 100 };
+        }
+      }
       if (spEarlier && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'historical' };
       const rfbStruck = rfbSeg?.tachado === true;
       // ANAT-D05: a struck block becomes historical; an unidentified struck block keeps its type (no guess) and becomes
@@ -554,7 +678,43 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (rfbStruck && (descriptor.context === 'operative_candidate' || struckUnidentified)) descriptor = { ...descriptor, context: 'historical' };
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';
+      // L-LEG-01 (design §3, §11): only through the verified plan, only for this exact block. Never promotes.
+      const lleg = llegPlan?.get(node.start);
+      let llegNotes: { note: NormasLegBlock['notes'][number]; nodes: Node[] }[] = [];
+      let llegAmbiguous: string | null = null; let llegPlaceholder = false;
+      if (lleg) {
+        llegSeen.add(lleg);
+        if (lleg.htmlSpan.end !== node.end) llegAmbiguous = 'the planned block does not coincide with the element read';
+        else if (lleg.ambiguous) llegAmbiguous = `${lleg.ambiguous.code}: ${lleg.ambiguous.detail}`;
+        else {
+          llegNotes = lleg.notes.map((note) => ({ note, nodes: note.anchors.map((a) => nodeAt.get(a.htmlSpan.start)).filter((n): n is Node => !!n && n.tag === 'a') }));
+          if (llegNotes.some((x, i) => x.nodes.length !== lleg.notes[i]!.anchors.length || x.nodes.some((n, k) => n.end !== lleg.notes[i]!.anchors[k]!.htmlSpan.end))) {
+            llegNotes = []; llegAmbiguous = 'a planned note does not coincide with the anchors read';
+          } else if (lleg.placeholder) {
+            if (['article', 'paragraph', 'inciso', 'alinea', 'item'].includes(descriptor.type)) { llegPlaceholder = true; descriptor = { ...descriptor, context: 'prohibited' }; }
+            else llegAmbiguous = `revoked placeholder on a block read as ${descriptor.type}, not as a device`;
+          }
+        }
+        if (llegAmbiguous && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'unknown' };
+      }
       const part = attach(node, descriptor);
+      if (llegPlaceholder) for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_revoked_placeholder');
+      if (llegAmbiguous) {
+        for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_note_ambiguous');
+        limitation('normas_leg_note_ambiguous', `normas.leg.br compilation note not proven (${llegAmbiguous}); the block is kept out of operative_candidate and nothing was cut.`, { ...node.span });
+      }
+      // §11.3/§11.5: one editorial_note per planned region, child of the part that IS the block (the caput, for an article
+      // or clause opening block, so siblings never overlap); creating it does not close the caput continuation.
+      const blockPart = result.parts.find((y) => y.id === `${part.id}-caput`) ?? part;
+      for (const { note, nodes } of llegNotes) {
+        const caput = openCaput.get(part.id);
+        const first = nodes[0]!; const last = nodes[nodes.length - 1]!;
+        const np = newPart('editorial_note', first.span.start, last.span.end, blockPart.id, 'prohibited', note.kind === 'vide' ? 'normas_leg_vide' : 'normas_leg_editorial_note',
+          pointer(first.path, first.start, first.end), note.text.slice(0, 256));
+        np.sourcePointers = nodes.map((n) => pointer(n.path, n.start, n.end));
+        if (caput) openCaput.set(part.id, caput);
+        addOwnership(np);
+      }
       if (context !== 'operative_candidate') part.contextReasons.push('inherited_dom_zone');
       if (rfbStruck) part.contextReasons.push('rfb_tachado_source');
       if (spEarlier && part.context === 'historical') part.contextReasons.push('sefaz_sp_portal_revogado');
@@ -613,6 +773,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   }
   result.coverage.textLength = length; result.coverage.accountedLength = length;
   // R1-SP-03: the proof is local (preparation ↔ HTML ↔ resource), not a verification of the official collection.
+  if (llegPlan) {
+    const unmatched = [...llegPlan.values()].filter((b) => !llegSeen.has(b)).length;
+    if (unmatched) limitation('normas_leg_plan_block_unmatched', `${unmatched} planned normas.leg.br block(s) were not read as leaf blocks; no rule was applied to them.`);
+    limitation('normas_leg_local_preparation_only', 'normas.leg.br provenance is a local preparation proof (bytes, URL, URN, version, plan); the official collection of these bytes is not verified here.');
+  }
   if (input.source === 'SEFAZ-SP-PORTAL') limitation('sefaz_sp_portal_local_preparation_only', 'Sefaz-SP portal provenance is a local preparation proof (bytes, URL, hash, region); the official collection of these bytes is not verified here.');
   if (unidentified || result.coverage.segments.some((segment) => segment.classification === 'unidentified')) limitation('unidentified_content', 'Unrecognized text is fully accounted for and is not a successful identification.');
   if (result.coverage.missingResources.length) limitation('missing_resources', 'Referenced resources were not supplied; no fetch was attempted.');
