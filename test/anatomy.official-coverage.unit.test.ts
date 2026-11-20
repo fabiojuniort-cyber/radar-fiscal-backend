@@ -13,6 +13,8 @@ import { portalActChars } from '../ops/anatomy/official-act-size.js';
 
 // E9 / P2–P3 (R2 of #303, c.6701945748): one grid; every axis required; stages kept apart; inputs checked.
 
+const acceptedSampleIds = ['rfb:108391', 'rfb:115131', 'rfb:122645', 'rfb:133898', 'rfb:142967', 'rfb:148629', 'rfb:148693', 'rfb:37103'];
+const acceptedCellIds = ['rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-interpretativo--pequeno', 'rfb--instrucao-normativa--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--medio', 'rfb--portaria--pequeno', 'rfb--resolucao--pequeno'];
 const real = collectSamples();
 test('E9 matrix and samples baseline are regenerated identical to the committed files', () => {
   assert.deepEqual(samplesBaseline(collectSamples([])), JSON.parse(readFileSync(SAMPLES_BASELINE, 'utf8')), 'run: npx tsx ops/anatomy/official-coverage-matrix.ts --write');
@@ -40,8 +42,8 @@ test('E9 motor R2: measured layouts, complete readings and acceptance remain dis
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(!m.requiredPending.includes('planalto--lei--grande'), 'measured large Planalto layouts');
   assert.ok(!m.requiredPending.includes('normas-leg-br--lei--grande'), 'updated versions are assessed under their own profile');
-  assert.deepEqual(real.filter((s) => s.stages.accepted), [], 'historical records remain pinned to the previous identity')
-  assert.deepEqual(m.cells.filter((c) => c.accepted), []);
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), acceptedSampleIds);
+  assert.deepEqual(m.cells.filter((c) => c.accepted).map((c) => c.id).sort(), acceptedCellIds);
   assert.equal(real.find((s) => s.id === 'rfb:127905')!.stages.accepted, false, 'partial reading: never accepted');
   assert.equal(real.find((s) => s.id === 'rfb:104314')!.stages.accepted, false, 'partial reading: never accepted');
   const leg = real.filter((s) => s.id.startsWith('lei-'));
@@ -311,7 +313,9 @@ test('E9 acceptance B4: the committed file is the append-only union with #305/#3
   const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string; entrySha256: string; revalidates?: string }[] };
   // composition gate (tribusca-control#116, after c.6965245285): append-only — the 2026-11-11 Portaria record at 0e009431 is
   // PRESERVED and a revalidation record pins the composed engine; only the record on the current engine makes it accepted
-  assert.equal(file.acceptances.length, 18, '12 NORMAS-LEG records of #309 @ 0cfc46c preserved + Portaria @ 0e009431 preserved + Portaria revalidated + 4 E9-A1');
+  assert.equal(file.acceptances.length, 26, '18 historical records, 5 revalidations and 3 new E9-MOTOR R2 acceptances');
+  assert.deepEqual(file.acceptances.slice(18).map((r) => r.sampleId).sort(), acceptedSampleIds);
+  assert.ok(file.acceptances.slice(18).every((r) => r.engineBuildHash === E));
   assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);
   assert.deepEqual(file.acceptances[12], { ...file.acceptances[12], sampleId: 'rfb:148693', cellId: 'rfb--portaria--medio',
     entrySha256: '7d894b61a3c20f546455baa3282bb032d853dc953059e93696cc39e9924e01ae', engineBuildHash: '0e009431a059493805384b89be2b37d3132545ffb7bc04c630270126bf2ca194' }, 'the original record is untouched');
@@ -325,8 +329,8 @@ test('E9 acceptance B4: the committed file is the append-only union with #305/#3
     ['rfb:142967', 'rfb--portaria--pequeno', '9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7']];
   a1.forEach(([sampleId, cellId, entrySha256], i) => assert.deepEqual(file.acceptances[14 + i], { ...file.acceptances[14 + i], sampleId, cellId, entrySha256, engineBuildHash: '4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a', scope: 'offline' }, `E9-A1 record ${sampleId}`));
   const real = m.collectSamples();
-  assert.deepEqual(real.filter((s) => s.stages.accepted), [], 'historical records remain pinned to the previous identity');
-  assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted), []);
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), acceptedSampleIds);;
+  assert.deepEqual(m.buildMatrix(real).cells.filter((c) => c.accepted).map((c) => c.id).sort(), acceptedCellIds);
 });
 
 // ---- R2 (independent review c.6784793278): B-1 per-annex completeness, B-2 self-citation, B-3 completeness flag, B-4 dates ----
@@ -378,7 +382,7 @@ test('R2 B-1/B-2 (5–8): other-norm citation, self-citation, ambiguity and the 
 test('R2 (9) + B-3: only complete samples are eligible (Portaria 635 + E9-A1); partial readings are flagged complete:false without changing coverage', async () => {
   const m = await import('../ops/anatomy/official-coverage-matrix.js');
   const real = m.collectSamples(); const mx = m.buildMatrix(real);
-  assert.deepEqual(real.filter((s) => s.stages.accepted), [], 'historical records remain pinned to the previous identity');
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), acceptedSampleIds);;
   const by = (id: string) => real.find((s) => s.id === id)!;
   assert.deepEqual([by('rfb:148693').readingComplete, by('rfb:148629').readingComplete, by('rfb:148516').readingComplete, by('rfb:148681').readingComplete], [true, true, false, false]);
   const cell = (id: string) => mx.cells.find((c) => c.id === id)!;
@@ -464,7 +468,7 @@ test('R4 B2-2 (items 1–3): positive path end-to-end on a SYNTHETIC act; nettin
   assert.equal(proh.complete, true, 'reading complete; force/function decided elsewhere (no acceptance implied)');
   // the real lot of this branch has no producer: every real sample keeps its earlier assessment (fail closed)
   const real = m.collectSamples();
-  assert.deepEqual(real.filter((s) => s.stages.accepted), [], 'historical records remain pinned to the previous identity');
+  assert.deepEqual(real.filter((s) => s.stages.accepted).map((s) => s.id).sort(), acceptedSampleIds);;
   assert.equal(real.find((s) => s.id === 'rfb:148629')!.readingComplete, true);
 });
 
