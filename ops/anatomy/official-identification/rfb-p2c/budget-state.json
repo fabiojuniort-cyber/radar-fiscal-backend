@@ -5,7 +5,7 @@
     "owner": "EXEC #303 (claude/anat-e9-coverage)",
     "package": "E9-P2-c",
     "approvedBy": "tribusca-control#116 c.6708512598 §3 — orçamento NOVO de até 16, condicionado ao PASS independente da guarda (#303 c.6708499687)",
-    "status": "suspended",
+    "status": "active",
     "expiresAt": "2026-11-21T23:59:59Z",
     "total": 16,
     "perType": {
