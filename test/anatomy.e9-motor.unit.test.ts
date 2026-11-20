@@ -61,3 +61,52 @@ test('Planalto uses a proved body and supports a separated or compact ordinal', 
 test('NORMAS-LEG refuses an unissued plan', () => {
   assert.throws(() => readAnatomyInput({ source: 'NORMAS-LEG', representationId: 'synthetic', html: '<p>Art. 1º.</p>' }), /requires/u);
 });
+
+test('R3 proved portal whitespace is structural without losing text, offsets or unknown content', () => {
+  const title = 'PORTARIA N\u00ba 20';
+  const code = '<p class="identifica">' + title + '</p> \n<p>&nbsp;</p><p class="dou-paragraph">Art. 1\u00ba Vig\u00eancia.</p>';
+  const wrap = (html: string) => '<article id="materia"><div class="texto-dou">' + html + '</div></article>';
+  const valid = typedPortal('DOU', wrap(code), title);
+  assert.equal(valid.status, 'complete');
+  assert.match(valid.canonicalText, /\u00a0/u);
+  assert.equal(valid.coverage.accountedLength, valid.canonicalText.length);
+  assert.ok(valid.coverage.segments.every((segment) => segment.classification === 'recognized'));
+  for (const unknown of ['Texto real sem marca\u00e7\u00e3o', '\u200b']) {
+    const partial = typedPortal('DOU', wrap(unknown + code + '<p>' + unknown + '</p>'), title);
+    assert.equal(partial.status, 'partial');
+    assert.ok(partial.coverage.segments.some(({ span, classification }) => classification === 'unidentified'
+      && partial.canonicalText.slice(span.start, span.end).includes(unknown)));
+  }
+  const generic = readAnatomyInput({ source: 'DOU', representationId: 'unproved', html: wrap(code) });
+  assert.equal(generic.status, 'partial');
+  assert.ok(generic.parts.some((part) => part.type === 'unidentified'));
+});
+
+test('R3 walks a proved nested DOU body and preserves quotes, tables and original pointers', () => {
+  const title = 'PORTARIA N\u00ba 20';
+  const nested = '<html><head></head><body><p class="identifica">' + title + '</p>'
+    + '<p>Art. 1\u00ba Publica\u00e7\u00e3o.</p><blockquote><p>Art. 88 Texto citado.</p>'
+    + '<table><tr><td>Quadro citado</td></tr></table></blockquote><p>Art. 2\u00ba Vig\u00eancia.</p></body></html>';
+  const html = (part: string) => '<header>Navega\u00e7\u00e3o</header><article id="materia"><div class="texto-dou">' + part + '</div></article>';
+  const value = html(nested);
+  const result = typedPortal('DOU', value, title);
+  const articles = result.parts.filter((part) => part.type === 'article');
+  assert.equal(articles.length, 2);
+  assert.ok(result.parts.some((part) => part.type === 'quoted_text' && part.context === 'prohibited'
+    && result.canonicalText.slice(part.span.start, part.span.end).includes('Art. 88')));
+  assert.ok(result.parts.some((part) => part.type === 'cell' && part.context === 'prohibited'));
+  const firstSourceSpan = articles[0]!.sourcePointers[0]!.sourceSpan!;
+  assert.equal(value.slice(firstSourceSpan.start, firstSourceSpan.end), '<p>Art. 1\u00ba Publica\u00e7\u00e3o.</p>');
+  assert.doesNotMatch(result.canonicalText, /Navega/u);
+  const generic = readAnatomyInput({ source: 'DOU', representationId: 'unproved', html: value });
+  assert.ok(generic.parts.every((part) => part.type !== 'article'));
+  const withImage = typedPortal('DOU', html(nested.replace('</body>', '<img src="page.jpg"></body>')), title);
+  assert.equal(withImage.status, 'partial');
+  assert.ok(withImage.limitations.some((limitation) => limitation.code === 'image_without_ocr'));
+  assert.ok(withImage.parts.every((part) => part.type !== 'article'));
+
+  const confazTitle = 'CONV\u00caNIO ICMS 1/26';
+  const confaz = '<main id="content-core"><div id="parent-fieldname-text"><html><body>'
+    + '<p class="A1-1TituloAcordo">' + confazTitle + '</p><p>Cl\u00e1usula primeira Teor.</p></body></html></div></main>';
+  assert.ok(typedPortal('CONFAZ', confaz, confazTitle).parts.every((part) => part.type !== 'clause'));
+});

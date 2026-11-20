@@ -50,6 +50,24 @@ const groupLevel = (word: string) => GROUP_RANK[word.normalize('NFD').replace(/\
 const GROUP = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|Livro|T[íi]tulo|Cap[íi]tulo|Se[çc][ãa]o|Subse[çc][ãa]o)\s+(?:[IVXLCDM]+|\d+|[ÚU]NIC[OA]|[ÚU]nic[oa])(?:\s*[-–—:.]|\s*$)/u;
 type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number; itemNumber?: string };
 const blocks = new Set(['p', 'div', 'section', 'h1', 'h2', 'h3', 'h4', 'li', 'table', 'tr', 'td', 'th', 'article']);
+const layoutWhitespace = /^[\p{White_Space}]*$/u;
+
+// Only the direct document wrapper of a verified DOU fragment is transparent. Embedded images
+// keep the previous path until their role and the completeness of the act can be assessed.
+function hasNestedDouBody(node: Node): boolean {
+  if (node.tag !== 'div' || node.start !== 0) return false;
+  const documents = node.children.filter((child) => child.tag === 'html');
+  if (documents.length !== 1 || documents[0]!.children.filter((child) => child.tag === 'body').length !== 1) return false;
+  const pending = [...node.children];
+  while (pending.length) {
+    const child = pending.pop()!;
+    if (child.blocked) continue;
+    if (child.tag === 'img') return false;
+    for (const nested of child.children) pending.push(nested);
+  }
+  return true;
+}
+
 const excluded = new Set(['script', 'style', 'noscript', 'template', 'iframe', 'object', 'head']);
 const textOf = (node: Node): string => {
   const stack = [node]; let text = '';
@@ -216,6 +234,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   if (input.source === 'PLANALTO' && !portal) throw new TypeError('PLANALTO requires issued official act preparation');
   const raw = portal ? full.slice(portal.start, portal.end) : full;
   const originOffset = portal?.start ?? 0;
+  const portalLayout = portal?.source === 'DOU' || portal?.source === 'CONFAZ';
   const maxNodes = portal ? PORTAL_MAX_NODES : ANATOMY_READER_LIMITS.maxNodes;
   const childOrders = new Map<string | null, number>();
   const pointer = (locator: string, start: number | null = null, end: number | null = null): Pointer => ({
@@ -594,7 +613,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (rfbSeg?.tachado) for (const x of result.parts.slice(before)) if (x.context === 'historical' && !x.contextReasons.includes('rfb_tachado_source')) x.contextReasons.push('rfb_tachado_source');
       return;
     }
-    const hasBlock = node.children.some((child) => blocks.has(child.tag));
+    const hasBlock = node.children.some((child) => blocks.has(child.tag))
+      || (portal?.source === 'DOU' && hasNestedDouBody(node));
     const quotedDom = quotedAncestor || node.tag === 'blockquote' || node.tag === 'q';
     if (blocks.has(node.tag) && !hasBlock && node.span.end > node.span.start) {
       const text = matchText(node).trim();
@@ -697,6 +717,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
         }
         if (llegAmbiguous && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'unknown' };
       }
+      if (portalLayout && descriptor.type === 'unidentified'
+          && layoutWhitespace.test(result.canonicalText.slice(node.span.start, node.span.end))) return;
       const part = attach(node, descriptor);
       if (llegPlaceholder) for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_revoked_placeholder');
       if (llegAmbiguous) {
@@ -763,7 +785,9 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const owner = owners.sort((a, b) => (a.end - a.start) - (b.end - b.start) || Number(b.part.id.slice(5)) - Number(a.part.id.slice(5)))[0]?.part;
     if (!owner) {
       // Avoid overlapping siblings: uncovered pieces belong to the root, whose recognition is only structural.
-      result.coverage.segments.push({ span: { start, end }, partId: root.id, classification: 'unidentified' });
+      const structural = portalLayout && layoutWhitespace.test(result.canonicalText.slice(start, end));
+      result.coverage.segments.push({ span: { start, end }, partId: root.id, classification: structural ? 'recognized' : 'unidentified' });
+      if (structural) result.coverage.recognizedLength += end - start;
     } else {
       if (owner.type === 'unidentified') unidentified = owner;
       const classification = owner.type === 'unidentified' ? 'unidentified' : 'recognized';

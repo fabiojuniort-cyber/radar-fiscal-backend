@@ -1,5 +1,5 @@
 {
-  "engineHash": "817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe",
+  "engineHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
     "docs/anatomy/nfc-shadow-manifest.json": "af1d1edfb25573d6a262dde06cf03dfb3b2864e46ff3aaf5cd9765538f4e8d0c",
@@ -20,7 +20,7 @@
     "src/modules/anatomy/pdf-reader.ts": "c6464899099cc4c310a335302a2982d1a22d434720f93afd7a4d112e2c545b2f",
     "src/modules/anatomy/profile-rules.ts": "fb687f713031b8491d63699edaa48594ce26ecd45f064789591d43b22c2ab98e",
     "src/modules/anatomy/profile.ts": "cb10898fba6b6195eb912564f2dbfd2a01572603535a81f816ff4a1b455b8398",
-    "src/modules/anatomy/readers.ts": "ca538408434d0d2befcd0cd3676c6d062bb1c5dd1d93d2a477da845c14147218",
+    "src/modules/anatomy/readers.ts": "1c27d773b06ab09c47a2b92f6fe2ae060e5eafac4618d06e1e418b69e950e9bf",
     "src/modules/anatomy/rfb-inline-attachments.ts": "f59f2a281134a0ecfa07f865a58009837027d83adf4499b0d95f743f364a896b",
     "src/modules/anatomy/rfb-quote-resume.ts": "750d5c90f97e237e4a751d217e1afca051debf31dbdad70bc23d03dd0d396be5",
     "src/modules/anatomy/sefaz-sp-preparation.ts": "e5c24a28d4ac1e630eaca1cb31fd8d9e26e6270b42e69f37b3e7e099358b3d35"
