@@ -1,0 +1,52 @@
+{
+  "id": "148121",
+  "act": "Ato Declaratório Interpretativo 3/2025",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148121/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148121/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148121/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "c5c108ebf89fea077ee76a3f8b82f4338ddd185c667a4688e20fd068255e3195",
+  "bytes": 11971,
+  "consultedAt": "2026-11-20T16:01:41.128Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c direct (Ato Declaratório Interpretativo, grant E9-P2c-G1)",
+  "identification": {
+    "idAto": 148121,
+    "epigrafe": "Ato Declaratório Interpretativo RFB nº 3, de 3 de dezembro de 2025",
+    "numeroAto": "3",
+    "dataAto": "2025-12-03",
+    "dataPublicacao": "2025-12-04",
+    "dadosPublicacao": "Publicado(a) no DOU de 04/12/2025, seção 1, página 44",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "2b97b0ed23eb97e3349f3cef5aebc305c1e708d4e8d56d503918cacba5df1f04",
+    "htmlSha256": "eaaff3cd4ab1af1ea6843e90f84c6fb95581099ceef5fdd2b45fe9dc599468e7",
+    "pieces": 12,
+    "missingSegments": [],
+    "struckSegments": [],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c direct, grant E9-P2c-G1)",
+  "promoted": false,
+  "p2c": {
+    "type": "Ato Declaratório Interpretativo",
+    "mode": "direct-by-idAto",
+    "grantId": "E9-P2c-G1",
+    "acervoSize": "pequeno",
+    "measuredChars": 3631,
+    "size": "pequeno"
+  }
+}
