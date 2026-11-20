@@ -1,6 +1,7 @@
 import type { Kysely } from 'kysely';
 import type { DB } from '../../infrastructure/database/database.types.js';
 import type { DouState } from './dou.connector.js';
+import type { DouReserveReceipts } from './dou-reserve.js';
 import { ConnectorError } from './connector.error.js';
 
 export async function readDouSourceState(db: Kysely<DB>, sourceId: string, runId: string): Promise<DouState> {
@@ -20,5 +21,19 @@ export async function readDouSourceState(db: Kysely<DB>, sourceId: string, runId
       if (/^\d{4}-\d{2}-\d{2}-DO[123]E?\.zip$/.test(name) && typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)) archives[name] = value;
     }
   }
-  return { archives, ...(last?.finished_at ? { lastSuccessAt: last.finished_at } : {}) };
+  const reserveArchives: DouReserveReceipts = {};
+  const reserve = metadata?.douReserveArchives;
+  if (reserve && typeof reserve === 'object' && !Array.isArray(reserve)) {
+    for (const [key, value] of Object.entries(reserve)) {
+      const section = /^\d{4}-\d{2}-\d{2}-(DO[13])$/.exec(key)?.[1];
+      if (!section || !value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const { rawSha256, observedSections } = value as Record<string, unknown>;
+      if (typeof rawSha256 === 'string' && /^[a-f0-9]{64}$/.test(rawSha256) &&
+          Array.isArray(observedSections) && observedSections.length > 0 && observedSections.length <= 2 &&
+          observedSections.every(item => item === section || item === `${section}E`)) {
+        reserveArchives[key] = { rawSha256, observedSections };
+      }
+    }
+  }
+  return { archives, ...(Object.keys(reserveArchives).length ? { reserveArchives } : {}), ...(last?.finished_at ? { lastSuccessAt: last.finished_at } : {}) };
 }

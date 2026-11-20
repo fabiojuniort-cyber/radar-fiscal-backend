@@ -1,10 +1,129 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DOU_XML_SECTIONS, DouConnector, douCollectionDates } from '../src/modules/collection/dou.connector.js';
-import { fixtureFetch, makeZip } from './dou.fixtures.js';
+import { DOU_XML_SECTIONS, DouConnector, douCollectionDates, type DouState } from '../src/modules/collection/dou.connector.js';
+import { DouReserveClient } from '../src/modules/collection/dou-reserve.client.js';
+import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
+import { fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
 import { buildConnectorRegistry } from '../src/modules/collection/connector-registry.factory.js';
 const context = () => ({ sourceId:'dou',runId:'run',attemptId:'attempt',signal:new AbortController().signal });
 const credentials = () => ({ email:'test@example.invalid',password:'fixture' });
+
+test('reserve revisits a changed monthly ZIP for delayed extras and returns to primary on the next successful run', async () => {
+  const normal = await fixtureEntries('DO1');
+  const extra = await fixtureEntries('DO1E');
+  const empty = await makeZip([]);
+  const first = await makeZip(normal);
+  const second = await makeZip([...normal, ...extra]);
+  let snapshot = first;
+  let primaryReturns = false;
+  let reserveRequests = 0;
+  const primary = await fixtureFetch();
+  const fetchInlabs: typeof fetch = async (input, init) =>
+    primaryReturns ? primary(input, init) : new Response(null, { status: 404 });
+  const fallback: typeof fetch = async (input, init) => {
+    reserveRequests++;
+    const url = new URL(String(input));
+    assert.equal(url.hostname, 'www.in.gov.br');
+    assert.equal(new Headers(init?.headers).has('cookie'), false);
+    if (url.pathname.endsWith('/base-de-dados')) {
+      return new Response([
+        '<a href="/documents/1/2">S01092026_Atualizado171650.zip</a>',
+        '<a href="/documents/1/3">S03092026_Atualizado171929.zip</a>',
+        '<a href="https://example.invalid/fake">S01092026_Atualizado171650.zip</a>',
+      ].join(''));
+    }
+    return new Response(new Uint8Array(url.pathname.endsWith('/2') ? snapshot : empty));
+  };
+  let state: DouState = { archives: {} };
+  const connector = new DouConnector({
+    credentials, fetch: fetchInlabs, reserve: new DouReserveClient(fallback),
+    dates: ['2026-09-18'], now: () => new Date('2026-09-21T12:00:00Z'), readState: async () => state,
+  });
+  function remember(result: Awaited<ReturnType<DouConnector['collect']>>) {
+    state = {
+      archives: result.metadata!.douArchives as DouState['archives'],
+      reserveArchives: result.metadata!.douReserveArchives as NonNullable<DouState['reserveArchives']>,
+    };
+  }
+  const normalOnly = await connector.collect(context());
+  assert.equal(normalOnly.publications.length, 4);
+  assert.deepEqual(normalOnly.partialFailures, []);
+  const observation = (normalOnly.metadata!.dou as { archives: Record<string, unknown>[] }).archives[0]!;
+  assert.equal(observation.extrasComplete, false);
+  assert.deepEqual(observation.unobservedSections, ['DO1E']);
+  remember(normalOnly);
+
+  assert.equal((await connector.collect(context())).publications.length, 0);
+  snapshot = second;
+  const withExtra = await connector.collect(context());
+  assert.equal(withExtra.publications.length, 10);
+  assert.ok(withExtra.publications.every(publication => publication.metadata?.ingestionChannel === 'DOU_OPEN_DATA_ZIP'));
+  assert.ok(withExtra.publications.every(publication => publication.officialUrl.includes('pesquisa.in.gov.br')));
+  assert.ok(withExtra.publications.some(publication => publication.externalId?.includes(':DO1E:')));
+  remember(withExtra);
+
+  const requestsBeforeRecovery = reserveRequests;
+  primaryReturns = true;
+  const recovered = await connector.collect(context());
+  assert.equal(reserveRequests, requestsBeforeRecovery);
+  assert.equal(recovered.publications.length, 10);
+  assert.ok(recovered.publications.every(publication => publication.metadata?.ingestionChannel === 'INLABS'));
+  assert.deepEqual(recovered.metadata?.douReserveArchives, state.reserveArchives);
+  const normalize = (publication: typeof recovered.publications[number]) => {
+    const { identityHash, contentHash, officialUrl } = normalizePublication({ sourceId: 'dou', publication });
+    return [publication.externalId, identityHash, contentHash, officialUrl];
+  };
+  assert.deepEqual(recovered.publications.map(normalize).sort(), withExtra.publications.map(normalize).sort());
+});
+
+test('reserve is opt-in and never handles authentication rejection or rate limiting', async () => {
+  let reserveRequests = 0;
+  const reserve = new DouReserveClient(async () => { reserveRequests++; throw new Error('unexpected reserve call'); });
+  for (const [status, code] of [[401, 'INLABS_AUTH_FAILED'], [429, 'INLABS_RATE_LIMITED']] as const) {
+    const connector = new DouConnector({ credentials, reserve, dates: ['2026-09-18'], fetch: async () => new Response(null, { status }) });
+    await assert.rejects(connector.collect(context()), { code });
+  }
+  const connector = new DouConnector({ credentials, dates: ['2026-09-18'], fetch: async () => new Response(null, { status: 404 }) });
+  await assert.rejects(connector.collect(context()), { code: 'INLABS_HTTP_ERROR' });
+  assert.equal(reserveRequests, 0);
+});
+
+test('a later INLABS outage cannot mix a partially emitted primary run with reserve output', async () => {
+  const primary = await fixtureFetch();
+  let reserveRequests = 0;
+  let published = 0;
+  const connector = new DouConnector({
+    credentials, dates: ['2026-09-18'],
+    reserve: new DouReserveClient(async () => { reserveRequests++; throw new Error('unexpected reserve call'); }),
+    fetch: async (input, init) => new URL(String(input)).searchParams.get('dl')?.endsWith('DO1E.zip')
+      ? new Response(null, { status: 503 })
+      : primary(input, init),
+  });
+  await assert.rejects(connector.collectIncremental(context(), async () => { published++; }), { code: 'INLABS_UNAVAILABLE' });
+  assert.ok(published > 0);
+  assert.equal(reserveRequests, 0);
+});
+
+test('an unconfirmed monthly edition does not create a success or follow an external redirect', async () => {
+  const empty = await makeZip([]);
+  let redirect = false;
+  const requested: string[] = [];
+  const connector = new DouConnector({
+    credentials, dates: ['2026-09-18'], fetch: async () => new Response(null, { status: 503 }),
+    reserve: new DouReserveClient(async input => {
+      const url = new URL(String(input));
+      requested.push(url.hostname);
+      if (url.pathname.endsWith('/base-de-dados')) return new Response('<a href="/S01092026.zip">Monthly ZIP</a>');
+      return redirect
+        ? new Response(null, { status: 302, headers: { location: 'https://example.invalid/S01092026.zip' } })
+        : new Response(new Uint8Array(empty));
+    }),
+  });
+  await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_EDITIONS_UNCONFIRMED' });
+  redirect = true;
+  await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_HTTP_ERROR' });
+  assert.deepEqual(requested, Array(4).fill('www.in.gov.br'));
+});
 
 test('DOU runtime registration is explicitly gated',()=>{
   assert.equal(buildConnectorRegistry({includeDou:false}).has('dou'),false);

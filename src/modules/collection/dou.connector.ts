@@ -3,11 +3,14 @@ import { ConnectorError } from './connector.error.js';
 import { InlabsClient, type InlabsCredentials, type InlabsXmlSection } from './inlabs.client.js';
 import { parseDouZip, type DouArchiveContext } from './dou.parser.js';
 import { classifyDouContractExcerpt, DOU_SCOPE_RULE_VERSION } from './dou-scope.rules.js';
+import { DouReserveClient } from './dou-reserve.client.js';
+import { collectDouReserve, isDouReserveEligible, type DouReserveReceipts } from './dou-reserve.js';
 
 export const DOU_XML_SECTIONS: readonly InlabsXmlSection[] = ['DO1', 'DO1E', 'DO3', 'DO3E'];
 
 export interface DouState {
   archives: Record<string, string>;
+  reserveArchives?: DouReserveReceipts;
   lastSuccessAt?: Date;
 }
 export interface DouOptions {
@@ -24,6 +27,8 @@ export interface DouOptions {
    * availability to retry. Monitoring never sets it.
    */
   allowEmptyBatch?: boolean;
+  /** Opt-in dependency. The runtime does not supply this in the candidate. */
+  reserve?: DouReserveClient;
 }
 function failure(code: string, retryable = false) {
   return new ConnectorError(code, { code, kind: 'FETCH_ERROR', retryable });
@@ -63,9 +68,42 @@ export class DouConnector implements CollectionConnector {
     const state = await this.#options.readState?.(context.sourceId, context.runId) ?? { archives: {} };
     // Do not silently discard a gap that exceeds the bounded reconciliation window.
     if (!this.#options.dates && state.lastSuccessAt && now.getTime() - state.lastSuccessAt.getTime() > 60 * 86400000) throw failure('DOU_BACKFILL_REQUIRED');
+    const cutoff = new Date(now);
+    cutoff.setUTCDate(cutoff.getUTCDate() - 65);
+    const oldestReceiptDate = cutoff.toISOString().slice(0, 10);
+    const receipts = { ...state.archives };
+    const reserveReceipts: DouReserveReceipts = Object.fromEntries(
+      Object.entries(state.reserveArchives ?? {}).filter(([key]) => key.slice(0, 10) >= oldestReceiptDate),
+    );
+    let emitted = false;
+    const emitPrimary = async (publication: ConnectorPublication) => {
+      emitted = true;
+      await emit(publication);
+    };
+    try {
+      return await this.#collectInlabs(context, dates, receipts, reserveReceipts, oldestReceiptDate, emitPrimary);
+    } catch (error) {
+      context.signal.throwIfAborted();
+      if (!this.#options.reserve || emitted || !isDouReserveEligible(error)) throw error;
+      const result = await collectDouReserve(this.#options.reserve, dates, context, emit, error, reserveReceipts);
+      for (const map of [receipts, reserveReceipts]) {
+        for (const key of Object.keys(map)) if (key.slice(0, 10) < oldestReceiptDate) delete map[key];
+      }
+      return { ...result, metadata: { ...result.metadata, douArchives: receipts, douReserveArchives: reserveReceipts } };
+    }
+  }
+
+  async #collectInlabs(
+    context: ConnectorExecutionContext,
+    dates: readonly string[],
+    priorReceipts: Record<string, string>,
+    reserveReceipts: DouReserveReceipts,
+    oldestReceiptDate: string,
+    emit: (publication: ConnectorPublication) => Promise<void>,
+  ): Promise<ConnectorResult> {
     const client = new InlabsClient({ credentials: this.#options.credentials, ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}) });
     const partialFailures: ConnectorPartialFailure[] = [];
-    const receipts: Record<string, string> = { ...state.archives };
+    const receipts: Record<string, string> = { ...priorReceipts };
     const archives: Array<Record<string, unknown>> = []; let available = 0; let xmlCount = 0; let mediaCount = 0;
     let assembledMatterCount = 0; let legacyIgnoreCount = 0;
     let publicationCount = 0; let embeddedActCount = 0; let confazMatterCount = 0;
@@ -102,7 +140,7 @@ export class DouConnector implements CollectionConnector {
           }
           available++;
           context.memory?.('archive_downloaded', { archives: available, archiveBytes: download.bytes.byteLength, publications: publicationCount });
-          if (state.archives[filename] === download.rawSha256) {
+          if (priorReceipts[filename] === download.rawSha256) {
             archives.push({ filename, state: 'UNCHANGED', date, section, rawSha256: download.rawSha256 });
             continue;
           }
@@ -162,8 +200,7 @@ export class DouConnector implements CollectionConnector {
       if (!available && !this.#options.allowEmptyBatch) throw failure('INLABS_EDITIONS_NOT_AVAILABLE', true);
       // Bound receipt history. Only a terminal successful RUN makes these receipts
       // eligible as a checkpoint; attempt success alone precedes publication persistence.
-      const cutoff = new Date(now); cutoff.setUTCDate(cutoff.getUTCDate() - 65);
-      for (const name of Object.keys(receipts)) if (name.slice(0, 10) < cutoff.toISOString().slice(0, 10)) delete receipts[name];
+      for (const name of Object.keys(receipts)) if (name.slice(0, 10) < oldestReceiptDate) delete receipts[name];
       return { publications: [], partialFailures, metadata: {
         dou: {
           archives,
@@ -189,6 +226,7 @@ export class DouConnector implements CollectionConnector {
           coverage: 'DOU_SECTIONS_1_3_NORMAL_AND_EXTRA', sections: [...DOU_XML_SECTIONS], supplementsVerified: false,
           archivalStorage: 'NOT_CONFIGURED', xmlTimelinessGuaranteed: false },
         douArchives: receipts,
+        ...(Object.keys(reserveReceipts).length ? { douReserveArchives: reserveReceipts } : {}),
       } };
     } finally { client.close(); }
   }
