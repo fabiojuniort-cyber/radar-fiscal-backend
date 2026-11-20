@@ -5,12 +5,30 @@
     "owner": "EXEC #303 (claude/anat-e9-coverage)",
     "package": "E9-P2-c-anexo-PDF",
     "approvedBy": "tribusca-control#116 COORD decisão C (2026-11-11): preparar a rota exata do PDF oficial 83325 com orçamento máximo de UMA requisição efetiva; execução só após revisão independente da guarda, grant válido e especificamente autorizado, dono único, débito antes da rede, identidade do recurso e redirect fail-closed",
-    "status": "active",
+    "status": "suspended",
     "expiresAt": "2026-11-21T23:59:59Z",
     "total": 1,
-    "perType": { "Solução de Consulta": 1 }
+    "perType": {
+      "Solução de Consulta": 1
+    }
   },
-  "used": { "total": 0, "perType": {} },
-  "attempts": [],
+  "used": {
+    "total": 1,
+    "perType": {
+      "Solução de Consulta": 1
+    }
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "type": "Solução de Consulta",
+      "kind": "capture",
+      "url": "https://normas.receita.fazenda.gov.br/sijut2consulta/anexoOutros.action?idArquivoBinario=83325",
+      "debitedAt": "2026-11-20T16:01:41.972Z",
+      "state": "settled",
+      "outcome": "HTTP 200",
+      "settledAt": "2026-11-20T16:01:42.088Z"
+    }
+  ],
   "note": "SUSPENDED: prepared only. Activation requires the independent review PASS of collect-p2c-attachment.ts (route guard) and a specific COORD authorization. Own ledger; the P2-c G1 balance is not used."
 }

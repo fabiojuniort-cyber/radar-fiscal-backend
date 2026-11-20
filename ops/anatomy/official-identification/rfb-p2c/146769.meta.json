@@ -1,0 +1,58 @@
+{
+  "id": "146769",
+  "act": "Resolução 182/2025",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/146769/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/146769/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/146769/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "9a18062a7e3fd4ad0b2237ca2d0ab8e9ee40c4dc68c49925933f5a5ab5c13ac1",
+  "bytes": 13153,
+  "consultedAt": "2026-11-20T16:01:40.992Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c direct (Resolução, grant E9-P2c-G1)",
+  "identification": {
+    "idAto": 146769,
+    "epigrafe": "Resolução CGSN nº 182, de 26 de setembro de 2025",
+    "numeroAto": "182",
+    "dataAto": "2025-09-26",
+    "dataPublicacao": "2025-10-01",
+    "dadosPublicacao": "Publicado(a) no DOU de 01/10/2025, seção 1, página 57",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "03c354f46de1f475e60f035d7e4846c945fe68ba78488f60c0b76b8e0b7c96d0",
+    "htmlSha256": "7849be1a1d613e08236ec38973e9662cc770933adc7869c6177d4f69564ac386",
+    "pieces": 5,
+    "missingSegments": [],
+    "struckSegments": [],
+    "attachments": [
+      {
+        "id": "80837",
+        "name": "Art. 1º.htm",
+        "status": "missing"
+      }
+    ],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c direct, grant E9-P2c-G1)",
+  "promoted": false,
+  "p2c": {
+    "type": "Resolução",
+    "mode": "direct-by-idAto",
+    "grantId": "E9-P2c-G1",
+    "acervoSize": "médio",
+    "measuredChars": 785,
+    "size": "pequeno"
+  }
+}
