@@ -35,7 +35,8 @@
 
 8. **Persistência imediata do consumo, com ou sem sucesso:**
    - suspender o grant (`status: suspended`);
-   - commit do ledger (tentativa e resultado) e, se gravados, do PDF e do meta;
+   - incluir no commit o ledger de transporte e o arquivo `148681-83325.<sha256-do-grantId>.outcome.json` criado ao lado dele. O diagnóstico registra o código da decisão do coletor, HTTP quando disponível e se o PDF foi salvo, sem guardar o corpo recusado nem mensagens brutas. Se gravados, incluir também o PDF e o meta;
+   - se o resultado indicar `outcomeWriteFailed`, preservar o código e o motivo exibidos no terminal no comentário da #116. Publicar a suspensão e o consumo mesmo nesse caso;
    - **push imediato**;
    - comentário na #116 com o resultado (`outcome`, SHA-256 e bytes, ou o motivo da recusa).
 9. **Fechamento:** conferir que o ledger publicado mostra `used.total` = 1. Qualquer nova tentativa exige grant novo.
@@ -48,4 +49,4 @@
 ## 5. Fora deste protocolo
 - Nenhuma descoberta e nenhum outro anexo.
 - O PDF tachado 82416 nunca é pedido.
-- O layout real do PDF 83325 não foi verificado. Uma recusa de identidade gasta a requisição e não grava nada (fail closed).
+- O layout real do PDF 83325 não foi verificado. Uma recusa de identidade gasta a requisição e grava apenas o diagnóstico da recusa.

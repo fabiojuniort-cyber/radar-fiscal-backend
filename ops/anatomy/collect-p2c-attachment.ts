@@ -20,7 +20,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BudgetRefused, RequestBudget } from './request-budget.js';
 import { extractPdfLines } from '../../src/modules/anatomy/pdf-reader.js';
@@ -174,7 +174,22 @@ async function readCapped(r: Response, max: number): Promise<{ body: Uint8Array 
   return { body };
 }
 
-export interface AttachmentRun { requests: number; stored: boolean; outcome: string; sha256?: string; bytes?: number; pages?: number }
+type AttachmentOutcome =
+  | 'stored' | 'transport_error' | 'ledger_error' | 'followed_redirect' | 'redirect' | 'final_url_mismatch'
+  | 'http_error' | 'stream_error' | 'too_large' | 'not_pdf' | 'unreadable_pdf' | 'identity_mismatch'
+  | 'write_failed' | 'cleanup_failed';
+
+export interface AttachmentRun {
+  requests: number;
+  stored: boolean;
+  outcome: string;
+  code?: AttachmentOutcome;
+  outcomeFile?: string;
+  outcomeWriteFailed?: true;
+  sha256?: string;
+  bytes?: number;
+  pages?: number;
+}
 
 export async function runAttachment(doFetch: typeof fetch, opts: { grantId: string; owner: string; budgetFile?: string; outDir?: string; actJson?: Buffer; now?: () => Date;
   /** R3 C-5: single-owner preflight, applied on EVERY path (CLI or direct call). Default: local ledger = pushed ledger, unused. */
@@ -196,34 +211,57 @@ export async function runAttachment(doFetch: typeof fetch, opts: { grantId: stri
   const budget = RequestBudget.open(opts.budgetFile ?? ATT_BUDGET, { grantId: opts.grantId, owner: opts.owner, package: ATT_PACKAGE,
     requested: { total: 1, perType: { [TARGET.type]: 1 } } }, opts.now);
   let sent = 0;
+  let httpStatus: number | null = null;
+  const finish = (code: AttachmentOutcome, outcome: string, proof?: { sha256: string; bytes: number; pages: number }): AttachmentRun => {
+    const result: AttachmentRun = { requests: sent, stored: code === 'stored', outcome, code, ...proof };
+    if (!sent) return result;
+
+    // Record the collector decision separately from the HTTP outcome. The grant ID distinguishes future grants.
+    const grantKey = sha(Buffer.from(opts.grantId));
+    const outcomeFile = `${base}.${grantKey}.outcome.json`;
+    const evidence = {
+      schema: 'p2c-attachment-outcome/1', idAto: TARGET.idAto, idArquivoBinario: TARGET.idArquivoBinario,
+      grantId: opts.grantId, httpStatus, requests: sent, stored: result.stored, code, ...proof,
+    };
+    try {
+      writeFileSync(join(dirname(ledger), outcomeFile), `${JSON.stringify(evidence, null, 2)}\n`, { flag: 'wx' });
+      return { ...result, outcomeFile };
+    } catch {
+      return { ...result, outcomeWriteFailed: true };
+    }
+  };
   try {
-    const debited = budget.fetcher(TARGET.type, 'capture', doFetch);
+    const debited = budget.fetcher(TARGET.type, 'capture', async (input, init) => {
+      sent++;
+      const response = await doFetch(input, init);
+      httpStatus = response.status;
+      return response;
+    });
     // One shot: a second call (e.g. a redirect hop) is refused before it is sent; the route is re-checked per call.
     const oneShot = (async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input instanceof Request ? input.url : input);
       const why = sent > 0 ? 'one shot: a second request is never sent' : routeProblem(url);
       if (why) throw new BudgetRefused(why);
-      sent++; return debited(input, init);
+      return debited(input, init);
     }) as typeof fetch;
     let r: Response;
     try { r = await oneShot(TARGET.url, { redirect: 'manual', signal: AbortSignal.timeout(60_000) }); }
-    catch (e) { return { requests: sent, stored: false, outcome: `failed (debited if sent): ${(e as Error).message}` }; }
+    catch (e) { return finish(httpStatus === null ? 'transport_error' : 'ledger_error', `failed (debited if sent): ${(e as Error).message}`); }
     // Never trust the transport: a response that was itself the result of a followed redirect is refused.
-    if (r.redirected || r.type === 'opaqueredirect') return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): the transport followed a redirect (${r.url || 'unknown URL'})` };
-    if (r.status >= 300 && r.status < 400) return { requests: sent, stored: false, outcome: `redirect ${r.status} → ${String(r.headers.get('location'))}: not followed (fail closed), nothing stored` };
-    if (r.url && r.url !== TARGET.url) return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): final URL ${r.url} differs from the pinned route` };
-    if (r.status !== 200) return { requests: sent, stored: false, outcome: `HTTP ${r.status}: nothing stored` };
+    if (r.redirected || r.type === 'opaqueredirect') return finish('followed_redirect', `refused after capture (debited, not stored): the transport followed a redirect (${r.url || 'unknown URL'})`);
+    if (r.status >= 300 && r.status < 400) return finish('redirect', `redirect ${r.status} → ${String(r.headers.get('location'))}: not followed (fail closed), nothing stored`);
+    if (r.url && r.url !== TARGET.url) return finish('final_url_mismatch', `refused after capture (debited, not stored): final URL ${r.url} differs from the pinned route`);
+    if (r.status !== 200) return finish('http_error', `HTTP ${r.status}: nothing stored`);
     let capped: Awaited<ReturnType<typeof readCapped>>;
     try { capped = await readCapped(r, MAX_PDF_BYTES); }
-    catch (e) { return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): stream error while reading (${(e as Error).message.slice(0, 120)})` }; }
-    if ('over' in capped) return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): body exceeds ${MAX_PDF_BYTES} bytes while reading (stopped at ${capped.over})` };
+    catch (e) { return finish('stream_error', `refused after capture (debited, not stored): stream error while reading (${(e as Error).message.slice(0, 120)})`); }
+    if ('over' in capped) return finish('too_large', `refused after capture (debited, not stored): body exceeds ${MAX_PDF_BYTES} bytes while reading (stopped at ${capped.over})`);
     const body = capped.body;
-    if (Buffer.from(body.subarray(0, 5)).toString('latin1') !== '%PDF-') return { requests: sent, stored: false, outcome: 'refused after capture (debited, not stored): not a PDF (no %PDF- header)' };
+    if (Buffer.from(body.subarray(0, 5)).toString('latin1') !== '%PDF-') return finish('not_pdf', 'refused after capture (debited, not stored): not a PDF (no %PDF- header)');
     let ex: Awaited<ReturnType<typeof extractPdfLines>>;
-    try { ex = await extractPdfLines(body); } catch (e) { return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): unreadable PDF (${(e as Error).message.slice(0, 120)})` }; }
+    try { ex = await extractPdfLines(body); } catch (e) { return finish('unreadable_pdf', `refused after capture (debited, not stored): unreadable PDF (${(e as Error).message.slice(0, 120)})`); }
     const ip = pdfIdentityProblem(ex.lines);
-    if (ip) return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): ${ip}` };
-    mkdirSync(outDir, { recursive: true });
+    if (ip) return finish('identity_mismatch', `refused after capture (debited, not stored): ${ip}`);
     const digest = sha(body);
     const meta = `${JSON.stringify({ id: base, idAto: TARGET.idAto, idArquivoBinario: TARGET.idArquivoBinario,
       resourceId: `rfb:${TARGET.idAto}:anexo:${TARGET.idArquivoBinario}`, url: TARGET.url, finalUrl: r.url || TARGET.url, contentType: r.headers.get('content-type'),
@@ -235,16 +273,22 @@ export async function runAttachment(doFetch: typeof fetch, opts: { grantId: stri
     const P = (f: string) => join(outDir, f); const pdfF = `${base}.pdf`; const metaF = `${base}.meta.json`;
     const created: string[] = [];
     try {
+      mkdirSync(outDir, { recursive: true });
       writeFileSync(P(`${pdfF}.partial`), body, { flag: 'wx' }); created.push(`${pdfF}.partial`);
       writeFileSync(P(`${metaF}.partial`), meta, { flag: 'wx' }); created.push(`${metaF}.partial`);
       if (existsSync(P(pdfF)) || existsSync(P(metaF))) throw new Error('final file already present');
       renameSync(P(`${pdfF}.partial`), P(pdfF)); created.push(pdfF);
       renameSync(P(`${metaF}.partial`), P(metaF));
     } catch (e) {
-      for (const f of created) rmSync(P(f), { force: true });
-      return { requests: sent, stored: false, outcome: `refused after capture (debited, not stored): write failed, nothing kept (${(e as Error).message.slice(0, 120)})` };
+      let cleanupFailed = false;
+      for (const f of created) {
+        try { rmSync(P(f), { force: true }); } catch { cleanupFailed = true; }
+      }
+      const detail = (e as Error).message.slice(0, 120);
+      if (cleanupFailed) return finish('cleanup_failed', `write failed and cleanup was incomplete (debited, inspect local files): ${detail}`);
+      return finish('write_failed', `refused after capture (debited, not stored): write failed (${detail})`);
     }
-    return { requests: sent, stored: true, outcome: 'stored', sha256: digest, bytes: body.byteLength, pages: ex.pages };
+    return finish('stored', 'stored', { sha256: digest, bytes: body.byteLength, pages: ex.pages });
   } finally { budget.close(); }
 }
 
