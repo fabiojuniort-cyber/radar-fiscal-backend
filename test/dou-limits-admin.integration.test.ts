@@ -5,10 +5,27 @@ import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 import { buildApp } from '../src/app.js';
 import type { DB } from '../src/infrastructure/database/database.types.js';
-import { readWorkerDouLimits } from '../src/modules/collection/dou-download-limits.js';
+import { readWorkerDouLimits, saveAdminDouLimits } from '../src/modules/collection/dou-download-limits.js';
 
 const route = '/api/v1/admin/platform/dou-download-limits';
 const limits = { pdfMiB: 20, zipMiB: 32, expandedZipMiB: 64, xmlEntryMiB: 8 };
+
+type SignedWrite = {
+  sql: string;
+  values: [actor: string, limits: string, issuedAt: number, nonce: string, mac: string];
+};
+
+// Capture the real signer output without sending it to PostgreSQL or logging it.
+async function prepareWrite(actor: string, proposed: typeof limits): Promise<SignedWrite> {
+  let write: SignedWrite | undefined;
+  const capture = { query: async (sql: string, values: SignedWrite['values']) => {
+    write = { sql, values };
+    return { rows: [{ limits: proposed }] };
+  } };
+  await saveAdminDouLimits(capture as unknown as Pool, actor, proposed);
+  assert.ok(write);
+  return write;
+}
 
 async function session(app: Awaited<ReturnType<typeof buildApp>>) {
   const email = `dou-ci-${randomUUID()}@example.invalid`;
@@ -33,6 +50,15 @@ test('OPS gateway respects admin access, projects the audit entry, and rolls bac
   assert.equal(process.env.NODE_ENV, 'test');
   const admin = new Pool({ connectionString: adminUrl, max: 2 });
   t.after(() => admin.end());
+  const gateUrl = process.env.DATABASE_DOU_LIMITS_URL;
+  assert.ok(gateUrl);
+  const gateEndpoint = new URL(gateUrl);
+  assert.equal(gateEndpoint.hostname, url.hostname);
+  assert.equal(gateEndpoint.port, url.port);
+  assert.equal(gateEndpoint.pathname, url.pathname);
+  assert.equal(gateEndpoint.username, 'radar_dou_limits_runtime');
+  const gate = new Pool({ connectionString: gateUrl, max: 1 });
+  t.after(() => gate.end());
   const workerUrl = process.env.OPS_TEST_WORKER_URL;
   assert.ok(workerUrl);
   const workerDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: workerUrl }) }) });
@@ -118,7 +144,61 @@ test('OPS gateway respects admin access, projects the audit entry, and rolls bac
   assert.ok(entries.some((entry) => entry.before_data.zipMiB === first.after_data.zipMiB &&
     entry.after_data.zipMiB === lastLimits.zipMiB));
   assert.deepEqual((await get()).json().limits, lastLimits);
-  await admin.query(`UPDATE public.platform_user_roles SET revoked_at=now(),revoked_by='ops-dl-ci'
-    WHERE user_id=$1 AND role='PLATFORM_ADMIN' AND revoked_at IS NULL`, [operator.id]);
-  assert.equal((await put(limits)).statusCode, 403);
+
+  const nonceExists = async (nonce: string) => (await admin.query<{ present: boolean }>(`
+    SELECT EXISTS (SELECT FROM public.ops_dou_limits_used_nonces WHERE nonce=$1) AS present`, [nonce])).rows[0]!.present;
+  const submit = (write: SignedWrite) => gate.query(write.sql, write.values);
+  const snapshot = async () => ({
+    config: await state(),
+    auditCount: (await audit()).length,
+    nonceCount: await nonces(),
+  });
+
+  await t.test('same signed write is accepted once and replay returns 23505', async () => {
+    const proposed = { ...limits, zipMiB: 20 };
+    const write = await prepareWrite(operator.id, proposed);
+    assert.deepEqual((await submit(write)).rows[0]!.limits, proposed);
+    const committed = await snapshot();
+    assert.equal(committed.auditCount, entries.length + 1);
+    assert.equal(await nonceExists(write.values[3]), true);
+    await assert.rejects(submit(write), { code: '23505' });
+    assert.deepEqual(await snapshot(), committed);
+  });
+
+  await t.test('all signed fields are bound to the approved write', async () => {
+    const proposed = { ...limits, zipMiB: 22 };
+    const write = await prepareWrite(operator.id, proposed);
+    const [actor, payload, issuedAt, nonce, mac] = write.values;
+    const otherNonce = randomUUID();
+    const variants: Array<[label: string, values: SignedWrite['values']]> = [
+      ['actor', [customer.id, payload, issuedAt, nonce, mac]],
+      ['timestamp', [actor, payload, issuedAt + 1, nonce, mac]],
+      ['nonce', [actor, payload, issuedAt, otherNonce, mac]],
+      ['pdfMiB', [actor, JSON.stringify({ ...proposed, pdfMiB: 19 }), issuedAt, nonce, mac]],
+      ['zipMiB', [actor, JSON.stringify({ ...proposed, zipMiB: 23 }), issuedAt, nonce, mac]],
+      ['expandedZipMiB', [actor, JSON.stringify({ ...proposed, expandedZipMiB: 65 }), issuedAt, nonce, mac]],
+      ['xmlEntryMiB', [actor, JSON.stringify({ ...proposed, xmlEntryMiB: 7 }), issuedAt, nonce, mac]],
+    ];
+    const before = await snapshot();
+    for (const [field, values] of variants) {
+      await assert.rejects(submit({ sql: write.sql, values }), { code: '42501', message: 'dou_limits_signature_invalid' }, field);
+      assert.deepEqual(await snapshot(), before, field);
+      assert.equal(await nonceExists(values[3]), false, field);
+    }
+    assert.equal(await nonceExists(nonce), false);
+    assert.deepEqual((await submit(write)).rows[0]!.limits, proposed);
+    assert.equal(await nonceExists(nonce), true);
+  });
+
+  await t.test('a valid write signed while authorized cannot be submitted after revocation', async () => {
+    const approved = await prepareWrite(operator.id, { ...limits, zipMiB: 24 });
+    const before = await snapshot();
+    const revoked = await admin.query(`UPDATE public.platform_user_roles SET revoked_at=now(),revoked_by='ops-dl-ci'
+      WHERE user_id=$1 AND role='PLATFORM_ADMIN' AND revoked_at IS NULL`, [operator.id]);
+    assert.equal(revoked.rowCount, 1);
+    await assert.rejects(submit(approved), { code: '42501', message: 'platform_admin_required' });
+    assert.equal(await nonceExists(approved.values[3]), false);
+    assert.deepEqual(await snapshot(), before);
+    assert.equal((await put(limits)).statusCode, 403);
+  });
 });
