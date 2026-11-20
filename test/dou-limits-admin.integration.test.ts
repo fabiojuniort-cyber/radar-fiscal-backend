@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { Writable } from 'node:stream';
 import test from 'node:test';
 import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 import { buildApp } from '../src/app.js';
 import type { DB } from '../src/infrastructure/database/database.types.js';
+import { loggerOptions } from '../src/infrastructure/logging/logger.js';
 import { readWorkerDouLimits, saveAdminDouLimits } from '../src/modules/collection/dou-download-limits.js';
 
 const route = '/api/v1/admin/platform/dou-download-limits';
@@ -63,7 +65,16 @@ test('OPS gateway respects admin access, projects the audit entry, and rolls bac
   assert.ok(workerUrl);
   const workerDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: new Pool({ connectionString: workerUrl }) }) });
   t.after(() => workerDb.destroy());
-  const app = await buildApp();
+  const logs: string[] = [];
+  assert.equal(typeof loggerOptions, 'object');
+  const originalLoggerOptions = { ...loggerOptions };
+  Object.assign(loggerOptions, { level: 'info', stream: new Writable({
+    write(chunk, _encoding, done) { logs.push(String(chunk)); done(); },
+  }) });
+  const app = await buildApp().finally(() => {
+    Object.assign(loggerOptions, originalLoggerOptions);
+    Reflect.deleteProperty(loggerOptions, 'stream');
+  });
   t.after(() => app.close());
 
   const initial = { preserved: 'fixture', douDownloadLimits: { zipMiB: 16, xmlEntryMiB: 'invalid', rejected: 'fixture' } };
@@ -188,6 +199,35 @@ test('OPS gateway respects admin access, projects the audit entry, and rolls bac
     assert.equal(await nonceExists(nonce), false);
     assert.deepEqual((await submit(write)).rows[0]!.limits, proposed);
     assert.equal(await nonceExists(nonce), true);
+  });
+
+  await t.test('the HTTP route sanitizes a duplicate nonce rejection and its Fastify log', async () => {
+    const marker = 'synthetic-db-detail-must-not-escape';
+    await admin.query(`
+      CREATE FUNCTION public.ops_test_duplicate_nonce() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        RAISE unique_violation USING MESSAGE='duplicate nonce from synthetic fixture',
+          DETAIL='synthetic-db-detail-must-not-escape', CONSTRAINT='ops_dou_limits_used_nonces_pkey';
+      END $$;
+      CREATE TRIGGER ops_test_duplicate_nonce BEFORE INSERT ON public.ops_dou_limits_used_nonces
+      FOR EACH ROW EXECUTE FUNCTION public.ops_test_duplicate_nonce();
+    `);
+    try {
+      const before = await snapshot();
+      const logStart = logs.length;
+      const response = await put({ ...limits, zipMiB: 24 });
+      assert.equal(response.statusCode, 503);
+      assert.deepEqual(response.json(), { error: 'dou_limits_store_not_ready' });
+      assert.deepEqual(await snapshot(), before);
+      const recorded = logs.slice(logStart);
+      assert.ok(recorded.some((entry) => entry.includes('request completed')));
+      assert.equal(recorded.some((entry) => entry.includes(marker) || entry.includes('23505') ||
+        entry.includes('ops_dou_limits_used_nonces_pkey') ||
+        entry.includes('duplicate nonce from synthetic fixture')), false);
+    } finally {
+      await admin.query(`DROP TRIGGER ops_test_duplicate_nonce ON public.ops_dou_limits_used_nonces;
+        DROP FUNCTION public.ops_test_duplicate_nonce();`);
+    }
   });
 
   await t.test('a valid write signed while authorized cannot be submitted after revocation', async () => {

@@ -144,6 +144,12 @@ export async function platformAdminRoutes(
       } catch (error) {
         // No privileged source UPDATE and no silent in-memory-only settings.
         // The DB write gate intentionally requires a separately reviewed SQL change.
+        if (error instanceof Error && 'code' in error && error.code === '23505' &&
+          'constraint' in error && error.constraint === 'ops_dou_limits_used_nonces_pkey') {
+          // PostgreSQL can include the rejected nonce in the error detail.
+          // Use the existing gateway rejection without passing the error to Fastify.
+          return reply.status(503).send({ error: 'dou_limits_store_not_ready' });
+        }
         if (error instanceof Error &&
           (('code' in error && ['42883','42501','28000'].includes(String(error.code))) ||
             error.message === 'dou_limits_store_not_ready')) {
