@@ -8,7 +8,8 @@ import { beginDouCoverage, coverageDates, markDouCoverage, mergeDouOriginProvena
 import { readDouSourceState } from '../src/modules/collection/dou-source-state.repository.js';
 import { executeConnector } from '../src/modules/collection/connector.executor.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
-import { fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
+import { fixtureDouZipLink, fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
+const septemberZipIndex = fixtureDouZipLink('S01092026.zip') + fixtureDouZipLink('S03092026.zip');
 import { buildConnectorRegistry } from '../src/modules/collection/connector-registry.factory.js';
 const context = () => ({ sourceId:'dou',runId:'run',attemptId:'attempt',signal:new AbortController().signal });
 const credentials = () => ({ email:'test@example.invalid',password:'fixture' });
@@ -20,8 +21,11 @@ test('reserve revisits a changed monthly ZIP for delayed extras and returns to p
   const first = await makeZip(normal);
   const second = await makeZip([
     ...normal.map(entry => ({ ...entry, name: `20260918/DO1/${entry.name}` })),
-    ...extra.map(entry => ({ ...entry, name: `20260918/DO1E/${entry.name}` })),
+    ...extra.map((entry, index) => ({ ...entry, name: `20260918/DO1E/${index === 0 ? entry.name.replace(/\.xml$/, '.XML') : entry.name}` })),
     { name: '20260917/DO1/515_20260917_10000.xml', bytes: Buffer.from('unselected payload') },
+    { name: '20260918/DO1/1_BCB_2_001.jpg', bytes: Buffer.from('ffd8ffe0', 'hex') },
+    { name: '20260918/DO1/Thumbs.db', bytes: Buffer.from('d0cf11e0a1b11ae1', 'hex') },
+    { name: '2026-09-17-DO1E.zip', bytes: Buffer.from('out-of-scope known daily ZIP') },
   ]);
   let snapshot = first;
   let primaryReturns = false;
@@ -38,14 +42,14 @@ test('reserve revisits a changed monthly ZIP for delayed extras and returns to p
     if (url.pathname.endsWith('/base-de-dados')) {
       assert.equal(url.search, '?ano=2026&mes=Setembro');
       return new Response([
-        '<a href="/documents/20181/741444604/S01092026_Atualizado171650.zip/fixture1?version=1.0&amp;download=true">S01092026_Atualizado171650.zip</a>',
-        '<a href="/documents/20181/741444604/S03092026_Atualizado171929.zip/fixture3?version=1.0&amp;download=true">S03092026_Atualizado171929.zip</a>',
+        fixtureDouZipLink('S01092026_Atualizado171650.zip'),
+        fixtureDouZipLink('S03092026_Atualizado171929.zip'),
         '<a href="https://example.invalid/fake">S01092026_Atualizado171650.zip</a>',
         '<a href="/documents/wrong-month">S01102026_Atualizado171650.zip</a>',
       ].join(''));
     }
     assert.equal(url.searchParams.get('download'), 'true');
-    return new Response(new Uint8Array(url.pathname.endsWith('/fixture1') ? snapshot : empty));
+    return new Response(new Uint8Array(url.pathname.includes('/S01') ? snapshot : empty));
   };
   let state: DouState = { archives: {} };
   const connector = new DouConnector({
@@ -135,17 +139,17 @@ test('a later INLABS outage cannot mix a partially emitted primary run with rese
 
 test('an unconfirmed monthly edition does not create a success or follow an external redirect', async () => {
   const empty = await makeZip([]);
-  let redirect = false;
+  let redirect: string | undefined;
   const requested: string[] = [];
   const connector = new DouConnector({
     credentials, dates: ['2026-09-18'], fetch: async () => new Response(null, { status: 503 }),
     reserve: new DouReserveClient(async input => {
       const url = new URL(String(input));
       requested.push(url.hostname);
-      if (url.pathname.endsWith('/base-de-dados')) return new Response('<a href="/S01092026.zip">ZIP</a><a href="/S03092026.zip">ZIP</a>');
+      if (url.pathname.endsWith('/base-de-dados')) return new Response(septemberZipIndex);
       if (url.pathname === '/leiturajornal') return new Response('<html>Portal reference unavailable</html>');
-      return redirect && url.pathname.startsWith('/S01')
-        ? new Response(null, { status: 302, headers: { location: 'https://example.invalid/S01092026.zip' } })
+      return redirect && url.pathname.includes('/S01')
+        ? new Response(null, { status: 302, headers: { location: redirect } })
         : new Response(new Uint8Array(empty));
     }),
   });
@@ -153,9 +157,11 @@ test('an unconfirmed monthly edition does not create a success or follow an exte
   assert.equal(result.completion?.complete, false);
   assert.equal(result.metadata?.douConsultation, 'OK');
   assert.equal(result.metadata?.douCoverageStatus, 'INCOMPLETE');
-  redirect = true;
+  redirect = 'https://example.invalid/S01092026.zip';
   await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_HTTP_ERROR' });
-  assert.deepEqual(requested, Array(7).fill('www.in.gov.br'));
+  redirect = 'https://www.in.gov.br/other/S01092026.zip';
+  await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_HTTP_ERROR' });
+  assert.deepEqual(requested, Array(9).fill('www.in.gov.br'));
 });
 
 test('monthly nested ZIP validates folder date, package section, XML section and leaf uniqueness', async () => {
@@ -166,7 +172,7 @@ test('monthly nested ZIP validates folder date, package section, XML section and
   const connector = new DouConnector({
     credentials, dates: ['2026-09-18'], fetch: async () => new Response(null, { status: 503 }),
     reserve: new DouReserveClient(async input => new URL(String(input)).pathname.endsWith('/base-de-dados')
-      ? new Response('<a href="/S01092026.zip">ZIP</a><a href="/S03092026.zip">ZIP</a>')
+      ? new Response(septemberZipIndex)
       : new Response(new Uint8Array(await makeZip(String(input).includes('S03') ? [] : entries)))),
   });
   assert.equal((await connector.collect(context())).publications.length, 1);
@@ -184,7 +190,7 @@ test('official ZIP discovery requests each selected year-month once', async () =
   const requested: string[] = [];
   const client = new DouReserveClient(async input => {
     requested.push(new URL(String(input)).search);
-    return new Response('<a href="/S03122026.zip">Dezembro</a><a href="/S01012027.zip">Janeiro</a>');
+    return new Response(fixtureDouZipLink('S03122026.zip') + fixtureDouZipLink('S01012027.zip'));
   });
   const result = await client.index(['2026-12', '2027-01', '2026-12'], AbortSignal.timeout(2000));
   assert.deepEqual(requested, ['?ano=2026&mes=Dezembro', '?ano=2027&mes=Janeiro']);
@@ -192,17 +198,20 @@ test('official ZIP discovery requests each selected year-month once', async () =
 });
 
 test('official ZIP filenames must agree and priority is independent of anchor order', async () => {
-  const monthly = '<a href="/d/S01112026.zip/id">S01112026.zip</a>';
-  const monthlyMirror = '<a href="/mirror/S01112026.zip/id2">S01112026.zip</a>';
-  const updated = '<a href="/d/S01112026_Atualizado150000.zip/id">S01112026_Atualizado150000.zip</a>';
-  const secondUpdated = '<a href="/d/S01112026_Atualizado170000.zip/id2">S01112026_Atualizado170000.zip</a>';
-  const wrong = '<a href="/d/S03112026.zip/id">S01112026.zip</a>';
+  const monthly = fixtureDouZipLink('S01112026.zip');
+  const monthlyMirror = fixtureDouZipLink('S01112026.zip', 2);
+  const updated = fixtureDouZipLink('S01112026_Atualizado150000.zip');
+  const secondUpdated = fixtureDouZipLink('S01112026_Atualizado170000.zip', 2);
+  const wrong = fixtureDouZipLink('S03112026.zip', 1, 'S01112026.zip');
   const resolve = (links: string[]) => new DouReserveClient(async () => new Response(links.join('')))
     .index(['2026-11'], AbortSignal.timeout(2_000));
   for (const links of [[monthly, monthlyMirror, updated], [updated, monthlyMirror, monthly]]) {
     assert.equal((await resolve(links)).get('S01112026')?.filename, 'S01112026_Atualizado150000.zip');
   }
   assert.equal((await resolve([wrong])).size, 0);
+  assert.equal((await resolve([fixtureDouZipLink('S01112026.zip', 1, 'ZIP')])).size, 0);
+  assert.equal((await resolve([fixtureDouZipLink('S01112026.zip', 1, 'S01112026_unexpected.zip')])).size, 0);
+  assert.equal((await resolve(['<a href="/archive/S01112026.zip">S01112026.zip</a>'])).size, 0);
   assert.equal((await resolve([monthly, updated, secondUpdated])).size, 0);
 });
 
@@ -239,6 +248,60 @@ test('portal counts are recorded separately and the due queue advances across a 
   assert.deepEqual(coverageDates(ledger, recent, dec8), [...recent.slice(0, 3), '2026-11-20']);
 });
 
+test('runtime bootstrap persists every eligible date and advances unknown dates after rollover', async () => {
+  const now = new Date('2026-12-02T12:00:00Z');
+  let state: DouState = { archives: {} };
+  const months: string[] = [];
+  const connector = new DouConnector({
+    credentials, now: () => now, readState: async () => state,
+    fetch: async () => new Response(null, { status: 404 }),
+    reserve: new DouReserveClient(async input => {
+      months.push(new URL(String(input)).searchParams.get('mes')!);
+      return new Response('<html>known package missing</html>');
+    }),
+  });
+  async function failed() {
+    const result = await executeConnector({ connector, sourceId: 'dou', runId: 'fixture', attemptId: 'a', timeoutMs: 10_000 });
+    assert.equal(result.ok, false);
+    if (result.ok) throw new Error('unexpected sealed spool');
+    assert.equal(result.code, 'DOU_RESERVE_PACKAGE_UNLISTED');
+    return JSON.parse(JSON.stringify(result.metadata?.douCoverage)) as NonNullable<DouState['reserveCoverage']>;
+  }
+  const initial = await failed();
+  assert.deepEqual(months, ['Dezembro', 'Novembro']);
+  assert.equal(Object.keys(initial.rows).length, 32 * 4);
+  assert.equal(initial.rows['2026-11-01:DO1']!.consultation, 'FAILED');
+  assert.equal(initial.rows['2026-11-19:DO1E']!.consultation, 'NOT_ATTEMPTED');
+  assert.equal(initial.rows['2026-10-31:DO1'], undefined);
+  assert.equal(initial.rows['2026-12-03:DO1'], undefined);
+  state = { archives: {}, reserveCoverage: initial };
+  const continued = await failed();
+  assert.equal(continued.rows['2026-11-02:DO1']!.consultation, 'FAILED');
+  assert.equal(continued.rows['2026-11-03:DO1']!.consultation, 'NOT_ATTEMPTED');
+});
+
+test('a collection hiatus seeds missing dates and preserves aged escalations without growing the live queue forever', () => {
+  const nov19 = new Date('2026-11-19T12:00:00Z');
+  const old = markDouCoverage(beginDouCoverage(undefined, nov19, true), ['2026-11-19'], nov19, {
+    channel: 'DOU_OPEN_DATA_ZIP', observed: {}, expected: { '2026-11-19:DO3E': { '218-A': 1 } },
+  });
+  const dec4 = new Date('2026-12-04T12:00:00Z');
+  let ledger = beginDouCoverage(old, dec4, true);
+  assert.equal(ledger.rows['2026-11-25:DO1E']!.consultation, 'NOT_ATTEMPTED');
+  assert.equal(ledger.rows['2026-12-01:DO1']!.consultation, 'NOT_ATTEMPTED');
+  assert.deepEqual(ledger.rows['2026-11-19:DO3E']!.editions, { '218-A': { observed: 0, expected: 1 } });
+  ledger = beginDouCoverage(ledger, new Date('2027-02-05T12:00:00Z'), true);
+  assert.equal(ledger.rows['2026-11-19:DO3E'], undefined);
+  assert.equal(ledger.archivedEscalations?.['2026-11-19:DO3E']!.status, 'ESCALATED');
+  assert.deepEqual(ledger.archivedEscalations?.['2026-11-19:DO3E']!.editions, { '218-A': { observed: 0, expected: 1 } });
+  const archivedAtFeb = ledger.archivedEscalationCount!;
+  for (let month = 3; month <= 12; month++) {
+    ledger = beginDouCoverage(ledger, new Date(Date.UTC(2027, month - 1, 5, 12)), true);
+    assert.ok(Object.keys(ledger.rows).length <= 66 * 4);
+  }
+  assert.ok(ledger.archivedEscalationCount! > archivedAtFeb);
+});
+
 test('reserve fails a whole spool on missing, ambiguous or invalid later packages and preserves debt across restart', async t => {
   const contents = await fixtureEntries('DO1');
   const good = await makeZip(contents);
@@ -251,13 +314,21 @@ test('reserve fails a whole spool on missing, ambiguous or invalid later package
   crc.writeUInt32LE((crc.readUInt32LE(directory + 16) ^ 0xffffffff) >>> 0, directory + 16);
   const badPath = await makeZip([{ ...do3, name: `unknown/${first.name}` }]);
   const badXml = await makeZip([do3, { name: '515_20260918_99.xml', bytes: Buffer.from('<invalid/>') }]);
-  const index = '<a href="/S01092026.zip">ZIP</a><a href="/S03092026.zip">ZIP</a>';
+  const hiddenXml = await makeZip([do3, { ...do3, name: do3.name.replace(/\.xml$/, '.XML.backup') }]);
+  const disguisedXml = await makeZip([do3, { ...do3, name: 'not-an-image.jpg' }]);
+  const duplicateExtension = await makeZip([do3, { ...do3, name: do3.name.replace(/\.xml$/, '.XML') }]);
+  const nestedDaily = await makeZip([do3, { name: '2026-09-18-DO3E.zip', bytes: good }]);
+  const index = septemberZipIndex;
   const cases = [
-    { index: '<a href="/S01092026.zip">ZIP</a>', bytes: crc, code: 'DOU_RESERVE_PACKAGE_UNLISTED', late: false },
-    { index: index + '<a href="/alternate/S03092026.zip">ZIP</a>', bytes: crc, code: 'DOU_RESERVE_PACKAGE_UNLISTED', late: false },
+    { index: fixtureDouZipLink('S01092026.zip'), bytes: crc, code: 'DOU_RESERVE_PACKAGE_UNLISTED', late: false },
+    { index: index + fixtureDouZipLink('S03092026.zip', 2), bytes: crc, code: 'DOU_RESERVE_PACKAGE_UNLISTED', late: false },
     { index, bytes: crc, code: 'DOU_ZIP_CRC_MISMATCH', late: true },
     { index, bytes: badPath, code: 'DOU_UNSAFE_ZIP_PATH', late: true },
     { index, bytes: badXml, code: 'DOU_INVALID_XML_ROOT', late: true },
+    { index, bytes: hiddenXml, code: 'DOU_UNRECOGNIZED_ZIP_MEMBER', late: true },
+    { index, bytes: disguisedXml, code: 'DOU_UNRECOGNIZED_ZIP_MEMBER', late: true },
+    { index, bytes: duplicateExtension, code: 'DOU_UNSAFE_ZIP', late: true },
+    { index, bytes: nestedDaily, code: 'DOU_NESTED_DAILY_ZIP_UNSUPPORTED', late: true },
   ];
 
   let persistedObservation: unknown;
@@ -273,7 +344,7 @@ test('reserve fails a whole spool on missing, ambiguous or invalid later package
       reserve: new DouReserveClient(async input => {
         const url = new URL(String(input));
         if (url.pathname.endsWith('/base-de-dados')) return new Response(fixture.index);
-        return new Response(new Uint8Array(url.pathname.startsWith('/S01') ? good : fixture.bytes));
+        return new Response(new Uint8Array(url.pathname.includes('/S01') ? good : fixture.bytes));
       }),
     });
     const outcome = await executeConnector({ connector, sourceId: 'dou', runId: 'fixture', attemptId: 'a', timeoutMs: 10_000,

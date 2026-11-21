@@ -10,10 +10,10 @@ interface CoverageRow {
   date: string;
   section: DouCoverageSection;
   status: 'PENDING' | 'CONFIRMED_BY_COUNT' | 'ESCALATED';
-  lastAttemptAt: string;
+  lastAttemptAt: string | null;
   dueAt: string;
   deadline: string;
-  consultation: 'FAILED' | 'OK';
+  consultation: 'NOT_ATTEMPTED' | 'FAILED' | 'OK';
   reason: string;
   editions: Record<string, { observed: number; expected: number | null }>;
 }
@@ -22,6 +22,9 @@ export interface DouCoverage {
   version: 1;
   rows: Record<string, CoverageRow>;
   lastChannel?: DouChannel;
+  retainedFrom?: string;
+  archivedEscalationCount?: number;
+  archivedEscalations?: Record<string, CoverageRow>;
 }
 
 const DAY_MS = 86_400_000;
@@ -59,49 +62,109 @@ function safeCount(value: unknown): value is number {
 
 export function readDouCoverage(value: unknown): DouCoverage | undefined {
   const snapshot = record(value);
-  const rows = record(snapshot?.rows);
-  if (snapshot?.version !== 1 || !rows || Object.keys(rows).length > MAX_ROWS) return undefined;
-  const output: DouCoverage = { version: 1, rows: {} };
+  if (snapshot?.version !== 1) return undefined;
+  const rows = readRows(snapshot.rows);
+  if (!rows) return undefined;
+  const output: DouCoverage = { version: 1, rows };
+  if (snapshot.retainedFrom !== undefined) {
+    if (!isoDate(snapshot.retainedFrom)) return undefined;
+    output.retainedFrom = snapshot.retainedFrom;
+  }
+  if (snapshot.archivedEscalationCount !== undefined) {
+    if (typeof snapshot.archivedEscalationCount !== 'number' || !Number.isSafeInteger(snapshot.archivedEscalationCount) ||
+        snapshot.archivedEscalationCount < 0) return undefined;
+    output.archivedEscalationCount = snapshot.archivedEscalationCount;
+  }
+  if (snapshot.archivedEscalations !== undefined) {
+    const archived = readRows(snapshot.archivedEscalations);
+    if (!archived || Object.values(archived).some(row => row.status !== 'ESCALATED')) return undefined;
+    output.archivedEscalations = archived;
+  }
   if (snapshot.lastChannel === 'INLABS' || snapshot.lastChannel === 'DOU_OPEN_DATA_ZIP') output.lastChannel = snapshot.lastChannel;
+  return output;
+}
+
+function readRows(value: unknown): Record<string, CoverageRow> | undefined {
+  const rows = record(value);
+  if (!rows || Object.keys(rows).length > MAX_ROWS) return undefined;
+  const output: Record<string, CoverageRow> = {};
   for (const [key, raw] of Object.entries(rows)) {
     const row = record(raw);
     const editions = record(row?.editions);
     if (!row || !isoDate(row.date) || !DOU_COVERAGE_SECTIONS.includes(row.section as DouCoverageSection) ||
         key !== `${row.date}:${row.section}` || row.deadline !== deadlineOf(row.date) ||
         !['PENDING', 'CONFIRMED_BY_COUNT', 'ESCALATED'].includes(String(row.status)) ||
-        !['FAILED', 'OK'].includes(String(row.consultation)) ||
+        !['NOT_ATTEMPTED', 'FAILED', 'OK'].includes(String(row.consultation)) ||
         typeof row.reason !== 'string' || !/^[A-Z0-9_]{1,70}$/.test(row.reason) ||
-        typeof row.lastAttemptAt !== 'string' || typeof row.dueAt !== 'string' ||
-        !Number.isFinite(Date.parse(row.lastAttemptAt)) || !Number.isFinite(Date.parse(row.dueAt)) ||
+        (row.consultation === 'NOT_ATTEMPTED'
+          ? row.lastAttemptAt !== null
+          : typeof row.lastAttemptAt !== 'string' || !Number.isFinite(Date.parse(row.lastAttemptAt))) ||
+        typeof row.dueAt !== 'string' || !Number.isFinite(Date.parse(row.dueAt)) ||
         !editions || Object.keys(editions).length > 32) return undefined;
     for (const [edition, item] of Object.entries(editions)) {
       const counts = record(item);
       if (!isDouEdition(edition) || !safeCount(counts?.observed) || (counts?.expected !== null && !safeCount(counts?.expected))) return undefined;
     }
-    output.rows[key] = row as unknown as CoverageRow;
+    output[key] = row as unknown as CoverageRow;
   }
   return output;
+}
+
+function previousMonthStart(today: string): string {
+  const start = new Date(today + 'T12:00:00Z');
+  start.setUTCDate(1);
+  start.setUTCMonth(start.getUTCMonth() - 1);
+  return start.toISOString().slice(0, 10);
 }
 
 export function coverageDates(coverage: DouCoverage, ordinaryDates: readonly string[], now: Date): string[] {
   const recent = ordinaryDates.slice(0, 3);
   const today = douLocalDate(now);
+  const earliest = previousMonthStart(today);
   // Expired rows are selected once even when starved, so their unresolved
   // coverage is escalated and remains visible to operations.
   const due = Object.values(coverage.rows)
-    .filter(row => row.status === 'PENDING' && !recent.includes(row.date) &&
+    .filter(row => row.status === 'PENDING' && row.date >= earliest && row.date <= today && !recent.includes(row.date) &&
       (row.deadline < today || Date.parse(row.dueAt) <= now.getTime()))
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt) || a.date.localeCompare(b.date) || a.section.localeCompare(b.section));
   return due[0] ? [...recent, due[0].date] : recent;
 }
 
-export function beginDouCoverage(previous: DouCoverage | undefined, now: Date): DouCoverage {
-  const oldestFinal = new Date(now.getTime() - 65 * DAY_MS).toISOString().slice(0, 10);
+export function beginDouCoverage(previous: DouCoverage | undefined, now: Date, seedWindow = false): DouCoverage {
+  const today = douLocalDate(now);
+  const earliest = previousMonthStart(today);
+  const retainedFrom = new Date(Date.parse(today) - 65 * DAY_MS).toISOString().slice(0, 10);
+  const rows: Record<string, CoverageRow> = {};
+  const expired: Record<string, CoverageRow> = {};
+  for (const [key, original] of Object.entries(previous?.rows ?? {})) {
+    const outsideWindow = original.date < earliest;
+    const row: CoverageRow = outsideWindow && original.status === 'PENDING'
+      ? { ...original, status: 'ESCALATED', reason: 'COVERAGE_WINDOW_CLOSED' }
+      : original;
+    if (row.date >= retainedFrom) rows[key] = row;
+    else if (row.status === 'ESCALATED') expired[key] = row;
+  }
+
+  if (seedWindow) {
+    const seedFrom = today <= deadlineOf(earliest) ? earliest : today.slice(0, 7) + '-01';
+    for (let timestamp = Date.parse(seedFrom); timestamp <= Date.parse(today); timestamp += DAY_MS) {
+      const date = new Date(timestamp).toISOString().slice(0, 10);
+      for (const section of DOU_COVERAGE_SECTIONS) {
+        const key = `${date}:${section}`;
+        rows[key] ??= {
+          date, section, status: 'PENDING', lastAttemptAt: null, dueAt: date + 'T00:00:00.000Z',
+          deadline: deadlineOf(date), consultation: 'NOT_ATTEMPTED', reason: 'AWAITING_FIRST_CONSULTATION', editions: {},
+        };
+      }
+    }
+  }
   return {
     version: 1,
     ...(previous?.lastChannel ? { lastChannel: previous.lastChannel } : {}),
-    rows: Object.fromEntries(Object.entries(previous?.rows ?? {}).filter(([, row]) =>
-      row.date >= oldestFinal || row.status !== 'CONFIRMED_BY_COUNT')),
+    rows,
+    retainedFrom,
+    archivedEscalationCount: (previous?.archivedEscalationCount ?? 0) + Object.keys(expired).length,
+    ...(Object.keys(expired).length ? { archivedEscalations: expired } : {}),
   };
 }
 

@@ -54,7 +54,7 @@ function detachXmlStrings(values: Record<string, string>): void {
 }
 
 function parsePart(entry: DouXmlEntry): Part {
-  const match = /^(\d+)_(\d{8})_(\d+)(?:-(\d+))?\.xml$/.exec(entry.name);
+  const match = /^(\d+)_(\d{8})_(\d+)(?:-(\d+))?\.xml$/i.exec(entry.name);
   if (!match) throw error('DOU_UNRECOGNIZED_XML_FILENAME');
   let xml: string;
   try { xml = new TextDecoder('utf-8', { fatal: true }).decode(entry.bytes); } catch { throw error('DOU_INVALID_ENCODING'); }
@@ -415,7 +415,7 @@ interface DouGroups {
 function addDouEntry({ groups, invalid, partialFailures }: DouGroups, entry: DouXmlEntry): void {
   // Infer a group only from the validated filename pattern so a broken continuation
   // prevents a truncated publication from being persisted as a new complete version.
-  const filenameGroup = /^(\d+)_\d{8}_(\d+)(?:-\d+)?\.xml$/.exec(entry.name);
+  const filenameGroup = /^(\d+)_\d{8}_(\d+)(?:-\d+)?\.xml$/i.exec(entry.name);
   const key = filenameGroup ? `${filenameGroup[1]}:${filenameGroup[2]}` : entry.name;
   try {
     const p = parsePart(entry);
@@ -457,8 +457,9 @@ export function parseDouEntries(entries: DouXmlEntry[], context: DouArchiveConte
 }
 
 interface DouZipSelection { date: string; sections: readonly string[] }
+type ZipLeaf = Omit<DouXmlEntry, 'bytes'> & { auxiliary?: boolean };
 
-function selectMonthlyZipEntry(path: string, selection: DouZipSelection): Omit<DouXmlEntry, 'bytes'> | undefined {
+function selectMonthlyZipEntry(path: string, selection: DouZipSelection): ZipLeaf | undefined {
   // Monthly editions are published flat or in a fixed date/section hierarchy.
   // Never extract to the archive's entry path. Only the basename enters the XML parser.
   if (path.endsWith('/')) {
@@ -476,12 +477,37 @@ function selectMonthlyZipEntry(path: string, selection: DouZipSelection): Omit<D
     expectedSection = nested[2]!;
     name = nested[3]!;
   }
-  if (!name.endsWith('.xml')) return undefined;
-  const fileDate = /^\d+_(\d{8})_\d+(?:-\d+)?\.xml$/.exec(name)?.[1];
+  if (!/\.xml$/i.test(name)) {
+    const embedded = /^(\d{4}-\d{2}-\d{2})-(DO[13]E?)\.zip$/i.exec(name);
+    if (embedded) {
+      const date = embedded[1]!.replaceAll('-', '');
+      const section = embedded[2]!.toUpperCase();
+      if (!selection.sections.includes(section) || (folderDate && (folderDate !== date || expectedSection !== section))) {
+        throw error('DOU_UNSAFE_ZIP_PATH');
+      }
+      if (date === selection.date) throw error('DOU_NESTED_DAILY_ZIP_UNSUPPORTED');
+      return undefined;
+    }
+    // Thumbs.db and normal images exist in official samples. A renamed
+    // article-shaped file is not an auxiliary member, regardless of suffix.
+    if (/^thumbs\.db$/i.test(name) ||
+        (/\.(?:jpe?g|png|gif)$/i.test(name) && !/^\d+_\d{8}_\d+(?:-\d+)?\./.test(name))) {
+      return !folderDate || folderDate === selection.date ? { name: path, auxiliary: true } : undefined;
+    }
+    throw error('DOU_UNRECOGNIZED_ZIP_MEMBER');
+  }
+  const fileDate = /^\d+_(\d{8})_\d+(?:-\d+)?\.xml$/i.exec(name)?.[1];
   if (!fileDate) throw error('DOU_UNRECOGNIZED_XML_FILENAME');
   if (folderDate && folderDate !== fileDate) throw error('DOU_ZIP_FOLDER_DATE_MISMATCH');
   if (fileDate !== selection.date) return undefined;
   return { name, ...(expectedSection ? { expectedSection } : {}) };
+}
+
+function validAuxiliary(name: string, bytes: Buffer): boolean {
+  if (/\.jpe?g$/i.test(name)) return bytes.subarray(0, 3).toString('hex') === 'ffd8ff';
+  if (/\.png$/i.test(name)) return bytes.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+  if (/\.gif$/i.test(name)) return /^GIF8[79]a$/.test(bytes.subarray(0, 6).toString('ascii'));
+  return bytes.subarray(0, 8).toString('hex') === 'd0cf11e0a1b11ae1';
 }
 
 /** Read one XML entry at a time without copying the compressed archive. */
@@ -523,20 +549,21 @@ async function visitDouZip(
       if (++entryCount > (selection ? 120_000 : 5000) || entry.isEncrypted()) {
         fail(error('DOU_UNSAFE_ZIP')); return;
       }
-      let selected: Omit<DouXmlEntry, 'bytes'> | undefined = { name: entry.fileName };
+      let selected: ZipLeaf | undefined = { name: entry.fileName };
       if (selection) {
         try { selected = selectMonthlyZipEntry(entry.fileName, selection); }
         catch (e) { fail(e); return; }
         if (!selected) { zip.readEntry(); return; }
       }
       total += entry.uncompressedSize;
-      if (names.has(selected.name) || names.size >= 5000 || entry.uncompressedSize > 8 * 1024 * 1024 || total > 128 * 1024 * 1024) {
+      const logicalName = selection ? selected.name.toLowerCase() : selected.name;
+      if (names.has(logicalName) || names.size >= 5000 || entry.uncompressedSize > 8 * 1024 * 1024 || total > 128 * 1024 * 1024) {
         fail(error('DOU_UNSAFE_ZIP')); return;
       }
-      names.add(selected.name);
+      names.add(logicalName);
       if (selected.name.endsWith('/')) { zip.readEntry(); return; }
-      if (selected.name.includes('/') || selected.name.includes('\\')) { fail(error('DOU_UNSAFE_ZIP_PATH')); return; }
-      if (!selected.name.endsWith('.xml')) { mediaCount++; zip.readEntry(); return; }
+      if (!selected.auxiliary && (selected.name.includes('/') || selected.name.includes('\\'))) { fail(error('DOU_UNSAFE_ZIP_PATH')); return; }
+      if (!selected.auxiliary && !/\.xml$/i.test(selected.name)) { mediaCount++; zip.readEntry(); return; }
       const entryMetadata = selected;
       zip.openReadStream(entry, (err, input) => {
         if (err || !input) { fail(error('DOU_INVALID_ZIP_ENTRY')); return; }
@@ -555,8 +582,13 @@ async function visitDouZip(
           if (done) return;
           if (size !== entry.uncompressedSize || crc32(entryBytes!) !== entry.crc32) { fail(error('DOU_ZIP_CRC_MISMATCH')); return; }
           try {
-            onEntry({ ...entryMetadata, bytes: entryBytes! });
-            xmlCount++;
+            if (entryMetadata.auxiliary) {
+              if (!validAuxiliary(entryMetadata.name, entryBytes!)) throw error('DOU_UNRECOGNIZED_ZIP_MEMBER');
+              mediaCount++;
+            } else {
+              onEntry({ ...entryMetadata, bytes: entryBytes! });
+              xmlCount++;
+            }
           } catch (e) { fail(e); return; }
           entryBytes = undefined;
           stream = undefined;

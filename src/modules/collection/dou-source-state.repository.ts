@@ -65,12 +65,11 @@ export async function readDouSourceState(db: Kysely<DB>, sourceId: string, runId
   });
   // Concurrent runs can finish out of observation order. Recover recently
   // observed dates which the latest run did not see when it acquired state.
-  const oldest = latest && Object.keys(latest.rows).sort()[0]?.slice(0, 10);
   for (const snapshot of earlier) {
     for (const [key, row] of Object.entries(snapshot.rows)) {
-      if (row.status === 'CONFIRMED_BY_COUNT' && oldest && row.date < oldest) continue;
+      if (latest!.retainedFrom && row.date < latest!.retainedFrom) continue;
       const current = latest!.rows[key];
-      if (!current || row.lastAttemptAt > current.lastAttemptAt) latest!.rows[key] = row;
+      if (!current || (row.lastAttemptAt ?? '') > (current.lastAttemptAt ?? '')) latest!.rows[key] = row;
     }
   }
   return {

@@ -12,7 +12,7 @@ import { DouConnector } from '../src/modules/collection/dou.connector.js';
 import { DouReserveClient } from '../src/modules/collection/dou-reserve.client.js';
 import { readDouSourceState } from '../src/modules/collection/dou-source-state.repository.js';
 import { runSchedulerTick } from '../src/modules/collection/scheduler.service.js';
-import { fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
+import { fixtureDouZipLink, fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
 import { getSourceOperationalSnapshot } from '../src/modules/collection/collection-monitoring.repository.js';
 
 test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, versions and receipts', async (t) => {
@@ -178,15 +178,15 @@ test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, vers
       };
       const reserve = new DouReserveClient(async input => {
         const url = new URL(String(input));
-        if (url.pathname.includes('base-de-dados')) return new Response('<a href="/S01092026.zip">ZIP</a>' +
-          (missingSection ? '' : '<a href="/S03092026.zip">ZIP</a>'));
+        if (url.pathname.includes('base-de-dados')) return new Response(fixtureDouZipLink('S01092026.zip') +
+          (missingSection ? '' : fixtureDouZipLink('S03092026.zip')));
         if (url.pathname.includes('leiturajornal')) {
           const section = url.searchParams.get('secao')!.toUpperCase();
           return new Response(`<script id="params" type="application/json">${JSON.stringify({
             dateUrl: url.searchParams.get('data'), section, typeNormDay: { DO1E: false, DO3E: false }, jsonArray: [],
           })}</script>`);
         }
-        return new Response(new Uint8Array(url.pathname.startsWith('/S01') ? payload : empty));
+        return new Response(new Uint8Array(url.pathname.includes('/S01') ? payload : empty));
       });
       async function attempt() {
         const processRegistry = new ConnectorRegistry();

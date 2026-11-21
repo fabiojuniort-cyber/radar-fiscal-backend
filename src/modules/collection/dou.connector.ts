@@ -67,12 +67,14 @@ export class DouConnector implements CollectionConnector {
     const now = this.#options.now?.() ?? new Date();
     const state = await this.#options.readState?.(context.sourceId, context.runId) ?? { archives: {} };
     const reserve = this.#options.reserve;
-    const coverage = reserve && state.reserveCoverage ? beginDouCoverage(state.reserveCoverage, now) : undefined;
+    const coverage = reserve && (state.reserveCoverage || !this.#options.dates)
+      ? beginDouCoverage(state.reserveCoverage, now, !this.#options.dates)
+      : undefined;
     const ordinaryDates = douCollectionDates(now);
     const dates = this.#options.dates ?? (coverage ? coverageDates(coverage, ordinaryDates, now) : ordinaryDates);
     if (!dates.length || dates.length > 4 || new Set(dates).size !== dates.length || dates.some(d => !/^\d{4}-\d{2}-\d{2}$/.test(d) || !Number.isFinite(Date.parse(d)) || new Date(d).toISOString().slice(0, 10) !== d)) throw failure('DOU_INVALID_DATE_BATCH');
     // Do not silently discard a gap that exceeds the bounded reconciliation window.
-    if (!this.#options.dates && !coverage && state.lastSuccessAt && now.getTime() - state.lastSuccessAt.getTime() > 60 * 86400000) throw failure('DOU_BACKFILL_REQUIRED');
+    if (!this.#options.dates && !state.reserveCoverage && state.lastSuccessAt && now.getTime() - state.lastSuccessAt.getTime() > 60 * 86400000) throw failure('DOU_BACKFILL_REQUIRED');
     const cutoff = new Date(now);
     cutoff.setUTCDate(cutoff.getUTCDate() - 65);
     const oldestReceiptDate = cutoff.toISOString().slice(0, 10);
@@ -99,7 +101,7 @@ export class DouConnector implements CollectionConnector {
         if (coverage && error instanceof ConnectorError) throw this.#coverageError(error, coverage, dates, now);
         throw error;
       }
-      const ledger = coverage ?? beginDouCoverage(undefined, now);
+      const ledger = coverage ?? beginDouCoverage(undefined, now, !this.#options.dates);
       const reserveDates = this.#options.dates ?? coverageDates(ledger, ordinaryDates, now);
       const observed: DouObservedEditions = {};
       try {

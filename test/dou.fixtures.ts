@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto';
 import yazl from 'yazl';
 import type { DouXmlEntry, DouArchiveContext } from '../src/modules/collection/dou.parser.js';
 export const fixtureDir = new URL('./fixtures/dou/', import.meta.url);
+export function fixtureDouZipLink(filename: string, ordinal = 1, label = filename): string {
+  const id = `00000000-0000-4000-8000-${String(ordinal).padStart(12, '0')}`;
+  return `<a href="/documents/49035712/741444604/${filename}/${id}?version=1.0&amp;download=true">${label}</a>`;
+}
 export async function fixtureEntries(section: string): Promise<DouXmlEntry[]> {
   const manifest = JSON.parse(await readFile(new URL('manifest.json', fixtureDir), 'utf8'));
   return Promise.all(manifest.filter((r: { section: string }) => r.section === section).map(async (r: { filename: string; rawSha256: string }) => {

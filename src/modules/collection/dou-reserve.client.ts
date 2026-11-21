@@ -20,6 +20,7 @@ const MONTHS = [
 export type DouReserveSection = '01' | '03';
 export interface DouReservePackage { filename: string; officialUrl: string }
 const packageName = /^S0[13]((?:0[1-9]|1[0-2])\d{4})(?:_Atualizado(?:[01]\d|2[0-3])[0-5]\d[0-5]\d)?\.zip$/i;
+const packagePath = /^\/documents\/\d+\/\d+\/([^/]+)\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
 function reserveError(code: string, httpStatus?: number): ConnectorError {
   return new ConnectorError(code, {
@@ -38,10 +39,20 @@ function officialUrl(href: string, base: string): URL | undefined {
   return undefined;
 }
 
+function documentFilename(url: URL | undefined): string | undefined {
+  if (!url || (url.hostname !== 'www.in.gov.br' && url.hostname !== 'in.gov.br')) return undefined;
+  const pathName = packagePath.exec(url.pathname)?.[1];
+  if (!pathName) return undefined;
+  try {
+    const filename = decodeURIComponent(pathName);
+    return packageName.test(filename) ? filename : undefined;
+  } catch { return undefined; }
+}
+
 export class DouReserveClient {
   constructor(private readonly fetcher: typeof fetch = fetch) {}
 
-  private async request(url: string, signal: AbortSignal): Promise<Response> {
+  private async request(url: string, signal: AbortSignal, mayRedirect?: (target: URL) => boolean): Promise<Response> {
     for (let hop = 0; hop <= 3; hop++) {
       signal.throwIfAborted();
       let response: Response;
@@ -55,7 +66,7 @@ export class DouReserveClient {
       await response.body?.cancel().catch(() => {});
       const location = response.headers.get('location');
       const target = location && officialUrl(location, url);
-      if (response.status < 300 || response.status >= 400 || !target) {
+      if (response.status < 300 || response.status >= 400 || !target || (mayRedirect && !mayRedirect(target))) {
         throw reserveError('DOU_RESERVE_HTTP_ERROR', response.status);
       }
       url = target.href;
@@ -93,15 +104,11 @@ export class DouReserveClient {
         const { href, label } = anchor;
         anchor = undefined;
         const url = officialUrl(href, response.url || indexUrl.href);
-        if (!url) return;
-        let pathComponents: string[];
-        try { pathComponents = url.pathname.split('/').map(value => decodeURIComponent(value)); }
-        catch { return; }
-        // Liferay puts the ZIP filename before the document UUID.
-        const fileNames = pathComponents.filter(name => packageName.test(name));
-        if (!fileNames.length) return;
-        const names = packageName.test(label.trim()) ? [label.trim(), ...fileNames] : fileNames;
-        const conflict = new Set(names.map(name => name.toUpperCase())).size > 1;
+        const filenameFromPath = documentFilename(url);
+        if (!url || !filenameFromPath) return;
+        const filenameFromLabel = label.trim();
+        const names = [filenameFromPath, filenameFromLabel].filter(name => packageName.test(name));
+        const conflict = !packageName.test(filenameFromLabel) || filenameFromPath.toUpperCase() !== filenameFromLabel.toUpperCase();
         for (const filename of names) {
           if (packageName.exec(filename)?.[1] !== monthAndYear) continue;
           const key = filename.slice(0, 9).toUpperCase();
@@ -209,11 +216,14 @@ export class DouReserveClient {
     signal: AbortSignal,
     use: (path: string, rawSha256: string, bytes: number) => Promise<T>,
   ): Promise<T> {
+    const url = officialUrl(pkg.officialUrl, DOU_OPEN_DATA_INDEX);
+    const matches = (target: URL | undefined) => documentFilename(target)?.toUpperCase() === pkg.filename.toUpperCase();
+    if (!url || !matches(url)) throw reserveError('DOU_RESERVE_INVALID_PACKAGE_URL');
     const dir = await mkdtemp(join(tmpdir(), 'dou-reserve-'))
       .catch(() => { throw reserveError('DOU_RESERVE_TEMP_UNAVAILABLE'); });
     const path = join(dir, 'monthly.zip');
     try {
-      const response = await this.request(pkg.officialUrl, signal);
+      const response = await this.request(url.href, signal, matches);
       const hash = createHash('sha256');
       let bytes = 0;
       const meter = new Transform({
