@@ -4,13 +4,15 @@ import { InlabsClient, type InlabsCredentials, type InlabsXmlSection } from './i
 import { parseDouZip, type DouArchiveContext } from './dou.parser.js';
 import { classifyDouContractExcerpt, DOU_SCOPE_RULE_VERSION } from './dou-scope.rules.js';
 import { DouReserveClient } from './dou-reserve.client.js';
-import { collectDouReserve, isDouReserveEligible, type DouReserveReceipts } from './dou-reserve.js';
+import { collectDouReserve, countDouEdition, isDouReserveEligible, type DouObservedEditions, type DouReserveReceipts } from './dou-reserve.js';
+import { beginDouCoverage, coverageDates, markDouCoverage, type DouChannel, type DouCoverage } from './dou-coverage.js';
 
 export const DOU_XML_SECTIONS: readonly InlabsXmlSection[] = ['DO1', 'DO1E', 'DO3', 'DO3E'];
 
 export interface DouState {
   archives: Record<string, string>;
   reserveArchives?: DouReserveReceipts;
+  reserveCoverage?: DouCoverage;
   lastSuccessAt?: Date;
 }
 export interface DouOptions {
@@ -63,11 +65,14 @@ export class DouConnector implements CollectionConnector {
     emit: (publication: ConnectorPublication) => Promise<void>,
   ): Promise<ConnectorResult> {
     const now = this.#options.now?.() ?? new Date();
-    const dates = this.#options.dates ?? douCollectionDates(now);
-    if (!dates.length || dates.length > 4 || new Set(dates).size !== dates.length || dates.some(d => !/^\d{4}-\d{2}-\d{2}$/.test(d) || !Number.isFinite(Date.parse(d)) || new Date(d).toISOString().slice(0, 10) !== d)) throw failure('DOU_INVALID_DATE_BATCH');
     const state = await this.#options.readState?.(context.sourceId, context.runId) ?? { archives: {} };
+    const reserve = this.#options.reserve;
+    const coverage = reserve && state.reserveCoverage ? beginDouCoverage(state.reserveCoverage, now) : undefined;
+    const ordinaryDates = douCollectionDates(now);
+    const dates = this.#options.dates ?? (coverage ? coverageDates(coverage, ordinaryDates, now) : ordinaryDates);
+    if (!dates.length || dates.length > 4 || new Set(dates).size !== dates.length || dates.some(d => !/^\d{4}-\d{2}-\d{2}$/.test(d) || !Number.isFinite(Date.parse(d)) || new Date(d).toISOString().slice(0, 10) !== d)) throw failure('DOU_INVALID_DATE_BATCH');
     // Do not silently discard a gap that exceeds the bounded reconciliation window.
-    if (!this.#options.dates && state.lastSuccessAt && now.getTime() - state.lastSuccessAt.getTime() > 60 * 86400000) throw failure('DOU_BACKFILL_REQUIRED');
+    if (!this.#options.dates && !coverage && state.lastSuccessAt && now.getTime() - state.lastSuccessAt.getTime() > 60 * 86400000) throw failure('DOU_BACKFILL_REQUIRED');
     const cutoff = new Date(now);
     cutoff.setUTCDate(cutoff.getUTCDate() - 65);
     const oldestReceiptDate = cutoff.toISOString().slice(0, 10);
@@ -76,21 +81,84 @@ export class DouConnector implements CollectionConnector {
       Object.entries(state.reserveArchives ?? {}).filter(([key]) => key.slice(0, 10) >= oldestReceiptDate),
     );
     let emitted = false;
+    const primaryObserved: DouObservedEditions = {};
     const emitPrimary = async (publication: ConnectorPublication) => {
+      if (coverage) countDouEdition(primaryObserved, publication.publishedAt!.toISOString().slice(0, 10), publication);
       emitted = true;
       await emit(publication);
     };
+    let primary: ConnectorResult;
     try {
-      return await this.#collectInlabs(context, dates, receipts, reserveReceipts, oldestReceiptDate, emitPrimary);
+      // Recompute the edition inventory while coverage is being tracked. In
+      // particular a previously known native ZIP must emit provenance again
+      // after an observed channel change, even if its checksum is unchanged.
+      primary = await this.#collectInlabs(context, dates, receipts, reserveReceipts, oldestReceiptDate, emitPrimary, Boolean(coverage));
     } catch (error) {
       context.signal.throwIfAborted();
-      if (!this.#options.reserve || emitted || !isDouReserveEligible(error)) throw error;
-      const result = await collectDouReserve(this.#options.reserve, dates, context, emit, error, reserveReceipts);
-      for (const map of [receipts, reserveReceipts]) {
-        for (const key of Object.keys(map)) if (key.slice(0, 10) < oldestReceiptDate) delete map[key];
+      if (!reserve || emitted || !isDouReserveEligible(error)) {
+        if (coverage && error instanceof ConnectorError) throw this.#coverageError(error, coverage, dates, now);
+        throw error;
       }
-      return { ...result, metadata: { ...result.metadata, douArchives: receipts, douReserveArchives: reserveReceipts } };
+      const ledger = coverage ?? beginDouCoverage(undefined, now);
+      const reserveDates = this.#options.dates ?? coverageDates(ledger, ordinaryDates, now);
+      const observed: DouObservedEditions = {};
+      try {
+        const result = await collectDouReserve(reserve, reserveDates, context, emit, error, reserveReceipts, observed, ledger.lastChannel !== 'DOU_OPEN_DATA_ZIP');
+        for (const map of [receipts, reserveReceipts]) {
+          for (const key of Object.keys(map)) if (key.slice(0, 10) < oldestReceiptDate) delete map[key];
+        }
+        return await this.#withCoverage({ ...result, metadata: { ...result.metadata, douArchives: receipts, douReserveArchives: reserveReceipts } },
+          reserve, ledger, reserveDates, now, 'DOU_OPEN_DATA_ZIP', observed, context.signal);
+      } catch (failure) {
+        context.signal.throwIfAborted();
+        if (failure instanceof ConnectorError) throw this.#coverageError(failure, ledger, reserveDates, now);
+        throw failure;
+      }
     }
+    if (!coverage || !reserve) return primary;
+    return this.#withCoverage(primary, reserve, coverage, dates, now, 'INLABS', primaryObserved, context.signal);
+  }
+
+  #coverageError(error: ConnectorError, ledger: DouCoverage, dates: readonly string[], now: Date): ConnectorError {
+    return new ConnectorError(error.message, {
+      code: error.code, kind: error.kind, retryable: error.retryable,
+      ...(error.httpStatus === undefined ? {} : { httpStatus: error.httpStatus }),
+      ...(error.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: error.retryAfterSeconds }),
+      metadata: { ...error.metadata, douCoverage: markDouCoverage(ledger, dates, now, { error: error.code }) },
+    });
+  }
+
+  async #withCoverage(
+    result: ConnectorResult, client: DouReserveClient, ledger: DouCoverage, dates: readonly string[], now: Date,
+    channel: DouChannel, observed: DouObservedEditions, signal: AbortSignal,
+  ): Promise<ConnectorResult> {
+    const expected: DouObservedEditions = {};
+    let next: DouCoverage;
+    if (result.partialFailures?.length) next = markDouCoverage(ledger, dates, now, { error: 'DOU_PRIMARY_PARTIAL' });
+    else {
+      const referenceSignal = AbortSignal.any([signal, AbortSignal.timeout(12_000)]);
+      for (const date of dates) {
+        try {
+          for (const [section, counts] of Object.entries(await client.editions(date, referenceSignal))) expected[`${date}:${section}`] = counts;
+        } catch (error) {
+          signal.throwIfAborted();
+          if (!referenceSignal.aborted) throw error;
+          break;
+        }
+      }
+      next = markDouCoverage(ledger, dates, now, { observed, expected, channel });
+    }
+    const pending = Object.values(next.rows).filter(row => row.status !== 'CONFIRMED_BY_COUNT').length;
+    return {
+      ...result,
+      ...(pending ? { completion: { complete: false, reason: 'MATERIAL_CONTENT_DEFERRED', pending: { douCoverageRows: pending } } } : {}),
+      metadata: {
+        ...result.metadata, douCoverage: next,
+        douConsultation: result.partialFailures?.length ? 'FAILED' : 'OK',
+        douCoverageStatus: pending ? 'INCOMPLETE' : 'CONFIRMED_BY_COUNT',
+        douCoverageEscalatedCount: Object.values(next.rows).filter(row => row.status === 'ESCALATED').length,
+      },
+    };
   }
 
   async #collectInlabs(
@@ -100,6 +168,7 @@ export class DouConnector implements CollectionConnector {
     reserveReceipts: DouReserveReceipts,
     oldestReceiptDate: string,
     emit: (publication: ConnectorPublication) => Promise<void>,
+    replay: boolean,
   ): Promise<ConnectorResult> {
     const client = new InlabsClient({ credentials: this.#options.credentials, ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}) });
     const partialFailures: ConnectorPartialFailure[] = [];
@@ -140,7 +209,7 @@ export class DouConnector implements CollectionConnector {
           }
           available++;
           context.memory?.('archive_downloaded', { archives: available, archiveBytes: download.bytes.byteLength, publications: publicationCount });
-          if (priorReceipts[filename] === download.rawSha256) {
+          if (!replay && priorReceipts[filename] === download.rawSha256) {
             archives.push({ filename, state: 'UNCHANGED', date, section, rawSha256: download.rawSha256 });
             continue;
           }

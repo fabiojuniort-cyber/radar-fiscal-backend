@@ -41,7 +41,7 @@ export function buildConnectorRegistry(
       credentials: () => process.env.INLABS_EMAIL && process.env.INLABS_PASSWORD
         ? { email: process.env.INLABS_EMAIL, password: process.env.INLABS_PASSWORD } : undefined,
       ...(options.douReserve ? { reserve: options.douReserve } : {}),
-      ...(options.db ? { readState: (sourceId: string, runId: string) => readDouSourceState(options.db!, sourceId, runId) } : {}),
+      ...(options.db ? { readState: (sourceId: string, runId: string) => readDouSourceState(options.db!, sourceId, runId, Boolean(options.douReserve)) } : {}),
     }));
   }
 

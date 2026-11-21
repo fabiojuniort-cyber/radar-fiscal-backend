@@ -7,6 +7,7 @@ import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Parser } from 'htmlparser2';
 import { ConnectorError } from './connector.error.js';
+import { isDouEdition, type DouEditionInventory } from './dou-coverage.js';
 
 export const DOU_OPEN_DATA_INDEX = 'https://www.in.gov.br/acesso-a-informacao/dados-abertos/base-de-dados';
 const MAX_INDEX_BYTES = 4 * 1024 * 1024;
@@ -18,6 +19,7 @@ const MONTHS = [
 
 export type DouReserveSection = '01' | '03';
 export interface DouReservePackage { filename: string; officialUrl: string }
+const packageName = /^S0[13]((?:0[1-9]|1[0-2])\d{4})(?:_Atualizado(?:[01]\d|2[0-3])[0-5]\d[0-5]\d)?\.zip$/i;
 
 function reserveError(code: string, httpStatus?: number): ConnectorError {
   return new ConnectorError(code, {
@@ -79,8 +81,7 @@ export class DouReserveClient {
 
   private async indexMonth(indexUrl: URL, monthAndYear: string, signal: AbortSignal): Promise<ReadonlyMap<string, DouReservePackage>> {
     const response = await this.request(indexUrl.href, signal);
-    const documents = new Map<string, DouReservePackage>();
-    const conflicts = new Set<string>();
+    const candidates = new Map<string, [Map<string, DouReservePackage | null>, Map<string, DouReservePackage | null>]>();
     let anchor: { href: string; label: string } | undefined;
     const parser = new Parser({
       onopentag(name, attrs) {
@@ -93,22 +94,35 @@ export class DouReserveClient {
         anchor = undefined;
         const url = officialUrl(href, response.url || indexUrl.href);
         if (!url) return;
-        // The official index may use a Liferay document identifier in href.
-        const names = [label.trim(), url.pathname.split('/').at(-1) ?? ''];
-        const match = names.map(value => /^(S0[13]((?:0[1-9]|1[0-2])\d{4})(?:_Atualizado(?:[01]\d|2[0-3])[0-5]\d[0-5]\d)?\.zip)$/i.exec(value)).find(Boolean);
-        if (!match || match[2] !== monthAndYear) return;
-        const filename = match[1]!;
-        const key = filename.slice(0, 9).toUpperCase();
-        const previous = documents.get(key);
-        if (previous && previous.officialUrl !== url.href) {
-          const oldIsUpdated = /_atualizado/i.test(previous.filename);
-          const newIsUpdated = /_atualizado/i.test(filename);
-          if (oldIsUpdated === newIsUpdated) { conflicts.add(key); return; }
-          if (oldIsUpdated) return;
+        let pathComponents: string[];
+        try { pathComponents = url.pathname.split('/').map(value => decodeURIComponent(value)); }
+        catch { return; }
+        // Liferay puts the ZIP filename before the document UUID.
+        const fileNames = pathComponents.filter(name => packageName.test(name));
+        if (!fileNames.length) return;
+        const names = packageName.test(label.trim()) ? [label.trim(), ...fileNames] : fileNames;
+        const conflict = new Set(names.map(name => name.toUpperCase())).size > 1;
+        for (const filename of names) {
+          if (packageName.exec(filename)?.[1] !== monthAndYear) continue;
+          const key = filename.slice(0, 9).toUpperCase();
+          const ranks = candidates.get(key) ?? [new Map(), new Map()];
+          const rank = ranks[/_atualizado/i.test(filename) ? 1 : 0];
+          rank.set(url.href, conflict || rank.get(url.href) === null ? null : { filename, officialUrl: url.href });
+          candidates.set(key, ranks);
         }
-        documents.set(key, { filename, officialUrl: url.href });
       },
     });
+    await this.readHtml(response, parser, signal);
+    const documents = new Map<string, DouReservePackage>();
+    for (const [key, [monthly, updated]] of candidates) {
+      const best = updated.size ? updated : monthly;
+      const candidate = best.values().next().value;
+      if (best.size === 1 && candidate) documents.set(key, candidate);
+    }
+    return documents;
+  }
+
+  private async readHtml(response: Response, parser: Parser, signal: AbortSignal): Promise<void> {
     const decoder = new TextDecoder();
     let total = 0;
     try {
@@ -124,8 +138,61 @@ export class DouReserveClient {
       if (error instanceof ConnectorError) throw error;
       throw reserveError('DOU_RESERVE_INVALID_INDEX');
     }
-    for (const key of conflicts) documents.delete(key);
-    return documents;
+  }
+
+  async editions(date: string, signal: AbortSignal): Promise<DouEditionInventory> {
+    const result: DouEditionInventory = {};
+    const portalDate = date.split('-').reverse().join('-');
+    for (const section of ['DO1', 'DO3'] as const) {
+      const regular = await this.editionPage(section, portalDate, signal);
+      if (!regular) continue;
+      result[section] = regular.counts;
+      const extraSection = `${section}E` as const;
+      if (regular.hasExtra === false) result[extraSection] = {};
+      if (regular.hasExtra === true) {
+        const extra = await this.editionPage(extraSection, portalDate, signal);
+        if (extra && Object.keys(extra.counts).length) result[extraSection] = extra.counts;
+      }
+    }
+    return result;
+  }
+
+  private async editionPage(section: 'DO1' | 'DO3' | 'DO1E' | 'DO3E', date: string, signal: AbortSignal) {
+    try {
+      const url = new URL('https://www.in.gov.br/leiturajornal');
+      url.searchParams.set('secao', section.toLowerCase());
+      url.searchParams.set('data', date);
+      const response = await this.request(url.href, signal);
+      let params = '';
+      let reading = false;
+      let scripts = 0;
+      const parser = new Parser({
+        onopentag(name, attrs) {
+          if (name === 'script' && attrs.id === 'params' && attrs.type === 'application/json') {
+            reading = true;
+            scripts++;
+          }
+        },
+        ontext(text) { if (reading) params += text; },
+        onclosetag(name) { if (name === 'script') reading = false; },
+      });
+      await this.readHtml(response, parser, signal);
+      if (scripts !== 1) return undefined;
+      const payload = JSON.parse(params);
+      const expectedSection = section.endsWith('E') ? new RegExp(`^${section.slice(0, 3)}(?:E|_EXTRA_[A-Z]+)$`) : new RegExp(`^${section}$`);
+      if (payload?.dateUrl !== date || !String(payload.section).split(',').every(value => expectedSection.test(value)) ||
+          !Array.isArray(payload.jsonArray) || payload.jsonArray.length > 5000) return undefined;
+      const counts: Record<string, number> = {};
+      for (const item of payload.jsonArray) {
+        if (!expectedSection.test(String(item?.pubName)) || typeof item.editionNumber !== 'string' ||
+            !isDouEdition(item.editionNumber)) return undefined;
+        counts[item.editionNumber] = (counts[item.editionNumber] ?? 0) + 1;
+      }
+      return { counts, hasExtra: payload.typeNormDay?.[`${section}E`] };
+    } catch {
+      signal.throwIfAborted();
+      return undefined;
+    }
   }
 
   private body(response: Response, maxBytes: number): Readable {

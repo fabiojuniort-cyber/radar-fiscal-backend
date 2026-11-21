@@ -1,10 +1,25 @@
-import type { ConnectorExecutionContext, ConnectorPartialFailure, ConnectorPublication, ConnectorResult } from './connector.contract.js';
+import type { ConnectorExecutionContext, ConnectorPublication, ConnectorResult } from './connector.contract.js';
 import { ConnectorError } from './connector.error.js';
 import { DouReserveClient, douReservePackageKey } from './dou-reserve.client.js';
 import { parseDouMonthlyZipDate } from './dou.parser.js';
 import { classifyDouContractExcerpt } from './dou-scope.rules.js';
+import { isDouEdition, type DouEditionInventory } from './dou-coverage.js';
 
-export type DouReserveReceipts = Record<string, { rawSha256: string; observedSections: string[] }>;
+export type DouReserveReceipts = Record<string, { rawSha256: string; observedSections: string[]; editions?: DouEditionInventory }>;
+export type DouObservedEditions = Record<string, Record<string, number>>;
+
+export function countDouEdition(observed: DouObservedEditions, date: string, publication: ConnectorPublication): void {
+  const dou = publication.metadata?.dou as { section: string; edition: string; embeddedAct?: boolean };
+  if (dou.embeddedAct) return;
+  if (!isDouEdition(dou.edition)) throw reserveFailure('DOU_INVALID_EDITION_NUMBER');
+  const key = `${date}:${dou.section}`;
+  const edition = observed[key] ??= {};
+  edition[dou.edition] = (edition[dou.edition] ?? 0) + 1;
+}
+
+function reserveFailure(code: string): ConnectorError {
+  return new ConnectorError(code, { code, kind: 'PROCESSING_ERROR', retryable: false });
+}
 
 export function isDouReserveEligible(error: unknown): error is ConnectorError {
   if (!(error instanceof ConnectorError)) return false;
@@ -21,6 +36,8 @@ export async function collectDouReserve(
   emit: (publication: ConnectorPublication) => Promise<void>,
   primaryError: ConnectorError,
   receipts: DouReserveReceipts,
+  observed: DouObservedEditions,
+  replay: boolean,
 ): Promise<ConnectorResult> {
   const { signal } = context;
   const index = await client.index(dates.map(date => date.slice(0, 7)), signal);
@@ -33,7 +50,11 @@ export async function collectDouReserve(
       datesByPackage.set(key, scope);
     }
   }
-  const partialFailures: ConnectorPartialFailure[] = [];
+  // The complete selected batch is the boundary. The executor's spool is
+  // private until the connector returns normally, including late ZIP failures.
+  for (const key of datesByPackage.keys()) {
+    if (!index.has(key)) throw reserveFailure('DOU_RESERVE_PACKAGE_UNLISTED');
+  }
   const archives: Array<Record<string, unknown>> = [];
   let xmlCount = 0;
   let publicationCount = 0;
@@ -41,22 +62,17 @@ export async function collectDouReserve(
   let embeddedActCount = 0;
   let confazMatterCount = 0;
   let usablePackages = 0;
-  let observedDateCount = 0;
   const editions = new Set<string>();
   for (const [key, scope] of datesByPackage) {
-    const pkg = index.get(key);
-    if (!pkg) {
-      partialFailures.push({ code: 'DOU_RESERVE_PACKAGE_UNLISTED', message: 'Official monthly ZIP missing or ambiguous', itemReference: key });
-      continue;
-    }
+    const pkg = index.get(key)!;
     await client.withPackage(pkg, signal, async (path, rawSha256, bytes) => {
       context.memory?.('archive_downloaded', { archives: usablePackages + 1, archiveBytes: bytes, publications: publicationCount });
       for (const date of scope.dates) {
         const archive = { ...pkg, date, rawSha256, ingestionChannel: 'DOU_OPEN_DATA_ZIP' as const };
         const receiptKey = `${date}-${scope.sections[0]}`;
         const receipt = receipts[receiptKey];
-        if (receipt?.rawSha256 === rawSha256) {
-          observedDateCount++;
+        if (!replay && receipt?.rawSha256 === rawSha256 && receipt.editions) {
+          for (const [section, counts] of Object.entries(receipt.editions)) observed[`${date}:${section}`] = counts;
           archives.push({
             ...archive, state: 'UNCHANGED', observedSections: receipt.observedSections,
             unobservedSections: scope.sections.filter(section => !receipt.observedSections.includes(section)), extrasComplete: false,
@@ -68,11 +84,12 @@ export async function collectDouReserve(
         const parsed = await parseDouMonthlyZipDate(path, archive, scope.sections, signal, async publication => {
           const reference = publication.externalId!;
           if (seen.has(reference)) {
-            throw new ConnectorError('Repeated official DOU identity in monthly ZIP', { code: 'DOU_RESERVE_DUPLICATE_MATTER', kind: 'PROCESSING_ERROR', retryable: false });
+            throw reserveFailure('DOU_RESERVE_DUPLICATE_MATTER');
           }
           seen.add(reference);
           const dou = publication.metadata?.dou as { section: string; edition: string; embeddedAct?: boolean };
           observedSections.add(dou.section);
+          countDouEdition(observed, date, publication);
           editions.add(`${date}:${dou.edition}`);
           if (dou.embeddedAct) embeddedActCount++;
           else assembledMatterCount++;
@@ -84,17 +101,13 @@ export async function collectDouReserve(
           } : publication);
           publicationCount++;
         });
-        partialFailures.push(...parsed.partialFailures);
+        if (parsed.partialFailures.length) throw reserveFailure(parsed.partialFailures[0]!.code);
         xmlCount += parsed.xmlCount;
-        if (observedSections.size) observedDateCount++;
-        if (observedSections.size && !parsed.partialFailures.length) {
-          receipts[receiptKey] = { rawSha256, observedSections: [...observedSections] };
-        } else {
-          delete receipts[receiptKey];
-        }
+        const observedEditions = Object.fromEntries(scope.sections.map(section => [section, observed[`${date}:${section}`] ?? {}]));
+        receipts[receiptKey] = { rawSha256, observedSections: [...observedSections], editions: observedEditions };
         archives.push({
           ...archive,
-          state: parsed.partialFailures.length ? 'PARTIAL' : observedSections.size ? 'OBSERVED' : 'PENDING_REVISIT',
+          state: observedSections.size ? 'OBSERVED' : 'PENDING_REVISIT',
           xmlCount: parsed.xmlCount,
           observedSections: [...observedSections],
           unobservedSections: scope.sections.filter(section => !observedSections.has(section)),
@@ -106,12 +119,9 @@ export async function collectDouReserve(
       context.memory?.('archive_parsed', { archives: usablePackages, xmlEntries: xmlCount, publications: publicationCount });
     });
   }
-  if (!observedDateCount) {
-    throw new ConnectorError('No dated DOU XML in available monthly packages', { code: 'DOU_RESERVE_EDITIONS_UNCONFIRMED', kind: 'SOURCE_UNAVAILABLE', retryable: false });
-  }
   return {
     publications: [],
-    partialFailures,
+    partialFailures: [],
     metadata: {
       dou: {
         ingestionChannel: 'DOU_OPEN_DATA_ZIP',

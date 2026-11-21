@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler, type QueryResult } from 'kysely';
+import type { DB } from '../src/infrastructure/database/database.types.js';
 import { DOU_XML_SECTIONS, DouConnector, douCollectionDates, type DouState } from '../src/modules/collection/dou.connector.js';
 import { DouReserveClient } from '../src/modules/collection/dou-reserve.client.js';
+import { beginDouCoverage, coverageDates, markDouCoverage, mergeDouOriginProvenance } from '../src/modules/collection/dou-coverage.js';
+import { readDouSourceState } from '../src/modules/collection/dou-source-state.repository.js';
+import { executeConnector } from '../src/modules/collection/connector.executor.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
 import { buildConnectorRegistry } from '../src/modules/collection/connector-registry.factory.js';
@@ -25,10 +30,11 @@ test('reserve revisits a changed monthly ZIP for delayed extras and returns to p
   const fetchInlabs: typeof fetch = async (input, init) =>
     primaryReturns ? primary(input, init) : new Response(null, { status: 404 });
   const fallback: typeof fetch = async (input, init) => {
-    reserveRequests++;
     const url = new URL(String(input));
     assert.equal(url.hostname, 'www.in.gov.br');
     assert.equal(new Headers(init?.headers).has('cookie'), false);
+    if (url.pathname === '/leiturajornal') return new Response('<html>Portal reference unavailable</html>');
+    reserveRequests++;
     if (url.pathname.endsWith('/base-de-dados')) {
       assert.equal(url.search, '?ano=2026&mes=Setembro');
       return new Response([
@@ -50,6 +56,7 @@ test('reserve revisits a changed monthly ZIP for delayed extras and returns to p
     state = {
       archives: result.metadata!.douArchives as DouState['archives'],
       reserveArchives: result.metadata!.douReserveArchives as NonNullable<DouState['reserveArchives']>,
+      reserveCoverage: result.metadata!.douCoverage as NonNullable<DouState['reserveCoverage']>,
     };
   }
   const normalOnly = await connector.collect(context());
@@ -81,6 +88,21 @@ test('reserve revisits a changed monthly ZIP for delayed extras and returns to p
     return [publication.externalId, identityHash, contentHash, officialUrl];
   };
   assert.deepEqual(recovered.publications.map(normalize).sort(), withExtra.publications.map(normalize).sort());
+  const reserveObservation = withExtra.publications.find(p => p.externalId === recovered.publications[0]!.externalId)!;
+  const primaryObservation = recovered.publications[0]!;
+  const baseOrigin = normalizePublication({ sourceId: 'dou', publication: primaryObservation }).originMetadata;
+  const reserveOrigin = normalizePublication({ sourceId: 'dou', publication: reserveObservation }).originMetadata;
+  const fromPrimaryToReserve = mergeDouOriginProvenance(baseOrigin, reserveOrigin);
+  const fromReserveToPrimary = mergeDouOriginProvenance(fromPrimaryToReserve, baseOrigin);
+  assert.equal(fromPrimaryToReserve.ingestionChannel, 'DOU_OPEN_DATA_ZIP');
+  assert.equal(fromReserveToPrimary.ingestionChannel, 'INLABS');
+  assert.deepEqual(fromReserveToPrimary.douArchiveByChannel, fromPrimaryToReserve.douArchiveByChannel);
+  assert.deepEqual(Object.keys(fromReserveToPrimary.douArchiveByChannel as object).sort(), ['DOU_OPEN_DATA_ZIP', 'INLABS']);
+  remember(recovered);
+  primaryReturns = false;
+  const backToReserve = await connector.collect(context());
+  assert.equal(backToReserve.publications.length, 10, 'a known reserve SHA still emits provenance after channel change');
+  assert.deepEqual(backToReserve.publications.map(normalize).sort(), recovered.publications.map(normalize).sort());
 });
 
 test('reserve is opt-in and never handles authentication rejection or rate limiting', async () => {
@@ -120,16 +142,20 @@ test('an unconfirmed monthly edition does not create a success or follow an exte
     reserve: new DouReserveClient(async input => {
       const url = new URL(String(input));
       requested.push(url.hostname);
-      if (url.pathname.endsWith('/base-de-dados')) return new Response('<a href="/S01092026.zip">Monthly ZIP</a>');
-      return redirect
+      if (url.pathname.endsWith('/base-de-dados')) return new Response('<a href="/S01092026.zip">ZIP</a><a href="/S03092026.zip">ZIP</a>');
+      if (url.pathname === '/leiturajornal') return new Response('<html>Portal reference unavailable</html>');
+      return redirect && url.pathname.startsWith('/S01')
         ? new Response(null, { status: 302, headers: { location: 'https://example.invalid/S01092026.zip' } })
         : new Response(new Uint8Array(empty));
     }),
   });
-  await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_EDITIONS_UNCONFIRMED' });
+  const result = await connector.collect(context());
+  assert.equal(result.completion?.complete, false);
+  assert.equal(result.metadata?.douConsultation, 'OK');
+  assert.equal(result.metadata?.douCoverageStatus, 'INCOMPLETE');
   redirect = true;
   await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_HTTP_ERROR' });
-  assert.deepEqual(requested, Array(4).fill('www.in.gov.br'));
+  assert.deepEqual(requested, Array(7).fill('www.in.gov.br'));
 });
 
 test('monthly nested ZIP validates folder date, package section, XML section and leaf uniqueness', async () => {
@@ -149,7 +175,7 @@ test('monthly nested ZIP validates folder date, package section, XML section and
   entries = [{ ...valid, name: `20260918/DO3/${fixture.name}` }];
   await assert.rejects(connector.collect(context()), { code: 'DOU_UNSAFE_ZIP_PATH' });
   entries = [{ ...valid, name: `20260918/DO1E/${fixture.name}` }];
-  await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_EDITIONS_UNCONFIRMED' });
+  await assert.rejects(connector.collect(context()), { code: 'DOU_ZIP_FOLDER_SECTION_MISMATCH' });
   entries = [valid, fixture];
   await assert.rejects(connector.collect(context()), { code: 'DOU_UNSAFE_ZIP' });
 });
@@ -163,6 +189,130 @@ test('official ZIP discovery requests each selected year-month once', async () =
   const result = await client.index(['2026-12', '2027-01', '2026-12'], AbortSignal.timeout(2000));
   assert.deepEqual(requested, ['?ano=2026&mes=Dezembro', '?ano=2027&mes=Janeiro']);
   assert.deepEqual([...result.keys()], ['S03122026', 'S01012027']);
+});
+
+test('official ZIP filenames must agree and priority is independent of anchor order', async () => {
+  const monthly = '<a href="/d/S01112026.zip/id">S01112026.zip</a>';
+  const monthlyMirror = '<a href="/mirror/S01112026.zip/id2">S01112026.zip</a>';
+  const updated = '<a href="/d/S01112026_Atualizado150000.zip/id">S01112026_Atualizado150000.zip</a>';
+  const secondUpdated = '<a href="/d/S01112026_Atualizado170000.zip/id2">S01112026_Atualizado170000.zip</a>';
+  const wrong = '<a href="/d/S03112026.zip/id">S01112026.zip</a>';
+  const resolve = (links: string[]) => new DouReserveClient(async () => new Response(links.join('')))
+    .index(['2026-11'], AbortSignal.timeout(2_000));
+  for (const links of [[monthly, monthlyMirror, updated], [updated, monthlyMirror, monthly]]) {
+    assert.equal((await resolve(links)).get('S01112026')?.filename, 'S01112026_Atualizado150000.zip');
+  }
+  assert.equal((await resolve([wrong])).size, 0);
+  assert.equal((await resolve([monthly, updated, secondUpdated])).size, 0);
+});
+
+test('portal counts are recorded separately and the due queue advances across a month rollover', async () => {
+  const inventory = new DouReserveClient(async input => {
+    const url = new URL(String(input));
+    const section = url.searchParams.get('secao')?.toUpperCase();
+    const portalSection = section === 'DO1E' ? 'DO1_EXTRA_C' : section;
+    const jsonArray = section === 'DO1E' ? [{ pubName: portalSection, editionNumber: '218-C' }] : [];
+    return new Response(`<script id="params" type="application/json">${JSON.stringify({
+      dateUrl: url.searchParams.get('data'), section: portalSection, typeNormDay: { DO1E: true, DO3E: false }, jsonArray,
+    })}</script>`);
+  });
+  const expectedEd = await inventory.editions('2026-11-19', AbortSignal.timeout(2_000));
+  assert.deepEqual(expectedEd, { DO1: {}, DO1E: { '218-C': 1 }, DO3: {}, DO3E: {} });
+  const nov20 = new Date('2026-11-20T20:00:00Z');
+  let ledger = markDouCoverage(beginDouCoverage(undefined, nov20), ['2026-11-18', '2026-11-19', '2026-11-20'], nov20, {
+    channel: 'DOU_OPEN_DATA_ZIP', observed: {}, expected: { '2026-11-19:DO1E': { '218-C': 1 } },
+  });
+  assert.deepEqual(ledger.rows['2026-11-19:DO1E']!.editions, { '218-C': { observed: 0, expected: 1 } });
+  assert.equal(ledger.rows['2026-11-19:DO1E']!.deadline, '2026-12-07');
+  const dec8 = new Date('2026-12-08T15:00:00Z');
+  const recent = ['2026-12-08', '2026-12-07', '2026-12-06', '2026-12-01'];
+  assert.deepEqual(coverageDates(ledger, recent, dec8), [...recent.slice(0, 3), '2026-11-18']);
+  ledger = markDouCoverage(ledger, ['2026-11-18'], dec8, { error: 'DOU_RESERVE_PACKAGE_UNLISTED' });
+  assert.equal(ledger.rows['2026-11-18:DO1']!.status, 'ESCALATED');
+  assert.equal(ledger.rows['2026-11-18:DO1']!.consultation, 'FAILED');
+  assert.deepEqual(coverageDates(ledger, recent, dec8), [...recent.slice(0, 3), '2026-11-19']);
+  ledger = markDouCoverage(ledger, ['2026-11-19'], dec8, {
+    channel: 'DOU_OPEN_DATA_ZIP', observed: { '2026-11-19:DO1E': { '218-C': 1 } },
+    expected: { '2026-11-19:DO1E': { '218-C': 1 } },
+  });
+  assert.equal(ledger.rows['2026-11-19:DO1E']!.status, 'CONFIRMED_BY_COUNT');
+  assert.deepEqual(coverageDates(ledger, recent, dec8), [...recent.slice(0, 3), '2026-11-20']);
+});
+
+test('reserve fails a whole spool on missing, ambiguous or invalid later packages and preserves debt across restart', async t => {
+  const contents = await fixtureEntries('DO1');
+  const good = await makeZip(contents);
+  const [first] = contents;
+  assert.ok(first);
+  const do3 = { ...first, bytes: Buffer.from(Buffer.from(first.bytes).toString().replace('pubName="DO1"', 'pubName="DO3"')) };
+  const crc = Buffer.from(await makeZip([do3]));
+  const directory = crc.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+  assert.ok(directory > 0);
+  crc.writeUInt32LE((crc.readUInt32LE(directory + 16) ^ 0xffffffff) >>> 0, directory + 16);
+  const badPath = await makeZip([{ ...do3, name: `unknown/${first.name}` }]);
+  const badXml = await makeZip([do3, { name: '515_20260918_99.xml', bytes: Buffer.from('<invalid/>') }]);
+  const index = '<a href="/S01092026.zip">ZIP</a><a href="/S03092026.zip">ZIP</a>';
+  const cases = [
+    { index: '<a href="/S01092026.zip">ZIP</a>', bytes: crc, code: 'DOU_RESERVE_PACKAGE_UNLISTED', late: false },
+    { index: index + '<a href="/alternate/S03092026.zip">ZIP</a>', bytes: crc, code: 'DOU_RESERVE_PACKAGE_UNLISTED', late: false },
+    { index, bytes: crc, code: 'DOU_ZIP_CRC_MISMATCH', late: true },
+    { index, bytes: badPath, code: 'DOU_UNSAFE_ZIP_PATH', late: true },
+    { index, bytes: badXml, code: 'DOU_INVALID_XML_ROOT', late: true },
+  ];
+
+  let persistedObservation: unknown;
+  const previousTrustedMetadata = { douArchives: { '2026-09-18-DO1.zip': 'a'.repeat(64) } };
+  let previousCoverage = markDouCoverage(beginDouCoverage(undefined, new Date('2026-09-18T15:00:00Z')), ['2026-09-18'], new Date('2026-09-18T15:00:00Z'), {
+    channel: 'DOU_OPEN_DATA_ZIP', observed: {}, expected: { '2026-09-18:DO1E': { '218-C': 14 } },
+  });
+  for (const fixture of cases) {
+    const phases: string[] = [];
+    const connector = new DouConnector({
+      credentials, dates: ['2026-09-18'], now: () => new Date('2026-09-19T15:00:00Z'), fetch: async () => new Response(null, { status: 503 }),
+      readState: async () => ({ archives: {}, reserveCoverage: previousCoverage }),
+      reserve: new DouReserveClient(async input => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith('/base-de-dados')) return new Response(fixture.index);
+        return new Response(new Uint8Array(url.pathname.startsWith('/S01') ? good : fixture.bytes));
+      }),
+    });
+    const outcome = await executeConnector({ connector, sourceId: 'dou', runId: 'fixture', attemptId: 'a', timeoutMs: 10_000,
+      memory: phase => { phases.push(phase); },
+    });
+    assert.equal(outcome.ok, false);
+    if (outcome.ok) throw new Error('unexpected sealed spool');
+    assert.equal(outcome.code, fixture.code);
+    assert.equal(phases.includes('archive_parsed'), fixture.late);
+    assert.ok(!phases.includes('collect_complete'));
+    assert.ok(outcome.metadata?.douCoverage);
+    assert.equal(outcome.metadata?.douReserveArchives, undefined);
+    // Simulate the JSONB value persisted by finishCollectionAttempt on failure.
+    persistedObservation = JSON.parse(JSON.stringify(outcome.metadata));
+  }
+  const driver = new DummyDriver();
+  driver.acquireConnection = async () => ({
+    async executeQuery<R>(query): Promise<QueryResult<R>> {
+      assert.match(query.sql, /^select /);
+      if (query.sql.includes('select "trigger_type"')) return { rows: [{ trigger_type: 'SCHEDULED' }] as R[] };
+      if (query.sql.includes('MATERIAL_CONTENT_DEFERRED')) return { rows: [{ metadata: previousTrustedMetadata, finished_at: new Date('2026-09-18'), status: 'SUCCESS' }] as R[] };
+      assert.match(query.sql, /metadata \? 'douCoverage'/);
+      assert.match(query.sql, /finished_at" is not null/);
+      return { rows: [{ coverage: (persistedObservation as { douCoverage: unknown }).douCoverage }] as R[] };
+    },
+    async *streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> {},
+  });
+  const db = new Kysely<DB>({ dialect: {
+    createAdapter: () => new PostgresAdapter(),
+    createDriver: () => driver,
+    createIntrospector: database => new PostgresIntrospector(database),
+    createQueryCompiler: () => new PostgresQueryCompiler(),
+  } });
+  t.after(() => db.destroy());
+  const restarted = await readDouSourceState(db, 'dou', 'next-process', true);
+  assert.deepEqual(restarted.archives, previousTrustedMetadata.douArchives);
+  assert.equal(restarted.reserveCoverage?.rows['2026-09-18:DO1E']!.consultation, 'FAILED');
+  assert.deepEqual(restarted.reserveCoverage?.rows['2026-09-18:DO1E']!.editions, { '218-C': { observed: 0, expected: 14 } });
+  assert.equal(restarted.reserveArchives, undefined);
 });
 
 test('DOU runtime registration is explicitly gated',()=>{
