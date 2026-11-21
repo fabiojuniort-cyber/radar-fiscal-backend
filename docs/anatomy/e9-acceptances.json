@@ -450,6 +450,334 @@
         "Aceite técnico de leitura. legalStatus permanece unknown.",
         "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #328."
       ]
+    },
+    {
+      "sampleId": "rfb:108391",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "de7fe7f533c9cd92a608563e922b1d0f62470157f67cc9c81c6b79a18bee4bb8",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | revalidation-proposal.json e equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ],
+      "revalidates": "rfb:108391 @ 817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe"
+    },
+    {
+      "sampleId": "rfb:115131",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "scope": "offline",
+      "entrySha256": "eb9396ddc5a1b1a82023b7ea5c02c87728de8ac87b15ecc768fba647cbefe762",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | revalidation-proposal.json e equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ],
+      "revalidates": "rfb:115131 @ 817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe"
+    },
+    {
+      "sampleId": "rfb:133898",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "91ed4f2234de12ed0f90a6345ad71da0c5424a084c278065720f0225bfef340d",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | revalidation-proposal.json e equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ],
+      "revalidates": "rfb:133898 @ 817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe"
+    },
+    {
+      "sampleId": "rfb:142967",
+      "cellId": "rfb--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "9be5f1a905e12a73de15fd14707a65122f05ff5499b8ee9a23db7f2320ac18f5",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | revalidation-proposal.json e equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ],
+      "revalidates": "rfb:142967 @ 817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe"
+    },
+    {
+      "sampleId": "rfb:148693",
+      "cellId": "rfb--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "c2f211e660cc092380b41b3fa59ee42f541e7b8a61abe896a66ac9a737fd4f94",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | revalidation-proposal.json e equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ],
+      "revalidates": "rfb:148693 @ 817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe"
+    },
+    {
+      "sampleId": "rfb:37103",
+      "cellId": "rfb--ato-declaratorio-interpretativo--pequeno",
+      "scope": "offline",
+      "entrySha256": "f140ab9c82f2f098c11b544f63ead8567afceba0feac128fdd92ecbc88e7aef7",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | revalidation-proposal.json e equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ],
+      "revalidates": "rfb:37103 @ 817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe"
+    },
+    {
+      "sampleId": "rfb:148629",
+      "cellId": "rfb--ato-declaratorio-executivo--pequeno",
+      "scope": "offline",
+      "entrySha256": "a6c7b3e8581dd62b80d5c26c47fa138d911ffb0b3e35189e51ef70c3022062fb",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | revalidation-proposal.json e equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ],
+      "revalidates": "rfb:148629 @ 817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe"
+    },
+    {
+      "sampleId": "rfb:122645",
+      "cellId": "rfb--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "1730069dd494a0d0eda28317e217098f9488625ce4291602fac1e91c55cf3980",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | revalidation-proposal.json e equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ],
+      "revalidates": "rfb:122645 @ 817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe"
+    },
+    {
+      "sampleId": "M14",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "73ad5b450ccec29c70ce18f9d8d89ce5caf9d6d698c23aa31858076a28439bae",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M16",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "31846480cf24098462063210be0b417c7de7367acf39ac69eaeaf83398f8048c",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M18",
+      "cellId": "confaz--ajuste-sinief--pequeno",
+      "scope": "offline",
+      "entrySha256": "3ce1cb6f00ef08f65bad5758151e707ed064b1c5fd3a6c67cc25fd1f93ec9da9",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M19",
+      "cellId": "confaz--ajuste-sinief--grande",
+      "scope": "offline",
+      "entrySha256": "f55f4f14f11bde8bec9c12a0f879f9e0dc6f75800e7025ebd5bb44d7ca75ee22",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M20",
+      "cellId": "confaz--protocolo-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "56dfc3049d2e5b3247279619c1c377c91eb76365fde2da30c036c045c8631ad6",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M23",
+      "cellId": "dou--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "9325f5867f7ff80de6c16e0801e695e1b19e90d8b4cf2a355b233e3206ac644b",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M24",
+      "cellId": "dou--instrucao-normativa--medio",
+      "scope": "offline",
+      "entrySha256": "1e02632948279fb4ed756e7abe534036560cf71192fea737d4d251aefea29865",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M28",
+      "cellId": "dou--decreto--grande",
+      "scope": "offline",
+      "entrySha256": "547f620120894aa834c664cc13eb0f19779800cdb78839a404be7c08bf50ec03",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M29",
+      "cellId": "dou--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "798a5988bc9fd19fffc175a3aa64ec10db3a99e80081a943ebd55147e0d18477",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M30",
+      "cellId": "dou--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "3d845db6c61e24001e0f7f7deab74ea6f7f2402777531ac75768d133367c1ff2",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M32",
+      "cellId": "dou--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "47b5f83bd57b6e0c3ab40ca0355784796bce562ff2e3fc18c077d9e2fb04fc94",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
+    },
+    {
+      "sampleId": "M33",
+      "cellId": "dou--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "492624a989f90361d301007939a93ef03582e089c9fe6fcd0e3918e3307e2f3f",
+      "engineBuildHash": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R3)",
+      "decidedOn": "2026-11-21",
+      "ref": "tribusca-control#116 c.7057035145 | radar-fiscal-backend#333 @ 57faee3a62aa26da964a237578ac279f68e94c02 | equivalence.json e parecer independente de completude",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
+      ]
     }
   ]
 }
