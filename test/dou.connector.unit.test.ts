@@ -7,6 +7,7 @@ import { DouReserveClient } from '../src/modules/collection/dou-reserve.client.j
 import { beginDouCoverage, coverageDates, markDouCoverage, mergeDouOriginProvenance } from '../src/modules/collection/dou-coverage.js';
 import { readDouSourceState } from '../src/modules/collection/dou-source-state.repository.js';
 import { executeConnector } from '../src/modules/collection/connector.executor.js';
+import { summarizeDouCoverage } from '../src/modules/operations/source-health.js';
 import { normalizePublication } from '../src/modules/collection/publication.normalizer.js';
 import { fixtureDouZipLink, fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
 const septemberZipIndex = fixtureDouZipLink('S01092026.zip') + fixtureDouZipLink('S03092026.zip');
@@ -44,7 +45,7 @@ test('reserve revisits a changed monthly ZIP for delayed extras and returns to p
       return new Response([
         fixtureDouZipLink('S01092026_Atualizado171650.zip'),
         fixtureDouZipLink('S03092026_Atualizado171929.zip'),
-        '<a href="https://example.invalid/fake">S01092026_Atualizado171650.zip</a>',
+        '<a href="https://example.invalid/fake">S01102026_Atualizado171650.zip</a>',
         '<a href="/documents/wrong-month">S01102026_Atualizado171650.zip</a>',
       ].join(''));
     }
@@ -213,6 +214,14 @@ test('official ZIP filenames must agree and priority is independent of anchor or
   assert.equal((await resolve([fixtureDouZipLink('S01112026.zip', 1, 'S01112026_unexpected.zip')])).size, 0);
   assert.equal((await resolve(['<a href="/archive/S01112026.zip">S01112026.zip</a>'])).size, 0);
   assert.equal((await resolve([monthly, updated, secondUpdated])).size, 0);
+  for (const invalidUpdate of [
+    '<a href="/novo-caminho/pkg">S01112026_Atualizado150000.zip</a>',
+    '<a>S01112026_Atualizado250000.zip</a>',
+  ]) {
+    for (const order of [[monthly, invalidUpdate], [invalidUpdate, monthly]]) {
+      assert.equal((await resolve(order)).has('S01112026'), false);
+    }
+  }
 });
 
 test('portal counts are recorded separately and the due queue advances across a month rollover', async () => {
@@ -300,6 +309,39 @@ test('a collection hiatus seeds missing dates and preserves aged escalations wit
     assert.ok(Object.keys(ledger.rows).length <= 66 * 4);
   }
   assert.ok(ledger.archivedEscalationCount! > archivedAtFeb);
+});
+
+test('18 November to 8 December restart records each missing day, escalates expired November and exposes 65-day archive', () => {
+  const nov18 = new Date('2026-11-18T15:00:00Z');
+  const dec8 = new Date('2026-12-08T15:00:00Z');
+  const saved = beginDouCoverage(undefined, nov18, true);
+  // Legacy on-disk snapshots have rows but no date watermark.
+  const { recordedThrough: _watermark, ...legacy } = saved;
+  const resumed = beginDouCoverage(JSON.parse(JSON.stringify(legacy)), dec8, true);
+  assert.equal(resumed.recordedThrough, '2026-12-08');
+  assert.equal(resumed.rows['2026-11-18:DO1']!.status, 'ESCALATED');
+  for (let time = Date.parse('2026-11-19'); time <= Date.parse('2026-12-08'); time += 86_400_000) {
+    const date = new Date(time).toISOString().slice(0, 10);
+    for (const section of DOU_XML_SECTIONS) {
+      const row = resumed.rows[`${date}:${section}`]!;
+      assert.equal(row.consultation, 'NOT_ATTEMPTED');
+      assert.equal(row.status, date.startsWith('2026-11') ? 'ESCALATED' : 'PENDING');
+      if (date.startsWith('2026-11')) assert.equal(row.reason, 'EDITORIAL_WINDOW_MISSED_DURING_GAP');
+    }
+  }
+  assert.ok(!coverageDates(resumed, ['2026-12-08','2026-12-07','2026-12-06'], dec8).includes('2026-11-19'));
+  const operator = summarizeDouCoverage(resumed);
+  assert.ok(operator.activeEscalations.some(row => row.date === '2026-11-19'));
+  assert.ok(operator.pilotExclusions.some(row => row.date === '2026-10-09' && row.status === 'PENDING_OUTSIDE_PILOT'));
+  const afterRetention = beginDouCoverage(resumed, new Date('2027-03-01T15:00:00Z'), true);
+  const aged = summarizeDouCoverage(afterRetention);
+  assert.ok(aged.archivedEscalationCount > 0);
+  assert.ok(aged.archivedInLastObservation.some(row => row.date === '2026-11-19'));
+  assert.ok(aged.archivedGapInLastObservation);
+  assert.ok(!aged.activeEscalations.some(row => row.date === '2026-11-19'));
+  const following = summarizeDouCoverage(beginDouCoverage(afterRetention, new Date('2027-03-01T20:00:00Z'), true));
+  assert.equal(following.archivedEscalationCount, aged.archivedEscalationCount);
+  assert.equal(following.archivedInLastObservation.length, 0);
 });
 
 test('reserve fails a whole spool on missing, ambiguous or invalid later packages and preserves debt across restart', async t => {

@@ -14,6 +14,7 @@ import { readDouSourceState } from '../src/modules/collection/dou-source-state.r
 import { runSchedulerTick } from '../src/modules/collection/scheduler.service.js';
 import { fixtureDouZipLink, fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
 import { getSourceOperationalSnapshot } from '../src/modules/collection/collection-monitoring.repository.js';
+import { readDouCoverageHealth } from '../src/modules/operations/source-health.js';
 
 test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, versions and receipts', async (t) => {
   assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
@@ -209,6 +210,8 @@ test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, vers
       const onReserveMetadata = onReserve.metadata as Record<string, unknown>;
       assert.equal(onReserveMetadata.ingestionChannel, 'DOU_OPEN_DATA_ZIP');
       assert.deepEqual(Object.keys(onReserveMetadata.douArchiveByChannel as object).sort(), ['DOU_OPEN_DATA_ZIP', 'INLABS']);
+      const successfulConsultation = (await readDouCoverageHealth(db)).find(row => row.sourceCode === `dou-${sourceId}`)!;
+      assert.ok(successfulConsultation.lastConsultedAt);
       now = new Date('2026-09-21T12:00:00Z');
       missingSection = true;
       assert.equal((await attempt()).status, 'PROCESSING_FAILED');
@@ -217,6 +220,13 @@ test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, vers
       assert.equal(durable.reserveCoverage?.rows['2026-09-18:DO1E']?.consultation, 'FAILED');
       assert.equal(durable.reserveCoverage?.rows['2026-09-18:DO1E']?.reason, 'DOU_RESERVE_PACKAGE_UNLISTED');
       assert.ok(durable.reserveArchives?.['2026-09-18-DO1']?.rawSha256, 'only the prior coverage-only partial run advances its receipt');
+      const operator = (await readDouCoverageHealth(db)).find(row => row.sourceCode === `dou-${sourceId}`)!;
+      assert.deepEqual(operator.lastConsultedAt, successfulConsultation.lastConsultedAt);
+      assert.equal(operator.snapshotRunStatus, 'PROCESSING_FAILED');
+      assert.equal(operator.snapshotConsultation, 'FAILED');
+      assert.ok(operator.pending.some(row => row.section === 'DO1E' && row.consultation === 'FAILED'));
+      assert.equal(operator.archivedEscalationCount, 0);
+      assert.equal(operator.pilotExclusions[0]?.date, '2026-10-09');
       await db.deleteFrom('collection_runs').where('id', '=', restartRun).execute();
       primaryUp = true;
       assert.equal((await attempt()).status, 'PARTIAL_SUCCESS');

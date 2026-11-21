@@ -6,6 +6,7 @@ import { Pool } from 'pg';
 import {
   evaluateSourceHealth,
   readSourceHealthRows,
+  readDouCoverageHealth,
 } from '../../modules/operations/source-health.js';
 import type { DB } from './database.types.js';
 
@@ -28,8 +29,9 @@ const db = new Kysely<DB>({
 
 try {
   const rows = await readSourceHealthRows(db);
+  const douCoverage = await readDouCoverageHealth(db);
   const report = evaluateSourceHealth(rows, new Date());
-  console.log('SOURCE_HEALTH=' + JSON.stringify({ ...report, sources: rows }));
+  console.log('SOURCE_HEALTH=' + JSON.stringify({ ...report, sources: rows, douCoverage }));
   process.exitCode = report.alerts.length > 0 ? 2 : 0;
 } finally {
   await db.destroy();

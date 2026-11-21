@@ -25,6 +25,8 @@ export interface DouCoverage {
   retainedFrom?: string;
   archivedEscalationCount?: number;
   archivedEscalations?: Record<string, CoverageRow>;
+  recordedThrough?: string;
+  archivedGap?: { from: string; through: string };
 }
 
 const DAY_MS = 86_400_000;
@@ -66,6 +68,15 @@ export function readDouCoverage(value: unknown): DouCoverage | undefined {
   const rows = readRows(snapshot.rows);
   if (!rows) return undefined;
   const output: DouCoverage = { version: 1, rows };
+  if (snapshot.recordedThrough !== undefined) {
+    if (!isoDate(snapshot.recordedThrough)) return undefined;
+    output.recordedThrough = snapshot.recordedThrough;
+  }
+  if (snapshot.archivedGap !== undefined) {
+    const gap = record(snapshot.archivedGap);
+    if (!isoDate(gap?.from) || !isoDate(gap?.through) || gap.from > gap.through) return undefined;
+    output.archivedGap = { from: gap.from, through: gap.through };
+  }
   if (snapshot.retainedFrom !== undefined) {
     if (!isoDate(snapshot.retainedFrom)) return undefined;
     output.retainedFrom = snapshot.retainedFrom;
@@ -134,26 +145,41 @@ export function beginDouCoverage(previous: DouCoverage | undefined, now: Date, s
   const today = douLocalDate(now);
   const earliest = previousMonthStart(today);
   const retainedFrom = new Date(Date.parse(today) - 65 * DAY_MS).toISOString().slice(0, 10);
+  const savedThrough = previous?.recordedThrough ?? Object.values(previous?.rows ?? {})
+    .map(row => row.date).sort().at(-1);
   const rows: Record<string, CoverageRow> = {};
   const expired: Record<string, CoverageRow> = {};
+  let archivedGap: DouCoverage['archivedGap'];
+  let archivedGapCount = 0;
   for (const [key, original] of Object.entries(previous?.rows ?? {})) {
     const outsideWindow = original.date < earliest;
-    const row: CoverageRow = outsideWindow && original.status === 'PENDING'
-      ? { ...original, status: 'ESCALATED', reason: 'COVERAGE_WINDOW_CLOSED' }
+    const missedWhileOffline = seedWindow && savedThrough && savedThrough < original.deadline && today > original.deadline;
+    const row: CoverageRow = (outsideWindow || missedWhileOffline) && original.status === 'PENDING'
+      ? { ...original, status: 'ESCALATED', reason: missedWhileOffline ? 'EDITORIAL_WINDOW_MISSED_DURING_GAP' : 'COVERAGE_WINDOW_CLOSED' }
       : original;
     if (row.date >= retainedFrom) rows[key] = row;
     else if (row.status === 'ESCALATED') expired[key] = row;
   }
 
   if (seedWindow) {
-    const seedFrom = today <= deadlineOf(earliest) ? earliest : today.slice(0, 7) + '-01';
+    const ordinaryStart = today <= deadlineOf(earliest) ? earliest : today.slice(0, 7) + '-01';
+    const resumedFrom = savedThrough && new Date(Date.parse(savedThrough) + DAY_MS).toISOString().slice(0, 10);
+    if (resumedFrom && resumedFrom < retainedFrom) {
+      archivedGap = { from: resumedFrom, through: new Date(Date.parse(retainedFrom) - DAY_MS).toISOString().slice(0, 10) };
+      archivedGapCount = (Date.parse(retainedFrom) - Date.parse(resumedFrom)) / DAY_MS * DOU_COVERAGE_SECTIONS.length;
+    }
+    const outstandingStart = resumedFrom && resumedFrom < ordinaryStart ? resumedFrom : ordinaryStart;
+    const seedFrom = outstandingStart < retainedFrom ? retainedFrom : outstandingStart;
     for (let timestamp = Date.parse(seedFrom); timestamp <= Date.parse(today); timestamp += DAY_MS) {
       const date = new Date(timestamp).toISOString().slice(0, 10);
+      const deadline = deadlineOf(date);
+      const missedDeadline = today > deadline;
       for (const section of DOU_COVERAGE_SECTIONS) {
         const key = `${date}:${section}`;
         rows[key] ??= {
-          date, section, status: 'PENDING', lastAttemptAt: null, dueAt: date + 'T00:00:00.000Z',
-          deadline: deadlineOf(date), consultation: 'NOT_ATTEMPTED', reason: 'AWAITING_FIRST_CONSULTATION', editions: {},
+          date, section, status: missedDeadline ? 'ESCALATED' : 'PENDING', lastAttemptAt: null, dueAt: date + 'T00:00:00.000Z',
+          deadline, consultation: 'NOT_ATTEMPTED',
+          reason: missedDeadline ? 'EDITORIAL_WINDOW_MISSED_DURING_GAP' : 'AWAITING_FIRST_CONSULTATION', editions: {},
         };
       }
     }
@@ -163,7 +189,9 @@ export function beginDouCoverage(previous: DouCoverage | undefined, now: Date, s
     ...(previous?.lastChannel ? { lastChannel: previous.lastChannel } : {}),
     rows,
     retainedFrom,
-    archivedEscalationCount: (previous?.archivedEscalationCount ?? 0) + Object.keys(expired).length,
+    ...(seedWindow ? { recordedThrough: today } : previous?.recordedThrough ? { recordedThrough: previous.recordedThrough } : {}),
+    archivedEscalationCount: (previous?.archivedEscalationCount ?? 0) + Object.keys(expired).length + archivedGapCount,
+    ...(archivedGap ? { archivedGap } : {}),
     ...(Object.keys(expired).length ? { archivedEscalations: expired } : {}),
   };
 }

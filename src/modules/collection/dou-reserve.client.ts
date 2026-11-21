@@ -20,6 +20,7 @@ const MONTHS = [
 export type DouReserveSection = '01' | '03';
 export interface DouReservePackage { filename: string; officialUrl: string }
 const packageName = /^S0[13]((?:0[1-9]|1[0-2])\d{4})(?:_Atualizado(?:[01]\d|2[0-3])[0-5]\d[0-5]\d)?\.zip$/i;
+const announcedUpdate = /^S0[13]((?:0[1-9]|1[0-2])\d{4})_Atualizado/i;
 const packagePath = /^\/documents\/\d+\/\d+\/([^/]+)\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
 function reserveError(code: string, httpStatus?: number): ConnectorError {
@@ -96,7 +97,7 @@ export class DouReserveClient {
     let anchor: { href: string; label: string } | undefined;
     const parser = new Parser({
       onopentag(name, attrs) {
-        if (name === 'a' && attrs.href) anchor = { href: attrs.href, label: '' };
+        if (name === 'a') anchor = { href: attrs.href ?? '', label: '' };
       },
       ontext(text) { if (anchor) anchor.label += text; },
       onclosetag(name) {
@@ -105,16 +106,18 @@ export class DouReserveClient {
         anchor = undefined;
         const url = officialUrl(href, response.url || indexUrl.href);
         const filenameFromPath = documentFilename(url);
-        if (!url || !filenameFromPath) return;
         const filenameFromLabel = label.trim();
-        const names = [filenameFromPath, filenameFromLabel].filter(name => packageName.test(name));
-        const conflict = !packageName.test(filenameFromLabel) || filenameFromPath.toUpperCase() !== filenameFromLabel.toUpperCase();
+        const names = filenameFromPath
+          ? [filenameFromPath, filenameFromLabel]
+          : (announcedUpdate.test(filenameFromLabel) ? [filenameFromLabel] : []);
+        const conflict = !url || !filenameFromPath || filenameFromPath.toUpperCase() !== filenameFromLabel.toUpperCase();
         for (const filename of names) {
-          if (packageName.exec(filename)?.[1] !== monthAndYear) continue;
+          if ((packageName.exec(filename)?.[1] ?? announcedUpdate.exec(filename)?.[1]) !== monthAndYear) continue;
           const key = filename.slice(0, 9).toUpperCase();
           const ranks = candidates.get(key) ?? [new Map(), new Map()];
           const rank = ranks[/_atualizado/i.test(filename) ? 1 : 0];
-          rank.set(url.href, conflict || rank.get(url.href) === null ? null : { filename, officialUrl: url.href });
+          const target = url?.href ?? href;
+          rank.set(target, conflict || rank.get(target) === null ? null : { filename, officialUrl: target });
           candidates.set(key, ranks);
         }
       },
