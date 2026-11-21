@@ -9,10 +9,12 @@ import { createCollectionRun, acquireNextCollectionRun } from '../src/modules/co
 import { processAcquiredCollectionRun } from '../src/modules/collection/collection.engine.js';
 import { ConnectorRegistry } from '../src/modules/collection/connector.registry.js';
 import { DouConnector } from '../src/modules/collection/dou.connector.js';
+import { DouReserveClient } from '../src/modules/collection/dou-reserve.client.js';
 import { readDouSourceState } from '../src/modules/collection/dou-source-state.repository.js';
 import { runSchedulerTick } from '../src/modules/collection/scheduler.service.js';
-import { fixtureFetch } from './dou.fixtures.js';
+import { fixtureDouZipLink, fixtureEntries, fixtureFetch, makeZip } from './dou.fixtures.js';
 import { getSourceOperationalSnapshot } from '../src/modules/collection/collection-monitoring.repository.js';
+import { readDouCoverageHealth } from '../src/modules/operations/source-health.js';
 
 test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, versions and receipts', async (t) => {
   assert.ok(process.env.DATABASE_ADMIN_URL, 'DATABASE_ADMIN_URL is required');
@@ -154,6 +156,86 @@ test('real INLABS XML through scheduler, worker engine, PostgreSQL origins, vers
         }
         assert.ok(advanced,'heartbeat must advance after connector completion, during persistence');
       } finally {await blocker.query('ROLLBACK');blocker.release(); if(processing) assert.equal((await processing).status,'SUCCESS');}
+    });
+    await t.test('reserve observations survive a new connector process and both channels preserve one version', async () => {
+      const [first] = await fixtureEntries('DO1');
+      const id = '999999991';
+      const xml = Buffer.from(first!.bytes).toString('utf8')
+        .replace(/idMateria="\d+"/, `idMateria="${id}"`)
+        .replace(/<Identifica>[\s\S]*?<\/Identifica>/, '<Identifica>Observação sintética da reserva DOU</Identifica>');
+      const payload = await makeZip([{ name: `515_20260918_${id}.xml`, bytes: Buffer.from(xml) }]);
+      const empty = await makeZip([]);
+      let primaryUp = true;
+      let missingSection = false;
+      let now = new Date('2026-09-20T12:00:00Z');
+      const primary: typeof fetch = async input => {
+        const url = new URL(String(input));
+        if (url.pathname === '/logar.php') return primaryUp
+          ? new Response(null, { status: 302, headers: { location: 'index.php', 'set-cookie': 'inlabs_session_cookie=fixture' } })
+          : new Response(null, { status: 404 });
+        const file = url.searchParams.get('dl');
+        if (!file) return new Response('<html>Index</html>');
+        return file.endsWith('-DO1.zip') ? new Response(new Uint8Array(payload)) : new Response(null, { status: 404 });
+      };
+      const reserve = new DouReserveClient(async input => {
+        const url = new URL(String(input));
+        if (url.pathname.includes('base-de-dados')) return new Response(fixtureDouZipLink('S01092026.zip') +
+          (missingSection ? '' : fixtureDouZipLink('S03092026.zip')));
+        if (url.pathname.includes('leiturajornal')) {
+          const section = url.searchParams.get('secao')!.toUpperCase();
+          return new Response(`<script id="params" type="application/json">${JSON.stringify({
+            dateUrl: url.searchParams.get('data'), section, typeNormDay: { DO1E: false, DO3E: false }, jsonArray: [],
+          })}</script>`);
+        }
+        return new Response(new Uint8Array(url.pathname.includes('/S01') ? payload : empty));
+      });
+      async function attempt() {
+        const processRegistry = new ConnectorRegistry();
+        processRegistry.register(new DouConnector({
+          credentials: () => ({ email: 'fixture@example.invalid', password: 'fixture' }),
+          fetch: primary, dates: ['2026-09-18'], now: () => now, reserve,
+          readState: (source, runId) => readDouSourceState(db, source, runId, true),
+        }));
+        const runId = await newRun();
+        return await processAcquiredCollectionRun(db, processRegistry, await acquire(runId), { timeoutMs: 15_000, heartbeatIntervalMs: 0 });
+      }
+      const origin = () => db.selectFrom('publication_origins').select(['publication_id', 'metadata'])
+        .where('source_id', '=', sourceId).where('external_id', 'like', `%:${id}`).executeTakeFirstOrThrow();
+      assert.equal((await attempt()).status, 'SUCCESS');
+      const original = await origin();
+      primaryUp = false;
+      assert.equal((await attempt()).status, 'PARTIAL_SUCCESS');
+      const onReserve = await origin();
+      assert.equal(onReserve.publication_id, original.publication_id);
+      const onReserveMetadata = onReserve.metadata as Record<string, unknown>;
+      assert.equal(onReserveMetadata.ingestionChannel, 'DOU_OPEN_DATA_ZIP');
+      assert.deepEqual(Object.keys(onReserveMetadata.douArchiveByChannel as object).sort(), ['DOU_OPEN_DATA_ZIP', 'INLABS']);
+      const successfulConsultation = (await readDouCoverageHealth(db)).find(row => row.sourceCode === `dou-${sourceId}`)!;
+      assert.ok(successfulConsultation.lastConsultedAt);
+      now = new Date('2026-09-21T12:00:00Z');
+      missingSection = true;
+      assert.equal((await attempt()).status, 'PROCESSING_FAILED');
+      const restartRun = await newRun();
+      const durable = await readDouSourceState(db, sourceId, restartRun, true);
+      assert.equal(durable.reserveCoverage?.rows['2026-09-18:DO1E']?.consultation, 'FAILED');
+      assert.equal(durable.reserveCoverage?.rows['2026-09-18:DO1E']?.reason, 'DOU_RESERVE_PACKAGE_UNLISTED');
+      assert.ok(durable.reserveArchives?.['2026-09-18-DO1']?.rawSha256, 'only the prior coverage-only partial run advances its receipt');
+      const operator = (await readDouCoverageHealth(db)).find(row => row.sourceCode === `dou-${sourceId}`)!;
+      assert.deepEqual(operator.lastConsultedAt, successfulConsultation.lastConsultedAt);
+      assert.equal(operator.snapshotRunStatus, 'PROCESSING_FAILED');
+      assert.equal(operator.snapshotConsultation, 'FAILED');
+      assert.ok(operator.pending.some(row => row.section === 'DO1E' && row.consultation === 'FAILED'));
+      assert.equal(operator.archivedEscalationCount, 0);
+      assert.equal(operator.pilotExclusions[0]?.date, '2026-10-09');
+      await db.deleteFrom('collection_runs').where('id', '=', restartRun).execute();
+      primaryUp = true;
+      assert.equal((await attempt()).status, 'PARTIAL_SUCCESS');
+      const recovered = await origin();
+      assert.equal(recovered.publication_id, original.publication_id);
+      const recoveredMetadata = recovered.metadata as Record<string, unknown>;
+      assert.equal(recoveredMetadata.ingestionChannel, 'INLABS');
+      assert.deepEqual(recoveredMetadata.douArchiveByChannel, onReserveMetadata.douArchiveByChannel);
+      assert.equal((await db.selectFrom('publication_versions').select('id').where('publication_id', '=', original.publication_id).execute()).length, 1);
     });
   } finally {
     const ids = [...new Set((await db.selectFrom('publication_origins').select('publication_id').where('source_id','=',sourceId).execute()).map(r=>r.publication_id))];

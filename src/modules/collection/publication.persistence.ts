@@ -7,6 +7,7 @@ import type {
   Json,
 } from '../../infrastructure/database/database.types.js';
 import type { NormalizedPublication } from './publication.normalizer.js';
+import { mergeDouOriginProvenance } from './dou-coverage.js';
 
 export type PublicationDisposition =
   | 'NEW_PUBLICATION'
@@ -290,7 +291,7 @@ async function upsertOrigin(
         metadata: asJson(
           originMetadataWithPreservedFiles(
             origin.metadata,
-            input.publication.originMetadata,
+            mergeDouOriginProvenance(origin.metadata, input.publication.originMetadata),
           ),
         ),
       })
@@ -309,7 +310,7 @@ async function upsertOrigin(
         input.publication.externalId ?? null,
       official_url: input.publication.officialUrl,
       metadata: asJson(
-        input.publication.originMetadata,
+        mergeDouOriginProvenance(undefined, input.publication.originMetadata),
       ),
     })
     .execute();
