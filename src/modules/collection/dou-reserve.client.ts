@@ -11,6 +11,10 @@ import { ConnectorError } from './connector.error.js';
 export const DOU_OPEN_DATA_INDEX = 'https://www.in.gov.br/acesso-a-informacao/dados-abertos/base-de-dados';
 const MAX_INDEX_BYTES = 4 * 1024 * 1024;
 const MAX_PACKAGE_BYTES = 1024 * 1024 * 1024;
+const MONTHS = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+] as const;
 
 export type DouReserveSection = '01' | '03';
 export interface DouReservePackage { filename: string; officialUrl: string }
@@ -57,8 +61,24 @@ export class DouReserveClient {
     throw reserveError('DOU_RESERVE_REDIRECT_LIMIT');
   }
 
-  async index(signal: AbortSignal): Promise<ReadonlyMap<string, DouReservePackage>> {
-    const response = await this.request(DOU_OPEN_DATA_INDEX, signal);
+  async index(months: readonly string[], signal: AbortSignal): Promise<ReadonlyMap<string, DouReservePackage>> {
+    const packages = new Map<string, DouReservePackage>();
+    for (const month of new Set(months)) {
+      const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+      if (!match) throw reserveError('DOU_RESERVE_INVALID_MONTH');
+      const [, year, number] = match;
+      const url = new URL(DOU_OPEN_DATA_INDEX);
+      url.searchParams.set('ano', year!);
+      url.searchParams.set('mes', MONTHS[Number(number) - 1]!);
+      for (const [key, pkg] of await this.indexMonth(url, `${number}${year}`, signal)) {
+        packages.set(key, pkg);
+      }
+    }
+    return packages;
+  }
+
+  private async indexMonth(indexUrl: URL, monthAndYear: string, signal: AbortSignal): Promise<ReadonlyMap<string, DouReservePackage>> {
+    const response = await this.request(indexUrl.href, signal);
     const documents = new Map<string, DouReservePackage>();
     const conflicts = new Set<string>();
     let anchor: { href: string; label: string } | undefined;
@@ -71,12 +91,12 @@ export class DouReserveClient {
         if (name !== 'a' || !anchor) return;
         const { href, label } = anchor;
         anchor = undefined;
-        const url = officialUrl(href, response.url || DOU_OPEN_DATA_INDEX);
+        const url = officialUrl(href, response.url || indexUrl.href);
         if (!url) return;
         // The official index may use a Liferay document identifier in href.
         const names = [label.trim(), url.pathname.split('/').at(-1) ?? ''];
         const match = names.map(value => /^(S0[13]((?:0[1-9]|1[0-2])\d{4})(?:_Atualizado(?:[01]\d|2[0-3])[0-5]\d[0-5]\d)?\.zip)$/i.exec(value)).find(Boolean);
-        if (!match) return;
+        if (!match || match[2] !== monthAndYear) return;
         const filename = match[1]!;
         const key = filename.slice(0, 9).toUpperCase();
         const previous = documents.get(key);

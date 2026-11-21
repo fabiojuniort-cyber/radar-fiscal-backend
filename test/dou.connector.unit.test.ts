@@ -13,7 +13,11 @@ test('reserve revisits a changed monthly ZIP for delayed extras and returns to p
   const extra = await fixtureEntries('DO1E');
   const empty = await makeZip([]);
   const first = await makeZip(normal);
-  const second = await makeZip([...normal, ...extra]);
+  const second = await makeZip([
+    ...normal.map(entry => ({ ...entry, name: `20260918/DO1/${entry.name}` })),
+    ...extra.map(entry => ({ ...entry, name: `20260918/DO1E/${entry.name}` })),
+    { name: '20260917/DO1/515_20260917_10000.xml', bytes: Buffer.from('unselected payload') },
+  ]);
   let snapshot = first;
   let primaryReturns = false;
   let reserveRequests = 0;
@@ -26,13 +30,16 @@ test('reserve revisits a changed monthly ZIP for delayed extras and returns to p
     assert.equal(url.hostname, 'www.in.gov.br');
     assert.equal(new Headers(init?.headers).has('cookie'), false);
     if (url.pathname.endsWith('/base-de-dados')) {
+      assert.equal(url.search, '?ano=2026&mes=Setembro');
       return new Response([
-        '<a href="/documents/1/2">S01092026_Atualizado171650.zip</a>',
-        '<a href="/documents/1/3">S03092026_Atualizado171929.zip</a>',
+        '<a href="/documents/20181/741444604/S01092026_Atualizado171650.zip/fixture1?version=1.0&amp;download=true">S01092026_Atualizado171650.zip</a>',
+        '<a href="/documents/20181/741444604/S03092026_Atualizado171929.zip/fixture3?version=1.0&amp;download=true">S03092026_Atualizado171929.zip</a>',
         '<a href="https://example.invalid/fake">S01092026_Atualizado171650.zip</a>',
+        '<a href="/documents/wrong-month">S01102026_Atualizado171650.zip</a>',
       ].join(''));
     }
-    return new Response(new Uint8Array(url.pathname.endsWith('/2') ? snapshot : empty));
+    assert.equal(url.searchParams.get('download'), 'true');
+    return new Response(new Uint8Array(url.pathname.endsWith('/fixture1') ? snapshot : empty));
   };
   let state: DouState = { archives: {} };
   const connector = new DouConnector({
@@ -123,6 +130,39 @@ test('an unconfirmed monthly edition does not create a success or follow an exte
   redirect = true;
   await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_HTTP_ERROR' });
   assert.deepEqual(requested, Array(4).fill('www.in.gov.br'));
+});
+
+test('monthly nested ZIP validates folder date, package section, XML section and leaf uniqueness', async () => {
+  const [fixture] = await fixtureEntries('DO1');
+  assert.ok(fixture);
+  const valid = { ...fixture, name: `20260918/DO1/${fixture.name}` };
+  let entries = [valid];
+  const connector = new DouConnector({
+    credentials, dates: ['2026-09-18'], fetch: async () => new Response(null, { status: 503 }),
+    reserve: new DouReserveClient(async input => new URL(String(input)).pathname.endsWith('/base-de-dados')
+      ? new Response('<a href="/S01092026.zip">ZIP</a><a href="/S03092026.zip">ZIP</a>')
+      : new Response(new Uint8Array(await makeZip(String(input).includes('S03') ? [] : entries)))),
+  });
+  assert.equal((await connector.collect(context())).publications.length, 1);
+  entries = [{ ...valid, name: `20260917/DO1/${fixture.name}` }];
+  await assert.rejects(connector.collect(context()), { code: 'DOU_ZIP_FOLDER_DATE_MISMATCH' });
+  entries = [{ ...valid, name: `20260918/DO3/${fixture.name}` }];
+  await assert.rejects(connector.collect(context()), { code: 'DOU_UNSAFE_ZIP_PATH' });
+  entries = [{ ...valid, name: `20260918/DO1E/${fixture.name}` }];
+  await assert.rejects(connector.collect(context()), { code: 'DOU_RESERVE_EDITIONS_UNCONFIRMED' });
+  entries = [valid, fixture];
+  await assert.rejects(connector.collect(context()), { code: 'DOU_UNSAFE_ZIP' });
+});
+
+test('official ZIP discovery requests each selected year-month once', async () => {
+  const requested: string[] = [];
+  const client = new DouReserveClient(async input => {
+    requested.push(new URL(String(input)).search);
+    return new Response('<a href="/S03122026.zip">Dezembro</a><a href="/S01012027.zip">Janeiro</a>');
+  });
+  const result = await client.index(['2026-12', '2027-01', '2026-12'], AbortSignal.timeout(2000));
+  assert.deepEqual(requested, ['?ano=2026&mes=Dezembro', '?ano=2027&mes=Janeiro']);
+  assert.deepEqual([...result.keys()], ['S03122026', 'S01012027']);
 });
 
 test('DOU runtime registration is explicitly gated',()=>{

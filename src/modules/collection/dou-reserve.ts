@@ -23,7 +23,7 @@ export async function collectDouReserve(
   receipts: DouReserveReceipts,
 ): Promise<ConnectorResult> {
   const { signal } = context;
-  const index = await client.index(signal);
+  const index = await client.index(dates.map(date => date.slice(0, 7)), signal);
   const datesByPackage = new Map<string, { dates: string[]; sections: string[] }>();
   for (const date of dates) {
     for (const section of ['01', '03'] as const) {
