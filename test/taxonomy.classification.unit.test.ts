@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   allowsDerivedSegment,
+  hasAutomotiveApplication,
   planCuratedClassification,
 } from '../src/modules/taxonomy/classification/classification.curated.js';
 import {
@@ -153,6 +154,10 @@ test('chapter 87 mentions require contextual evidence to derive the automotive s
     ['Tratores agrícolas', 'Operações com tratores e reboques de uso agrícola.', false],
     ['Convênio ICMS', 'Operações com veículos rodoviários e autopeças.', true],
     ['Equipamentos industriais', 'Operações com máquinas industriais.\nRedação anterior: operações com autopeças.', false],
+    ['Convênio ICMS', 'Concede isenção nas saídas de máquinas industriais, exceto caminhões e ônibus.', false],
+    ['Convênio ICMS', 'Reduz a base de cálculo de máquinas agrícolas; não se aplica a caminhões.', false],
+    ['Convênio ICMS', 'Prorroga o benefício de que trata o Convênio ICMS 133/02 sobre caminhões.', false],
+    ['Convênio ICMS', 'Concede isenção nas saídas de ônibus destinados ao transporte escolar.', true],
   ] as const) {
     const plan = planCuratedClassification({ ...input, title, contentText });
     const application = plan.configSnapshot.automotiveApplication as boolean;
@@ -162,4 +167,18 @@ test('chapter 87 mentions require contextual evidence to derive the automotive s
   }
   assert.equal(allowsDerivedSegment(segment, null), true);
   assert.equal(allowsDerivedSegment('Agropecuária', false), true);
+});
+
+test('automotive application needs an affirmative clause in the title or first non-blank line', () => {
+  const cases: Array<[string, string | null, boolean, string]> = [
+    ['Convênio ICMS 52/91', 'Concede redução da base de cálculo nas operações com equipamentos industriais e implementos agrícolas.', false, 'no automotive application'],
+    ['Convênio ICMS', 'Isenção para máquinas, exceto caminhões.', false, 'exclusion (exceto)'],
+    ['Convênio ICMS', 'O benefício não se aplica a caminhões e ônibus.', false, 'exclusion (não se aplica)'],
+    ['Convênio ICMS', 'Altera o benefício previsto no Convênio ICMS 133/02 para ônibus.', false, 'incidental reference to another act'],
+    ['Convênio ICMS', 'Equipamentos industriais.\nRedação anterior: autopeças.', false, 'later line only'],
+    ['Convênio ICMS', '\n\nConcede isenção nas saídas de caminhões.', true, 'first non-blank line'],
+    ['Isenção para caminhões', null, true, 'title'],
+    ['Convênio ICMS', 'Concede isenção a caminhões, não se aplicando a reboques.', true, 'affirmative clause next to an exclusion'],
+  ];
+  for (const [title, text, expected, why] of cases) assert.equal(hasAutomotiveApplication(title, text), expected, why);
 });

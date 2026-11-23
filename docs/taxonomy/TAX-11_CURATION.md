@@ -126,6 +126,21 @@ site os filtrava e nunca salvou códigos dessas dimensões).
   automática com motivo `PRODUCTS` ("Pelos produtos citados: …"), a menos que
   já tenha sido marcado pelo texto. O curador remove/restaura como qualquer tag.
 
+### Segmento "Automotivo e equipamentos de transporte" (#336)
+
+- **Alcance:** vale para **todas** as promoções desse segmento derivadas dos produtos marcados (qualquer grupo
+  ligado a ele, não só "Veículos"/capítulo 87). As tags de produto, os NCMs e o grupo continuam registrados como
+  evidência do ato; só a promoção do segmento muda.
+- **Regra:** a classificação nova grava `automotiveApplication` no `config_snapshot` do run (`policyVersion` 4). O
+  segmento só é promovido com evidência **afirmativa** de aplicação automotiva ou de transporte rodoviário numa
+  oração do título ou da primeira linha não vazia do texto. Não contam orações de exclusão ("não se aplica a
+  caminhões", "exceto ônibus") nem referências incidentais a outro ato ou redação ("de que trata o Convênio ICMS
+  133/02", "nos termos", "redação anterior").
+- **Limite:** só o título e a primeira linha útil são lidos; uma aplicação automotiva descrita apenas mais adiante no
+  texto não promove o segmento (conservador). A lista de termos é fechada.
+- **Legado:** runs anteriores, sem o marcador no snapshot, mantêm a tag. Nada é reclassificado nem reprocessado: a
+  regra vale só para classificações novas.
+
 ### Afinidade com a empresa
 
 `GET /api/v1/companies/:companyId/publications/:id/affinity` (cabeçalho

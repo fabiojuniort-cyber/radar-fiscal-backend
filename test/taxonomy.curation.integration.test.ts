@@ -370,6 +370,8 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
 
     // Spreadsheet-like editor: batch save, generated unique codes, retire.
     const gridUrl = '/api/v1/admin/taxonomy/drafts/current/dimensions/product/rows';
+    let automotiveSegmentCode = '';
+    let truckCode = '';
     const gridRow = (label: string, extra: Record<string, unknown> = {}) => ({
       code: null,
       group: 'Fertilizantes e corretivos',
@@ -698,6 +700,41 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
       }
     }
 
+    // #336 fixture: the automotive segment linked to a "Veículos" group with a chapter 87 product.
+    const autoSector = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/taxonomy/drafts/current/dimensions/sector/rows',
+      headers: curator.headers,
+      payload: {
+        justification: 'Segmento automotivo',
+        rows: [{ code: null, group: null, label: 'Automotivo e equipamentos de transporte', officialCodes: [], aliases: [],
+          profileVisible: true, classifyByLabel: false, displayOrder: null }],
+        retire: [],
+      },
+    });
+    assert.equal(autoSector.statusCode, 200, autoSector.body);
+    automotiveSegmentCode = autoSector.json().created[0] as string;
+    const truck = await app.inject({
+      method: 'POST',
+      url: gridUrl,
+      headers: curator.headers,
+      payload: {
+        justification: 'Produto do capítulo 87',
+        rows: [{ code: null, group: 'Veículos', label: 'Caminhão de teste', officialCodes: ['8704'], aliases: [],
+          profileVisible: true, classifyByLabel: false, displayOrder: null }],
+        retire: [],
+      },
+    });
+    assert.equal(truck.statusCode, 200, truck.body);
+    truckCode = truck.json().created[0] as string;
+    const autoLinked = await app.inject({
+      method: 'POST',
+      url: gridUrl,
+      headers: curator.headers,
+      payload: { justification: 'Segmento do grupo', rows: [], retire: [], groupSegments: [{ group: 'veículos', segmentCodes: [automotiveSegmentCode] }] },
+    });
+    assert.equal(autoLinked.statusCode, 200, autoLinked.body);
+
     await withCuratorTransaction(app.curatorPool!, async (client) => {
       const open = await findOpenDraft(pgRunner(client));
       assert.ok(open);
@@ -822,6 +859,61 @@ test('TAX-11 curation: draft, tables, publication, profile, classification and t
         headers: customer.headers,
       });
       assert.equal(classifiedOne.json().status, 'CLASSIFIED');
+
+      // #336: projection of the API for NEW persisted classifications. Chapter 87 NCMs and the Veículos product stay as
+      // evidence; only the derived automotive segment needs an affirmative application in the title/first line.
+      await admin.query(
+        `INSERT INTO official_catalog_entries (catalog_edition_id, official_code, description, metadata)
+         SELECT ed.id, '8704.21.10', 'Caminhões (fixture #336).',
+           '{"assignable": true, "normalizedDigits": "87042110", "sourceValidFrom": "01/04/2022", "sourceValidTo": "31/12/9999", "normalizedValidFrom": "2022-04-01", "normalizedValidTo": "9999-12-31"}'::jsonb
+         FROM official_catalog_editions ed JOIN official_catalogs oc ON oc.id = ed.catalog_id
+         WHERE oc.code = 'NCM' AND ed.status = 'CURRENT'
+         ON CONFLICT (catalog_edition_id, official_code) DO NOTHING`,
+      );
+      const project = async (title: string, text: string) => {
+        const pub = await createPublication(admin, title, text);
+        await processPublicationNcmEnrichmentBatch(worker, { limit: 50 });
+        resetClassificationConceptCache();
+        const saved = await classifySinglePublication(worker, { publicationId: pub.publicationId, releaseId, persist: true });
+        assert.equal(saved.persisted, true);
+        const view = await app.inject({ method: 'GET', url: `/api/v1/publications/${pub.publicationId}/taxonomy`, headers: customer.headers });
+        assert.equal(view.statusCode, 200, view.body);
+        const codes = view.json().sections.flatMap((s: { tags: Array<{ conceptCode: string; reason: { type: string } }> }) => s.tags);
+        return { pub, tag: (code: string) => codes.find((x: { conceptCode: string }) => x.conceptCode === code) };
+      };
+      const negatives: Array<[string, string, string]> = [
+        ['Convênio ICMS 52/91', 'Concede redução da base de cálculo nas operações com equipamentos industriais e implementos agrícolas, inclusive NCM 8704.21.10.', 'no automotive application'],
+        ['Convênio ICMS', 'Concede isenção a máquinas industriais da NCM 8704.21.10; não se aplica a caminhões.', 'exclusion'],
+        ['Convênio ICMS', 'Prorroga o benefício de que trata o Convênio ICMS 133/02 sobre caminhões, NCM 8704.21.10.', 'incidental reference'],
+      ];
+      let legacy: Awaited<ReturnType<typeof project>> | null = null;
+      for (const [title, text, why] of negatives) {
+        const view = await project(title, text);
+        assert.equal(view.tag(truckCode)?.reason.type, 'NCM', `${why}: the chapter 87 product stays as evidence`);
+        assert.equal(view.tag(automotiveSegmentCode), undefined, `${why}: no automotive segment`);
+        legacy ??= view;
+      }
+      const positive = await project('Convênio ICMS', 'Concede isenção nas saídas de caminhões classificados na NCM 8704.21.10.');
+      assert.equal(positive.tag(truckCode)?.reason.type, 'NCM');
+      assert.equal(positive.tag(automotiveSegmentCode)?.reason.type, 'PRODUCTS', 'affirmative application derives the segment');
+      // A run written before the policy (no automotiveApplication in its snapshot) keeps the derived tag. Runs are
+      // immutable: only this isolated fixture strips the key, with triggers disabled for this transaction.
+      const strip = await admin.connect();
+      try {
+        await strip.query('BEGIN');
+        await strip.query("SET LOCAL session_replication_role = 'replica'");
+        const stripped = await strip.query(
+          `UPDATE publication_taxonomy_runs r SET config_snapshot = r.config_snapshot - 'automotiveApplication'
+           FROM publication_taxonomy_scans s
+           WHERE s.run_id = r.id AND s.publication_version_id = $1::uuid`,
+          [legacy!.pub.versionId],
+        );
+        assert.ok((stripped.rowCount ?? 0) >= 1);
+        await strip.query('COMMIT');
+      } catch (error) { await strip.query('ROLLBACK'); throw error; } finally { strip.release(); }
+      const legacyView = await app.inject({ method: 'GET', url: `/api/v1/publications/${legacy!.pub.publicationId}/taxonomy`, headers: customer.headers });
+      const legacyTags = legacyView.json().sections.flatMap((s: { tags: Array<{ conceptCode: string }> }) => s.tags);
+      assert.ok(legacyTags.some((x: { conceptCode: string }) => x.conceptCode === automotiveSegmentCode), 'legacy snapshot without the marker keeps the tag');
     }
 
     const enable = await app.inject({
