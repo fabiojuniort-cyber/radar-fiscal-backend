@@ -23,6 +23,8 @@ on:
       - 'src/modules/auth/password-reset.worker.ts'
       - 'src/worker.ts'
       - 'test/password-reset.worker.unit.test.ts'
+      - 'migrations/086_auth_reset_retention_homologation.sql'
+      - 'test/password-reset.retention.integration.test.ts'
       - 'package.json'
       - 'package-lock.json'
   workflow_dispatch:
@@ -86,6 +88,8 @@ jobs:
         run: npx tsx --test test/password-reset.r4.health-retention.integration.test.ts
       - name: R3 real PostgreSQL lock and partial failure non-enumeration
         run: npx tsx --test test/password-reset.r3.adversarial.integration.test.ts
+      - name: Retention windows, batching and concurrent outbox protection
+        run: npx tsx --test test/password-reset.retention.integration.test.ts
       - name: Authentication, session rotation, tenant isolation and public signup RLS
         run: npx tsx --test test/auth.integration.test.ts && npx tsx --test test/public-signup.integration.test.ts
 
