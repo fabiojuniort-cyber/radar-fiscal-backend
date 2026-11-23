@@ -462,6 +462,137 @@
       }
     },
     {
+      "idAto": 146769,
+      "epigrafe": "Resolução CGSN nº 182, de 26 de setembro de 2025",
+      "dadosPublicacao": "Publicado(a) no DOU de 01/10/2025, seção 1, página 57",
+      "bytes": 13153,
+      "sha256": "9a18062a7e3fd4ad0b2237ca2d0ab8e9ee40c4dc68c49925933f5a5ab5c13ac1",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "7849be1a1d613e08236ec38973e9662cc770933adc7869c6177d4f69564ac386",
+        "pieces": 5
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "7849be1a1d613e08236ec38973e9662cc770933adc7869c6177d4f69564ac386",
+      "status": "complete",
+      "canonicalChars": 785,
+      "unidentifiedChars": 0,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "preamble": 1,
+        "article": 2,
+        "caput": 2,
+        "signature": 1
+      },
+      "limitations": {},
+      "historicalByTachado": 0,
+      "historicalContextParts": 0,
+      "struckSegments": 0,
+      "attachmentsWithoutContent": 1,
+      "missingSegments": 0,
+      "outputHash": "ba3584cd844d27881e17127db381c7d0fe05094050a7675d2b4974960b22f404",
+      "inlineAttachments": {
+        "total": 1,
+        "states": {
+          "read": 1
+        },
+        "read": [
+          {
+            "id": 80837,
+            "sha256": "0e54237301b9d7d33eb4510b99b4146ab75f2fba1e28dc897246536a635f2df2",
+            "charset": "utf-8",
+            "bytes": 4458,
+            "chars": 377,
+            "unidentifiedChars": 2,
+            "referenceContext": "prohibited"
+          }
+        ]
+      }
+    },
+    {
+      "idAto": 148121,
+      "epigrafe": "Ato Declaratório Interpretativo RFB nº 3, de 3 de dezembro de 2025",
+      "dadosPublicacao": "Publicado(a) no DOU de 04/12/2025, seção 1, página 44",
+      "bytes": 11971,
+      "sha256": "c5c108ebf89fea077ee76a3f8b82f4338ddd185c667a4688e20fd068255e3195",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "eaaff3cd4ab1af1ea6843e90f84c6fb95581099ceef5fdd2b45fe9dc599468e7",
+        "pieces": 12
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "eaaff3cd4ab1af1ea6843e90f84c6fb95581099ceef5fdd2b45fe9dc599468e7",
+      "status": "complete",
+      "canonicalChars": 3631,
+      "unidentifiedChars": 0,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "preamble": 1,
+        "article": 3,
+        "caput": 3,
+        "paragraph": 6,
+        "signature": 1
+      },
+      "limitations": {},
+      "historicalByTachado": 0,
+      "historicalContextParts": 0,
+      "struckSegments": 0,
+      "attachmentsWithoutContent": 0,
+      "missingSegments": 0,
+      "outputHash": "6f98bf44d98ab6a7be77fdf003bf01250c04c71dbc82a2d090b4c4376b218a8d",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
+    },
+    {
+      "idAto": 148386,
+      "epigrafe": "Ato Declaratório Executivo Coana nº 87, de 11 de dezembro de 2025",
+      "dadosPublicacao": "Publicado(a) no DOU de 18/12/2025, seção 1, página 88",
+      "bytes": 9188,
+      "sha256": "f0cd9227be6234f2f9bae07f3413da7073155e6e40c4f240fa8061e72453127a",
+      "promoted": false,
+      "capturedPreparation": {
+        "preparationVersion": "rfb-api-original/0.2.0-provisional",
+        "htmlSha256": "67408b14c46646351891623a41829897ee3766e44860e7cc23f5347d70cb154f",
+        "pieces": 9
+      },
+      "preparationReconciliation": "identical",
+      "preparationVersion": "rfb-api-original/0.2.0-provisional",
+      "preparedHtmlSha256": "67408b14c46646351891623a41829897ee3766e44860e7cc23f5347d70cb154f",
+      "status": "complete",
+      "canonicalChars": 2574,
+      "unidentifiedChars": 0,
+      "partTypes": {
+        "document": 1,
+        "summary": 1,
+        "preamble": 1,
+        "article": 3,
+        "caput": 3,
+        "paragraph": 3,
+        "signature": 1
+      },
+      "limitations": {},
+      "historicalByTachado": 0,
+      "historicalContextParts": 0,
+      "struckSegments": 0,
+      "attachmentsWithoutContent": 0,
+      "missingSegments": 0,
+      "outputHash": "e22cc44115bc072abb41c6eca07c0a461ea4df15f5f5802ffdf2a00ec10ab9c2",
+      "inlineAttachments": {
+        "total": 0,
+        "states": {},
+        "read": []
+      }
+    },
+    {
       "idAto": 148516,
       "epigrafe": "Ato Declaratório Executivo Corat nº 33, de 23 de dezembro de 2025",
       "dadosPublicacao": "Publicado(a) no DOU de 24/12/2025, seção 1, página 838",

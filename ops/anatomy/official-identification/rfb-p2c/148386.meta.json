@@ -1,0 +1,52 @@
+{
+  "id": "148386",
+  "act": "Ato Declaratório Executivo 87/2025",
+  "url": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148386/visao/multivigente",
+  "finalUrl": "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148386/visao/multivigente",
+  "hops": [
+    "https://normasinternet2.receita.fazenda.gov.br/api/consulta-externa/ato/148386/visao/multivigente"
+  ],
+  "status": 200,
+  "contentType": "application/json",
+  "lastModified": null,
+  "sha256": "f0cd9227be6234f2f9bae07f3413da7073155e6e40c4f240fa8061e72453127a",
+  "bytes": 9188,
+  "consultedAt": "2026-11-20T16:01:41.196Z",
+  "urlStatus": "candidate",
+  "urlVerified": false,
+  "representation": "json",
+  "verified": false,
+  "reason": "E9 P2-c direct (Ato Declaratório Executivo, grant E9-P2c-G1)",
+  "identification": {
+    "idAto": 148386,
+    "epigrafe": "Ato Declaratório Executivo Coana nº 87, de 11 de dezembro de 2025",
+    "numeroAto": "87",
+    "dataAto": "2025-12-11",
+    "dataPublicacao": "2025-12-18",
+    "dadosPublicacao": "Publicado(a) no DOU de 18/12/2025, seção 1, página 88",
+    "visao": "multivigente",
+    "portalDeclaresVigente": true
+  },
+  "preparation": {
+    "preparationVersion": "rfb-api-original/0.2.0-provisional",
+    "preparationId": "28ff5900956566da9a6d83db13c3cfac39a4a878afff1683337f847cadc31f1b",
+    "htmlSha256": "67408b14c46646351891623a41829897ee3766e44860e7cc23f5347d70cb154f",
+    "pieces": 9,
+    "missingSegments": [],
+    "struckSegments": [],
+    "attachments": [],
+    "excluded": [
+      "/epigrafeCompleta"
+    ]
+  },
+  "origin": "automated fetch via consultOfficial (E9 P2-c direct, grant E9-P2c-G1)",
+  "promoted": false,
+  "p2c": {
+    "type": "Ato Declaratório Executivo",
+    "mode": "direct-by-idAto",
+    "grantId": "E9-P2c-G1",
+    "acervoSize": "pequeno",
+    "measuredChars": 2574,
+    "size": "pequeno"
+  }
+}
