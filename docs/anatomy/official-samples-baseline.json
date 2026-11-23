@@ -4,224 +4,224 @@
       "id": "ricms-an1art041",
       "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
       "profile": "SEFAZ-SP-PORTAL",
-      "outputHash": "230eece6b5ad6a9aa8ed9f044eb8c709a164f04f3ee78fe60bea3fb5e17552f6",
+      "outputHash": "e6ff492cce49bb1f063b14fed56286d4af9aa20c9b602acb94253f1266078e9c",
       "chars": 33383
     },
     {
       "id": "ricms-an2art003",
       "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
       "profile": "SEFAZ-SP-PORTAL",
-      "outputHash": "481089cf9c09d02b42390858a31f7d84802ed98aaa76896d53e22e4170d49612",
+      "outputHash": "b51b1bb913cde7964ca7f2f56bb3b5fa9a6a4915a683d8cca06081f687070311",
       "chars": 20457
     },
     {
       "id": "ricms-an2art039",
       "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
       "profile": "SEFAZ-SP-PORTAL",
-      "outputHash": "0f5153a69feb01b12c610240dffbd0ce5e0c68cd18b21e83298697c85995953d",
+      "outputHash": "79bf09cad3bc8b86c1da8c3911cd5e230d190d1819316560c39f9afa66df0e2e",
       "chars": 12616
     },
     {
       "id": "ricms-art007",
       "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
       "profile": "SEFAZ-SP-PORTAL",
-      "outputHash": "f1885c6d5a41f619cf392240891605a0be5d60c41b52c6e18ba70c021d2f8776",
+      "outputHash": "8658196e0df386f95ed3d2de8768fac8ba4a6ab03fa4f1f2c64b28a3f6c2a805",
       "chars": 11628
     },
     {
       "id": "ricms-art008",
       "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
       "profile": "SEFAZ-SP-PORTAL",
-      "outputHash": "f22973557f42dffb7e17797a7e01ec53b57ee4b122ca8eb8c9767163db052c41",
+      "outputHash": "7cebd8523d9683a5a4fca74292d0d35cc725e6372e541c08cee17ed58c56e76a",
       "chars": 3219
     },
     {
       "id": "ricms-art009",
       "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
       "profile": "SEFAZ-SP-PORTAL",
-      "outputHash": "e2db0e396ce31f518701777dcab14d44a70b43deba0469ea92d179aa71be3da3",
+      "outputHash": "bbaf36fb38a108d3f9552583ba06f96f3368e6f3cd69feaba1d492e33989d252",
       "chars": 3340
     },
     {
       "id": "lei-10637-2002-atualizada",
       "sha256": "8b3ccac420436c491d89df580991c859584987f0fbd9dff744bc2a381b3d3d55",
       "profile": "NORMAS-LEG",
-      "outputHash": "0b23156127c8ea39667bf191bc05a190f7c363ecdda2eba53dc375a4967e42f8",
+      "outputHash": "13005932ca3b949ff961b8a4cc1111109f668311990fb20d43fce5dece90b952",
       "chars": 74715
     },
     {
       "id": "lei-10833-2003-atualizada",
       "sha256": "c5ca0d93e92a5f53c3922a21aad2a606bae78cbc53374af614db3e255581feae",
       "profile": "NORMAS-LEG",
-      "outputHash": "3d16c72bd888d1c55cef053ebeefd6a877f9d359611e05eba3e56bde5a4b7f88",
+      "outputHash": "16128f4675237caf68416fec125c77f897a1dcd550d867d4d3c62cdcd5297fd2",
       "chars": 167570
     },
     {
       "id": "M10",
       "sha256": "1bfb6dabc79c5523fd697f4d598e7171be9a0ab694d92423018c71f91bf654bf",
       "profile": "PLANALTO",
-      "outputHash": "ddda4ab73b08f3273c63e9d9845e1528291bd7a348d35326a4194ac19dc7d079",
+      "outputHash": "7bc1f1ccf62b789e073c55cf289859f9bf8b6126d287f543bc46738cfb21fc45",
       "chars": 9391
     },
     {
       "id": "M12",
       "sha256": "5776d1bbd28af7567b3a1d29c385142cd5b37bce8551ae8119a1c120392c6a7f",
       "profile": "PLANALTO",
-      "outputHash": "21489f81d4307cce5aab1f4abae418e18d459c4c1e7c722efc9e7e1182ddcfd0",
+      "outputHash": "282496eb4ede790bf69fbc797ee0016dbdb9f841f30703d601ea1fba4289e8f5",
       "chars": 34582
     },
     {
       "id": "M14",
       "sha256": "13bdf6fd9bbb466bea42f81cd1017969d5ac02ba5fbd333ed8ce60620afacb93",
       "profile": "CONFAZ",
-      "outputHash": "345949952a175a04cd6d9f877378b6efe62911ff76342a3ed2112b8cb2ec26f9",
+      "outputHash": "c704122a618f5a2af71d503b15f4275bbfc0ca404d1783a9704224b232b257fd",
       "chars": 1657
     },
     {
       "id": "M16",
       "sha256": "2732a2e1422a8197d560ee94745a0402ced487ee712cbf7e9d934882347c1188",
       "profile": "CONFAZ",
-      "outputHash": "d277219a1b8d3c4f7189f5ac03757215ef349d8f22d2b6a824fc22b06fbde370",
+      "outputHash": "fc85e39a718af6f27ffa3cebdaa27756d8cebb83f05126b2ead5cb7bc1a473b0",
       "chars": 1814
     },
     {
       "id": "M18",
       "sha256": "f74457bdd4879560bb17d445eb5110091f356443929839f9d0c4a031c0032862",
       "profile": "CONFAZ",
-      "outputHash": "0776f010680d07b93cd3d347efe8e29f95703788e620327b0e3f37b47c3c4b1d",
+      "outputHash": "373e1abdeb29a4d4daed1e4d3e053d17f13d8b55c10938c8097d1c4ceaa7a21b",
       "chars": 1318
     },
     {
       "id": "M19",
       "sha256": "4253e31bedb7582f55fc553b3a887a986f97f49818e747ab04448a18cd32574b",
       "profile": "CONFAZ",
-      "outputHash": "7bc756f3247286ec6e7298fb3f16cc06edd65b0301b89c2504975c6ef959d55e",
+      "outputHash": "b3d111f276e8ac463d9c52660300f627378f66fb4205508be743c5bfcbc02750",
       "chars": 60404
     },
     {
       "id": "M20",
       "sha256": "6c09825912e536fd224b41437de777afd3f5eb289ac80d5b501b00fd59929a50",
       "profile": "CONFAZ",
-      "outputHash": "c81cc4e93def07c95b68ecdf1616a6f7b5f7ce35829118b9042b224add67e436",
+      "outputHash": "1271c4766b673dc3b49b1f3176c3870e55d99818791fd5e2f47b6261c7d89c28",
       "chars": 1244
     },
     {
       "id": "M21",
       "sha256": "29ae2cb3dcf233ff62c41cecb8e78a338c60c63c5796624da46809a6a2744d5c",
       "profile": "CONFAZ",
-      "outputHash": "2cecebde0393a50e5b4db2052c4aed8f08fc7bfa3e0becbe14757ad253a299e0",
+      "outputHash": "a172310ea774a9a683bbc4b2076d8499b954acf5533291d8ba14c245c10343e8",
       "chars": 25573
     },
     {
       "id": "M23",
       "sha256": "31b1b1f969813af9eba6dbac0f3781d6bbdc59a5b2f3af42ec30db291974d7a8",
       "profile": "DOU",
-      "outputHash": "79c6d6d39086cac58da181ecc5067ea8d20f7bb808109a29fed76f283e2445b9",
+      "outputHash": "fc591cb7bad6aa978acae1a71a6f05f4a686fdd61b09d20c41fc42aadd79e62b",
       "chars": 2056
     },
     {
       "id": "M24",
       "sha256": "2196ec600f9a1cff11047da3c467261168a1b79cd577126e3ec3e3280f206a10",
       "profile": "DOU",
-      "outputHash": "8487d0307701191ec47b33c2bb6d13610bf7b20e4fe20beb5a98c430cc98cc17",
+      "outputHash": "9b3a0efaaf556657ed09216283d8ec4879805a881e981ccfc3f62898ca92627f",
       "chars": 29447
     },
     {
       "id": "M25",
       "sha256": "f6fd18d1a8ea0926f1329cde48ccec6f9c251f7cee451980312d7fbd59f842c7",
       "profile": "DOU",
-      "outputHash": "1fba3e14989d77a27dfe64db5d70880512028bdf914ed783cb0a9084ef7287a1",
+      "outputHash": "96b22f80d00ce0ad2effc576f204018418ad4bad030ea1895c913340578185ee",
       "chars": 1006011
     },
     {
       "id": "M26",
       "sha256": "92cb1dff9ffc240ec1c715e063a9461d4b703da4da3654fc7fce96318f5b35d4",
       "profile": "DOU",
-      "outputHash": "c13eda18badbaa7f5fa33ef20c7689ba22b1226ca59538262fdf1c0715258176",
+      "outputHash": "074ce57bb3f4252a30641ae47ffb965aec0ed14085dc74ec2853e027e71730ce",
       "chars": 7580
     },
     {
       "id": "M28",
       "sha256": "a77a1e4e1d092ef86a3851389e6d2eae29af603b85d5e0099d099716bb5469f4",
       "profile": "DOU",
-      "outputHash": "da23d088e0dc12bfd977918b85af71768bb87cb89d3118da2e2b9073a7054688",
+      "outputHash": "f3020e991d19abd0589e857bb338a1d2041bf2f4facda86527f0a65cf3e6835c",
       "chars": 1162423
     },
     {
       "id": "M29",
       "sha256": "d2ca1bf2b076f678fd8e1a50554525dada0e19022d2769a8b780c6a8b1527896",
       "profile": "DOU",
-      "outputHash": "a9e7e316cba7efdcd1593a12c491446247449e8dd0868c52d8390087cb4db471",
+      "outputHash": "c34bb535c82673f6808872e6904e3b386414a0adb809c679877b9ad2f0265f04",
       "chars": 4833
     },
     {
       "id": "M30",
       "sha256": "3629a9eb77320633d92d9d12b1d626faef2ac46627dcd3f49e75aef86a1d3a31",
       "profile": "DOU",
-      "outputHash": "17b1d64e9225c13c755992883bf0361d324e68e8ba895a966f5a4e4df4cc8be9",
+      "outputHash": "940d11eb95d552af410072cdd7f37105d3ef707b142b24d7a1f3ea38a4066b85",
       "chars": 20539
     },
     {
       "id": "M32",
       "sha256": "866bd1e26cfdbf15bd706f442b5f807cf6e3fb19109efc860f75b9ac957daa0d",
       "profile": "DOU",
-      "outputHash": "cf854090df42e0f85ced004ad498d7138dcce3d201e627ff751508a0f1d2d9c7",
+      "outputHash": "2d4f5e9e27563d7a1b041d19a1279af694b641618521cdfedf5e7a738b4cb671",
       "chars": 2255
     },
     {
       "id": "M33",
       "sha256": "3d3c25f4310982087e0e95a74923a86701775e0280a300bac396503d2e1156b3",
       "profile": "DOU",
-      "outputHash": "83e43be656de5a5b74dd07e39583e7317417e8cff64e9a26d400d53a41cfb3bb",
+      "outputHash": "97ef10740f5144c9bb65caa46b03cf1f5b6af1ddf2f2dbb286cb24721cbbffd8",
       "chars": 1164
     },
     {
       "id": "M34",
       "sha256": "1b5b23ccbf7b97d94b020118a4106f06993454f9ea026562bbbb2bb7b1372642",
       "profile": "DOU",
-      "outputHash": "20f61fdacbecc867b94370d2d46e48271ef1cc9d2ebb9016fb737250cbffb96e",
+      "outputHash": "256dfb976ad304f3311719c3291d80577cab8edf70b5229b0bbdd9af069a7d36",
       "chars": 338990
     },
     {
       "id": "M5",
       "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
       "profile": "CONFAZ",
-      "outputHash": "c5de7863070b4c52e200fd66f4147c1fed1946d28b80c63f7e5c0beceb28b13c",
+      "outputHash": "9775e2e87c40f072d5eba55b3ea7b0bd8c6787c8deec6dfdd5edf9b41ec10fe0",
       "chars": 119687
     },
     {
       "id": "http:M1",
       "sha256": "fcab62384ebd6846157afefe13e82dbf313b435c26cc2605b284d98aaa613f36",
       "profile": "PLANALTO",
-      "outputHash": "d522fdb22ce2382cf43880a8781986a0ba8f7dee41048d514fa70fb4d38a3f87",
+      "outputHash": "78c96883a33688b2bc65760b417e65b792b68c75327a5b3b49b43a62271cf5d5",
       "chars": 114163
     },
     {
       "id": "http:M2",
       "sha256": "25b7fc2de4c59dde7e2bd1fe88ac56d8285276c1f5b856e5ea3533d88315b7e9",
       "profile": "PLANALTO",
-      "outputHash": "b09a970f77ea4999011f8559aa8ccc833d023f7ddd81b7d74762f7ce73f5063c",
+      "outputHash": "38dee737bf39dee58a16894f96b484119b1512180140a76b0ad8c916db8b3eac",
       "chars": 256474
     },
     {
       "id": "http:M3",
       "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
       "profile": "CONFAZ",
-      "outputHash": "f561f8a705516cdbbfcdd992c79e5ee63fd6a2b7b52a7cdfde26ad759a6e0d38",
+      "outputHash": "24a875e79513e8d1148eb16bec77d2fe1f213cf937d87ca6c5c98997a71f5ff7",
       "chars": 325058
     },
     {
       "id": "http:M4",
       "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
       "profile": "CONFAZ",
-      "outputHash": "09cfe61bc7230085da4be10c7aed8971d6f2949fb07689d7975e285c5736d1f9",
+      "outputHash": "144856d9ea771fe0e0ce6a9363975b2ab690a5aa362c00e24931c7fc292aa640",
       "chars": 54704
     },
     {
       "id": "http:M5",
       "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
       "profile": "CONFAZ",
-      "outputHash": "c9c8645bd175928e8a01ccaedc7d9757ff3ae548df3c7a673a5b593efa913ec9",
+      "outputHash": "9adfa8e7d7cd6ee4b2a7964e69bc520e51a02a277e3eab344d5ec0f453744d2f",
       "chars": 119682
     }
   ]

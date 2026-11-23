@@ -83,12 +83,37 @@ function hasNestedDouBody(node: Node): boolean {
   return true;
 }
 
+const struckMarkup = (node: Node): boolean => /^(?:s|strike|del)$/u.test(node.tag)
+  || /(?:^|;)\s*text-decoration(?:-line)?\s*:\s*line-through\s*(?:;|$)/iu.test(node.attrs.style ?? '');
+
+// Some compiled Planalto pages strike the ordinal glyph itself. That is not evidence
+// of an earlier wording. Any other visible struck text retains the existing guard.
+function hasSubstantivePlanaltoStrike(node: Node): boolean {
+  let previousText = '';
+  function visit(current: Node, inherited: boolean): boolean {
+    if (current.blocked) return false;
+    const struck = inherited || struckMarkup(current);
+    if (current.text === null) return current.children.some(child => visit(child, struck));
+    const text = current.text;
+    const substantive = struck && !layoutWhitespace.test(text)
+      && !(/^[º°]$/u.test(text) && /\d$/u.test(previousText));
+    previousText = text || previousText;
+    return substantive;
+  }
+  return visit(node, false);
+}
+
+function hasPlanaltoAnchor(node: Node, name: string): boolean {
+  if (node.blocked) return false;
+  return (node.tag === 'a' && node.attrs.name?.toLowerCase() === name)
+    || node.children.some(child => hasPlanaltoAnchor(child, name));
+}
+
 // A layout block may be treated as struck only when every nonblank text node carries
 // the source's strike markup. A live fragment in the same paragraph keeps the block unresolved.
 function isEntirelyStruck(node: Node, inherited = false): boolean {
   if (node.blocked) return true;
-  const struck = inherited || /^(?:s|strike|del)$/u.test(node.tag)
-    || /(?:^|;)\s*text-decoration(?:-line)?\s*:\s*line-through\s*(?:;|$)/iu.test(node.attrs.style ?? '');
+  const struck = inherited || struckMarkup(node);
   if (node.text !== null) return struck || layoutWhitespace.test(node.text);
   return node.children.every((child) => isEntirelyStruck(child, struck));
 }
@@ -424,6 +449,20 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
         limitation('item_parent_missing', `Item ${desc.itemNumber} has no open parent item ${expected}; attached to the enclosing device.`, { ...node.span });
       }
     }
+    // A new inciso I with the explicit artNNi. anchor resumes the operative article
+    // after its superseded sole paragraph (the following incisos then use normal ranks).
+    const top = logical[logical.length - 1]!.part;
+    if (portal?.source === 'PLANALTO' && desc.type === 'inciso' && desc.context === 'operative_candidate'
+      && top.type === 'paragraph' && top.context === 'prohibited' && top.contextReasons.includes('planalto_historical_markup')
+      && /^Parágrafo\s+único\b/iu.test(top.label) && /^I\s*[-–—]/u.test(textOf(node).trim())
+      && !hasSubstantivePlanaltoStrike(node)) {
+      const article = logical[logical.length - 2]?.part;
+      const number = /^Art\.\s*(\d+)\./iu.exec(article?.label ?? '')?.[1];
+      if (article?.type === 'article' && article.context === 'operative_candidate' && number
+        && hasPlanaltoAnchor(node, 'art' + number + 'i.')) {
+        logical.pop()!.part.span.end = node.span.start;
+      }
+    }
     const parent = logical[logical.length - 1]!.part;
     if (desc.type === 'annex') { annexHistorical = desc.context === 'historical'; annexContainer = containerOf(node.path); }
     let context = desc.context;
@@ -710,7 +749,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           const titleText = text.replace(/\s+/gu, ' ');
           const title = centered && planaltoChapterTitles.has(titleText.toUpperCase());
           if (chapter) {
-            descriptor = { type: 'group', context: 'prohibited', reason: 'planalto_chapter', rank: groupLevel('CAPITULO')[1] };
+            descriptor = { type: 'group', context: 'operative_candidate', reason: 'planalto_chapter', rank: groupLevel('CAPITULO')[1] };
           } else if (adjacent && centered && ((planaltoPrevious?.rank === groupLevel('CAPITULO')[1] && title)
             || (planaltoPrevious?.reason === 'planalto_chapter_title'
               && /^DAS OUTRAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO$/iu.test(matchText(previous!).trim().replace(/\s+/gu, ' '))
@@ -728,8 +767,13 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           } else if (/^[IVXLCDM]+\s+\p{L}/u.test(text) && isEntirelyStruck(node)) {
             descriptor = { type: 'body', context: 'prohibited', reason: 'planalto_struck_block', rank: 100 };
           }
-        } else if (descriptor.type !== 'unidentified' && node.tag === 'p' && /<(?:strike|s|del)\b/iu.test(raw.slice(node.start, node.end))) {
-          descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_historical_markup' };
+        } else if (descriptor.type !== 'unidentified' && node.tag === 'p') {
+          if (/<(?:strike|s|del)\b/iu.test(raw.slice(node.start, node.end)) && hasSubstantivePlanaltoStrike(node)) {
+            descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_historical_markup' };
+          } else if ((descriptor.type === 'paragraph' || descriptor.type === 'inciso')
+            && /^(?:§\s*\d+[º°o]?|[IVXLCDM]+\s*[-–—])\s*\.?\s*\(Revogad[oa]\s+pel[ao]\s+[^()]+\)(?:\s*\(Vigência\))?\s*\.?$/iu.test(text)) {
+            descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_repealed_placeholder' };
+          }
         }
         if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
           descriptor = { type: 'annex', context: 'operative_candidate', reason: 'planalto_sole_annex', rank: 2 };
@@ -816,6 +860,22 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     for (const child of node.children) walk(child, context, quotedDom, rfbSeg, spPortal);
   };
   walk(dom);
+  if (portal?.source === 'PLANALTO') {
+    // Parts are emitted parent first. Propagate the selection guard through the logical tree,
+    // including descendants of older struck devices and nested table parts.
+    const prohibited = new Set<string>();
+    for (const part of result.parts) {
+      if (part.parentId !== null && prohibited.has(part.parentId)) {
+        if (part.context === 'operative_candidate') {
+          part.context = 'prohibited';
+          part.contextReasons.push('planalto_prohibited_ancestor');
+        }
+        prohibited.add(part.id);
+      } else if (part.context === 'prohibited') {
+        prohibited.add(part.id);
+      }
+    }
+  }
   // ANAT-L20 (#293 §17): review signal only. With a verified plan whose candidate opening is the segment where the
   // reader's quotation opened and stayed open to the end, record the candidate and its evidence. No part is touched.
   const resume = input.source === 'RFB' && input.html !== undefined

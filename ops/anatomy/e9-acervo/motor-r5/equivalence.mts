@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, readdirSync, realpathSync, unlinkSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { AnatomyResult } from '../../../../src/modules/anatomy/contract.js';
 
 const [basePath, candidatePath, outputPath] = process.argv.slice(2);
 if (!basePath || !candidatePath || !outputPath) throw new Error('usage: equivalence.mts BASE CANDIDATE OUTPUT_DIR');
@@ -48,6 +49,28 @@ function verifyInputs(dir: string) {
   }
 }
 
+function checkOperativeAncestry(id: string, parts: AnatomyResult['parts']) {
+  const byId = new Map(parts.map(part => [part.id, part]));
+  let operativeCandidates = 0;
+  const prohibitedAncestorParts: string[] = [];
+  for (const part of parts) {
+    if (part.context !== 'operative_candidate') continue;
+    operativeCandidates++;
+    const seen = new Set([part.id]);
+    for (let parentId = part.parentId; parentId !== null;) {
+      const parent = byId.get(parentId);
+      if (!parent || seen.has(parentId)) throw new Error('Invalid ancestry: ' + id + ' / ' + part.id);
+      if (parent.context === 'prohibited') {
+        prohibitedAncestorParts.push(part.id);
+        break;
+      }
+      seen.add(parentId);
+      parentId = parent.parentId;
+    }
+  }
+  return { operativeCandidates, prohibitedAncestorParts };
+}
+
 async function probe(dir: string) {
   verifyInputs(dir);
   const start = performance.now();
@@ -71,9 +94,9 @@ async function probe(dir: string) {
       touched.push(f);
     }
     const normalized = new Map<string, Record<string, string>>();
-    const readings = new Map<string, { status: string; unidentified: number; limitations: string[]; quoteHash: string }>();
+    const readings = new Map<string, { status: string; unidentified: number; limitations: string[]; quoteHash: string; operativeAncestry: ReturnType<typeof checkOperativeAncestry> }>();
     const { anatomyIdentityHash, anatomyOutputHash } = await import(pathToFileURL(join(dir, 'src/modules/anatomy/contract.ts')).href);
-    const capture = (id: string, output: any) => {
+    const capture = (id: string, output: AnatomyResult) => {
       const neutral = structuredClone(output);
       if (anatomyOutputHash(output) !== output.outputHash) throw new Error('Invalid output hash: ' + id);
       if (output.parts.some((p: any) => p.legalStatus !== 'unknown' || (p.type === 'quoted_text' && p.context === 'operative_candidate')))
@@ -82,6 +105,7 @@ async function probe(dir: string) {
       const unidentified = output.coverage.segments.filter((s: any) => s.classification === 'unidentified')
         .reduce((n: number, s: any) => n + s.span.end - s.span.start, 0);
       readings.set(id, { status: output.status, unidentified, quoteHash: digest(quotes),
+        operativeAncestry: checkOperativeAncestry(id, output.parts),
         limitations: [...new Set<string>(output.limitations.map((l: any) => l.code))].sort() });
       neutral.identity.engineHash = 'NEUTRALIZED-ENGINE-IDENTITY';
       neutral.analysisId = anatomyIdentityHash(neutral.identity);
@@ -187,8 +211,22 @@ if (ledgerRecords.length) {
   if (ledgerRecords.length !== expectedEntries.length || !expectedEntries.every(e => ledgerRecords.some(r => r.sampleId === e.sampleId && r.cellId === e.cellId && r.entrySha256 === e.entrySha256))
     || candidate.projection.cells.filter((c: any) => c.accepted).length !== 20 + targets.length) throw Error('Candidate acceptances differ from proof');
 }
+const ancestry = (probe: Awaited<ReturnType<typeof probe>>) => {
+  const readings = evidence.samples.map(({ id }) => ({ id, reading: probe.out.get(id)!.reading }));
+  return {
+    checkedReadings: readings.filter(({ reading }) => reading !== null).length,
+    noEngineReading: readings.filter(({ reading }) => reading === null).map(({ id }) => id),
+    operativeCandidates: readings.reduce((n, { reading }) => n + (reading?.operativeAncestry.operativeCandidates ?? 0), 0),
+    violations: readings.flatMap(({ id, reading }) => (reading?.operativeAncestry.prohibitedAncestorParts ?? []).map(partId => ({ id, partId }))),
+  };
+};
+const operativeAncestry = { base: ancestry(base), candidate: ancestry(candidate) };
+for (const [side, result] of Object.entries(operativeAncestry)) {
+  console.log('Operative ancestry:', side, result.checkedReadings + ' readings,',
+    result.operativeCandidates + ' operative candidates,', result.violations.length + ' violations');
+}
 const reports = {
-  'equivalence.json': { base: evidence.base, baseEngine: base.engine, candidateEngine: candidate.engine, samples, cells, bySource },
+  'equivalence.json': { base: evidence.base, baseEngine: base.engine, candidateEngine: candidate.engine, samples, cells, bySource, operativeAncestry },
   'revalidation-proposal.json': { status: 'proposal_only', originalLedgerSha256: sha(beforeLedger), records: revalidation },
   'performance.json': { node: process.version, platform: process.platform, baseMilliseconds: base.ms,
     candidateMilliseconds: candidate.ms, combinedPeakRssKiB: process.resourceUsage().maxRSS },
@@ -202,4 +240,4 @@ console.log('Samples:', samples.reduce<Record<string, number>>((totals, sample) 
   totals[sample.verdict] = (totals[sample.verdict] ?? 0) + 1;
   return totals;
 }, {}));
-if (samples.some(s => s.verdict === 'unexpected')) process.exitCode = 1;
+if (samples.some(s => s.verdict === 'unexpected') || operativeAncestry.candidate.violations.length) process.exitCode = 1;

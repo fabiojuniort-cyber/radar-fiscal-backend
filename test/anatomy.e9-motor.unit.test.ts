@@ -156,24 +156,71 @@ test('R5 Planalto requires chapter, signature and strike evidence without droppi
   const title = 'LEI N\u00ba 100, DE 1 DE JANEIRO DE 2026';
   const read = (body: string) => typedPortal('PLANALTO', '<html><body><p>Casa Civil</p><p>' + title + '</p>'
     + '<p>Art. 1\u00ba Exemplo.</p>' + body + '</body></html>', title);
-  const chapter = '<p align="center">cap\u00edtulo II</p>';
+  const chapter = '<p align="center">cap\u00edtulo I</p>';
+  const article = '<p>Art. 2\u00ba Dispositivo do cap\u00edtulo.</p>';
   const heading = '<p align="center">DO IMPOSTO SOBRE A RENDA</p>';
   const oldText = '<p><s>XI</s> <span style="text-decoration: line-through">Reda\u00e7\u00e3o anterior.</span></p>';
   const date = '<p>Bras\u00edlia, 1 de janeiro de 2026; 205o da Independ\u00eancia e 138o da Rep\u00fablica.</p>';
   const signature = '<p>NOME DO PRESIDENTE<br><em>Outro Signat\u00e1rio</em></p>';
-  const complete = read(chapter + heading + oldText + date + signature + '<p>&nbsp;</p>');
+  const complete = read(chapter + heading + article + oldText + date + signature + '<p>&nbsp;</p>');
   assert.equal(complete.status, 'complete');
+  const chapterGroup = complete.parts.find(part => part.contextReasons.includes('planalto_chapter'));
+  const nestedArticle = complete.parts.find(part => part.type === 'article' && part.parentId === chapterGroup?.id);
+  assert.equal(chapterGroup?.type, 'group');
+  assert.equal(chapterGroup.context, 'operative_candidate');
+  assert.equal(nestedArticle?.context, 'operative_candidate');
+  const parts = new Map(complete.parts.map(part => [part.id, part]));
+  for (let parentId = nestedArticle.parentId; parentId !== null;) {
+    const ancestor = parts.get(parentId);
+    assert.ok(ancestor);
+    assert.notEqual(ancestor.context, 'prohibited', ancestor.id);
+    parentId = ancestor.parentId;
+  }
   for (const reason of ['planalto_chapter_title', 'planalto_struck_block', 'planalto_signatories']) {
     const part = complete.parts.find(p => p.contextReasons.includes(reason));
     assert.equal(part?.context, 'prohibited', reason);
     assert.ok(part?.sourcePointers[0]?.sourceSpan, reason);
   }
+  const titlePart = complete.parts.find(part => part.contextReasons.includes('planalto_chapter_title'));
+  assert.equal(titlePart?.parentId, chapterGroup.id);
   assert.match(complete.canonicalText, /Reda\u00e7\u00e3o anterior/u);
   for (const unproven of [heading, signature, oldText.replace('</p>', ' Texto vivo.</p>'),
     chapter + '<p align="center">Da obriga\u00e7\u00e3o geral</p>', '<p>*</p>', '<p>\u200b</p>']) {
     assert.equal(read(unproven).status, 'partial', unproven);
   }
+  const struck = read(chapter + heading + '<p>Art. 2\u00ba <strike>Trecho anterior.</strike></p>'
+    + '<p>\u00a7 1\u00ba Texto dependente.</p><p>Art. 3\u00ba Dispositivo seguinte.</p>');
+  const dependent = struck.parts.find(part => part.type === 'paragraph');
+  const nextArticle = struck.parts.find(part => part.type === 'article' && part.label.startsWith('Art. 3'));
+  assert.equal(dependent?.context, 'prohibited');
+  assert.ok(dependent.contextReasons.includes('planalto_prohibited_ancestor'));
+  assert.equal(nextArticle?.context, 'operative_candidate');
+
   const quote = read('<blockquote>' + chapter + heading + '</blockquote>');
   assert.ok(quote.parts.some(part => part.type === 'quoted_text' && part.context === 'prohibited'));
   assert.ok(!quote.parts.some(part => part.contextReasons.includes('planalto_chapter_title')));
+});
+
+test('R5 Planalto preserves ordinal-only strike and restores anchored article incisos', () => {
+  const title = 'LEI N\u00ba 100, DE 1 DE JANEIRO DE 2026';
+  const read = (body: string) => typedPortal('PLANALTO', '<html><body><p>Casa Civil</p><p>' + title + '</p>'
+    + '<p>Art. 1<strike>\u00ba</strike> Caput e remiss\u00e3o ao art. 8<strike>\u00b0</strike>.</p>'
+    + body + '</body></html>', title);
+  const article = '<p><a name="art62"></a>Art. 62. Pode operar em:</p>';
+  const historical = '<p><strike>Par\u00e1grafo \u00fanico. Trecho antigo.</strike></p>';
+  const replacement = (anchor: string) => '<p><a name="' + anchor + '"></a>I - reda\u00e7\u00e3o substitutiva;</p>'
+    + '<p>II - reda\u00e7\u00e3o subsequente.</p>';
+  const r = read('<p>\u00a7 1\u00ba (Revogado pela Lei n\u00ba 321, de 2001)</p>' + article + historical + replacement('art62i.'));
+  assert.equal(r.parts.find(part => part.type === 'article' && part.label.startsWith('Art. 1'))?.context, 'operative_candidate');
+  assert.equal(r.parts.find(part => part.contextReasons.includes('planalto_repealed_placeholder'))?.context, 'prohibited');
+  const owner = r.parts.find(part => part.type === 'article' && part.label.startsWith('Art. 62.'));
+  assert.ok(owner);
+  const incisos = r.parts.filter(part => part.type === 'inciso');
+  assert.deepEqual(incisos.map(part => [part.parentId, part.context]), [
+    [owner.id, 'operative_candidate'], [owner.id, 'operative_candidate'],
+  ]);
+  for (const anchor of ['art63i.', 'art62\u00a71i.']) {
+    assert.ok(read(article + historical + replacement(anchor)).parts.filter(part => part.type === 'inciso')
+      .every(part => part.context === 'prohibited'));
+  }
 });
