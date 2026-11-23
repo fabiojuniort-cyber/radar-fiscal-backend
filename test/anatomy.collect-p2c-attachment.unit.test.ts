@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { ATT_BUDGET, ATT_PACKAGE, cli, pdfIdentityProblem, routeProblem, runAttachment, TARGET, targetProblem } from '../ops/anatomy/collect-p2c-attachment.js';
 import type { BudgetState } from '../ops/anatomy/request-budget.js';
@@ -18,6 +19,10 @@ const budget = (status = 'active', total = 1) => {
   writeFileSync(f, JSON.stringify({ schema: 'request-budget/1', grant: { grantId: 'G-PDF', owner: 'exec-303', package: ATT_PACKAGE, approvedBy: 'test', status,
     expiresAt: '2026-11-21T23:59:59Z', total, perType: { 'Solução de Consulta': total } }, used: { total: 0, perType: {} }, attempts: [] }));
   return f;
+};
+const outcomeEvidence = (f: string, result: Awaited<ReturnType<typeof runAttachment>>) => {
+  assert.ok(result.outcomeFile);
+  return JSON.parse(readFileSync(join(dirname(f), result.outcomeFile), 'utf8'));
 };
 const read = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as BudgetState;
 const transport = (handler: (url: string, n: number) => Response) => {
@@ -58,6 +63,10 @@ test('C3: success — exactly 1 request, debited BEFORE the send, PDF named in i
   const r = await runAttachment(t.f, o);
   assert.deepEqual([r.requests, r.stored, r.outcome, t.urls], [1, true, 'stored', [TARGET.url]]);
   const s = read(f); assert.deepEqual([s.used.total, s.attempts.length, s.attempts[0]!.kind, s.attempts[0]!.outcome], [1, 1, 'capture', 'HTTP 200']);
+  assert.deepEqual(outcomeEvidence(f, r), {
+    schema: 'p2c-attachment-outcome/1', idAto: 148681, idArquivoBinario: 83325, grantId: 'G-PDF',
+    requests: 1, httpStatus: 200, stored: true, code: 'stored', sha256: r.sha256, bytes: r.bytes, pages: r.pages,
+  });
   const meta = JSON.parse(readFileSync(join(o.outDir, '148681-83325.meta.json'), 'utf8'));
   assert.deepEqual([meta.resourceId, meta.idArquivoBinario, meta.historicalAttachment.idArquivoBinario, meta.promoted], ['rfb:148681:anexo:83325', 83325, 82416, false]);
   assert.deepEqual(new Uint8Array(readFileSync(join(o.outDir, '148681-83325.pdf'))), PDF_OK, 'bytes verbatim');
@@ -67,21 +76,40 @@ test('C3: success — exactly 1 request, debited BEFORE the send, PDF named in i
 });
 
 test('C4: fail closed — redirect never followed, non-PDF, wrong identity, HTTP error and network error: 1 debited, nothing stored', async () => {
-  const cases: [string, (u: string, n: number) => Response, RegExp][] = [
-    ['302 to the same id', () => new Response(null, { status: 302, headers: { location: TARGET.url } }), /redirect 302 .* not followed/u],
-    ['302 elsewhere', () => new Response(null, { status: 302, headers: { location: 'https://evil.example/x.pdf' } }), /redirect 302/u],
-    ['HTML error page', () => new Response('<html>erro</html>', { status: 200, headers: { 'content-type': 'text/html' } }), /not a PDF/u],
-    ['another act', () => pdfResp(buildSyntheticPdf([[{ text: 'SOLUÇÃO DE CONSULTA Nº 259 - COSIT', y: 760 }]])), /does not name the act \(heading is nº 259, not nº 258\)/u],
-    ['HTTP 500', () => new Response('x', { status: 500 }), /HTTP 500/u],
-    ['network error', () => { throw new TypeError('fetch failed'); }, /failed/u],
+  const cases: [string, (u: string, n: number) => Response, RegExp, string, number | null][] = [
+    ['302 to the same id', () => new Response(null, { status: 302, headers: { location: TARGET.url } }), /redirect 302 .* not followed/u, 'redirect', 302],
+    ['302 elsewhere', () => new Response(null, { status: 302, headers: { location: 'https://evil.example/x.pdf' } }), /redirect 302/u, 'redirect', 302],
+    ['HTML error page', () => new Response('<html>erro</html>', { status: 200, headers: { 'content-type': 'text/html' } }), /not a PDF/u, 'not_pdf', 200],
+    ['another act', () => pdfResp(buildSyntheticPdf([[{ text: 'SOLUÇÃO DE CONSULTA Nº 259 - COSIT', y: 760 }]])), /does not name the act \(heading is nº 259, not nº 258\)/u, 'identity_mismatch', 200],
+    ['HTTP 500', () => new Response('x', { status: 500 }), /HTTP 500/u, 'http_error', 500],
+    ['network error', () => { throw new TypeError('fetch failed'); }, /failed/u, 'transport_error', null],
   ];
-  for (const [why, h, re] of cases) {
+  for (const [why, h, re, code, httpStatus] of cases) {
     const f = budget(); const t = transport(h); const o = opts(f);
     const r = await runAttachment(t.f, o);
     assert.equal(t.urls.length, 1, `${why}: exactly one request sent`); assert.equal(r.stored, false, why); assert.match(r.outcome, re, why);
+    assert.deepEqual(outcomeEvidence(f, r), {
+      schema: 'p2c-attachment-outcome/1', idAto: 148681, idArquivoBinario: 83325, grantId: 'G-PDF',
+      requests: 1, httpStatus, stored: false, code,
+    }, why);
     assert.equal(read(f).used.total, 1, `${why}: the one request is debited`);
     assert.equal(existsSync(join(o.outDir, '148681-83325.pdf')), false, `${why}: nothing stored`);
   }
+});
+
+test('C4: if the diagnostic cannot be written, the reason survives in the result and existing evidence is preserved', async () => {
+  const f = budget();
+  const grantKey = createHash('sha256').update('G-PDF').digest('hex');
+  const evidence = join(dirname(f), `148681-83325.${grantKey}.outcome.json`);
+  writeFileSync(evidence, 'earlier evidence');
+  const t = transport(() => new Response('<html>erro</html>'));
+  const r = await runAttachment(t.f, opts(f));
+  assert.equal(r.code, 'not_pdf');
+  assert.equal(r.outcomeWriteFailed, true);
+  assert.equal(r.outcomeFile, undefined);
+  assert.equal(readFileSync(evidence, 'utf8'), 'earlier evidence');
+  assert.equal(read(f).used.total, 1);
+  assert.equal(t.urls.length, 1);
 });
 
 test('C5: the CLI requires --stop-after 1 and refuses before opening the budget; the grant total caps a second attempt', async () => {
@@ -131,6 +159,7 @@ test('H3: the size limit is enforced WHILE reading — an endless body is cut ju
   const f = budget(); const t = transport(() => new Response(endless, { status: 200, headers: { 'content-type': 'application/pdf' } }));
   const r = await runAttachment(t.f, opts(f));
   assert.equal(r.stored, false); assert.match(r.outcome, /exceeds .* bytes while reading/u);
+  assert.equal(outcomeEvidence(f, r).code, 'too_large');
   assert.ok(pulled <= 20 * MiB + 2 * MiB, `pulled ${pulled / MiB} MiB (must stop near the 20 MiB limit)`);
 });
 
@@ -153,9 +182,13 @@ test('H4: identity — another act that merely MENTIONS "Cosit" and "258" is ref
 
 test('H5: a failure between the PDF and the meta writes leaves NO resource that looks valid; the next run refuses to treat it as stored', async () => {
   const f = budget(); const o = opts(f);
-  mkdirSync(join(o.outDir, '148681-83325.meta.json')); // the meta write will fail (EISDIR) after the PDF write
-  const r = await runAttachment(transport(() => pdfResp(PDF_OK)).f, o).catch((e: Error) => ({ requests: 1, stored: false, outcome: `threw: ${e.message}` }));
+  const r = await runAttachment(transport(() => {
+    mkdirSync(join(o.outDir, '148681-83325.meta.json.partial'));
+    return pdfResp(PDF_OK);
+  }).f, o);
   assert.equal(r.stored, false);
+  assert.equal(outcomeEvidence(f, r).code, 'write_failed');
+  assert.equal(existsSync(join(o.outDir, '148681-83325.pdf.partial')), false, 'the PDF staging file was removed');
   assert.equal(existsSync(join(o.outDir, '148681-83325.pdf')), false, 'no final PDF without its meta');
   const t2 = never(); const again = await runAttachment(t2.f, { ...o, budgetFile: budget() });
   assert.equal(t2.urls.length, 0); assert.doesNotMatch(again.outcome, /already stored/u, 'an incomplete write is never "already stored"');
