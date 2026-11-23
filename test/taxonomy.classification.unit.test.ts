@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  allowsDerivedSegment,
+  planCuratedClassification,
+} from '../src/modules/taxonomy/classification/classification.curated.js';
+import {
   planLexicalClassification,
 } from '../src/modules/taxonomy/classification/classification.engine.js';
 import {
@@ -131,4 +135,30 @@ test('lexical classification plan is reproducible and input-sensitive', () => {
   assert.equal(a.fingerprint.runFingerprint, b.fingerprint.runFingerprint);
   assert.notEqual(a.fingerprint.runFingerprint, c.fingerprint.runFingerprint);
   assert.equal(a.assertions.length, 1);
+});
+
+test('chapter 87 mentions require contextual evidence to derive the automotive segment in new scans', () => {
+  const segment = 'Automotivo e equipamentos de transporte';
+  const input = {
+    publicationVersionId: 'pub-version',
+    taxonomyReleaseId: 'release',
+    ncmCodes: ['87019490', '87162000'],
+    concepts: [{
+      releaseConceptId: 'tractor', code: 'product.tractor', label: 'Trator',
+      classifyByLabel: false, aliases: [], ncmPrefixes: ['87019490'], cclasstribCodes: [],
+    }],
+  };
+  for (const [title, contentText, expected] of [
+    ['Convênio ICMS 52/91', 'Concede redução da base de cálculo nas operações com equipamentos industriais e implementos agrícolas.', false],
+    ['Tratores agrícolas', 'Operações com tratores e reboques de uso agrícola.', false],
+    ['Convênio ICMS', 'Operações com veículos rodoviários e autopeças.', true],
+  ] as const) {
+    const plan = planCuratedClassification({ ...input, title, contentText });
+    const application = plan.configSnapshot.automotiveApplication as boolean;
+    assert.equal(application, expected);
+    assert.equal(allowsDerivedSegment(segment, application), expected);
+    assert.ok(plan.assertions.some(assertion => assertion.reasonCode === 'OFFICIAL_CODE_NCM'));
+  }
+  assert.equal(allowsDerivedSegment(segment, null), true);
+  assert.equal(allowsDerivedSegment('Agropecuária', false), true);
 });
