@@ -152,6 +152,7 @@ test('chapter 87 mentions require contextual evidence to derive the automotive s
     ['Convênio ICMS 52/91', 'Concede redução da base de cálculo nas operações com equipamentos industriais e implementos agrícolas.', false],
     ['Tratores agrícolas', 'Operações com tratores e reboques de uso agrícola.', false],
     ['Convênio ICMS', 'Operações com veículos rodoviários e autopeças.', true],
+    ['Equipamentos industriais', 'Operações com máquinas industriais.\nRedação anterior: operações com autopeças.', false],
   ] as const) {
     const plan = planCuratedClassification({ ...input, title, contentText });
     const application = plan.configSnapshot.automotiveApplication as boolean;
