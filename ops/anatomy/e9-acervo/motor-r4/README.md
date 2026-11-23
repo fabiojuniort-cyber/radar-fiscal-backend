@@ -1,6 +1,6 @@
 # E9-MOTOR R4
 
-Base R3 `9c717590`, motor `7b7260b2`. Candidato R4 `a1a05c52d12fea0b2b458193609950112e57a656fd8231c7c5c201df892a0ccf`.
+Base R3 `9c717590`, motor `7b7260b2`. Candidato R4 `9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa`.
 
 | Amostra | Leitura R3 → R4 | Alteração |
 | --- | --- | --- |

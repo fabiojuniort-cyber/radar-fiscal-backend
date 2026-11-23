@@ -1,7 +1,7 @@
 {
-  "baseMilliseconds": 60191,
-  "candidateMilliseconds": 48128,
-  "combinedPeakRssKiB": 739788,
+  "baseMilliseconds": 42512,
+  "candidateMilliseconds": 42599,
+  "combinedPeakRssKiB": 763792,
   "node": "v24.21.0",
   "platform": "win32"
 }

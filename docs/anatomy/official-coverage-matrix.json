@@ -35,7 +35,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "0a24b39f921dc49bc74266a2e63b79bd28d01614141d482707210a710295bcbb",
+      "outputHash": "e0fb1258c1caedbf18bcd4c4b70a834c2de553cb755720ae2709ed83ae13bbf7",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
@@ -62,7 +62,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "ac163fe771b283a4161decc15da6db978b4be4138496155c84f3c865be1bc50e",
+      "outputHash": "db6a3130b73ed160fa137a244526d1faf4487240cf4d3475c3481ffaf4e72ff6",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
@@ -89,7 +89,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "8b474681ae6eeed8f74a6ee55ef552b75bd7a9f7acc9afe8808266974c172166",
+      "outputHash": "a0d0e76dc429caa4f36f8e3318e7c63f9381f38145688cfd67d6ebf420cc9aea",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -117,7 +117,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "9b36d10a2132987cd3d4717c1a40401e2ffd6b74e4a4c7e3dd40f1afde71f638",
+      "outputHash": "9fe7e4b38965b145659b575d6148b6150b61c98fcb25cca0d9bd14f8460b9975",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
@@ -144,7 +144,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "69914e327f1d90a19d89ab468ba64c83b461e3bcfc95e9b8e135019845e51379",
+      "outputHash": "114275acd2bfbcee3ddfdecf11fd06c0b0ce4567d2840817c7f7aa496d8a02f7",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -172,7 +172,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "f2f35c4a79a0d48ffe1433bd5d41f458a18cdb6dbdec2afa83b2b375ec26daea",
+      "outputHash": "792e7f870b7dd92718524bdb0e4579354c09293c08a78ac92bdeb6306e103a4e",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -200,7 +200,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "6dc836c40317f52cf7325e1f09c85645dc287163d5f8463787b5ffa2fce1b382",
+      "outputHash": "487e4f0376f259716ff5c229fbf3b47414d95315a5bcb93e604bfcfca68f8bbe",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -228,7 +228,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "55ba541c698dac26e04419e24b472bf5bab2e2a8a49de818137d39feba973b3e",
+      "outputHash": "9188f17ce4fcb30839a8dcf20229df64bd234331f3ed6ca41215b7a4c5c6f089",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
@@ -255,7 +255,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "579166709a8b6a6b075fa2e4b8ce6ec898e319ef4fee09b36a015301a608491f",
+      "outputHash": "91668851d47084c57920aef9b60a09e812adef321b81f52d3eb8ddb9572a4dbf",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
@@ -282,7 +282,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "c7d34082af152ded19d53dbba2e01fc30592073a52ebe73f8e757a7006bfd00e",
+      "outputHash": "687c9c84b9ffe06f4c188a140cc6c517a72dd312c11a8698cd5b4bf2017e60e2",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -310,7 +310,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "d5cc2e2881dbf01f9a16b5bfd8e9abe68dbb954bbe5047bef08b86e41d20991d",
+      "outputHash": "cd1a312ea5e3ffb4d2ae57608e2955ef748643f30ae40e882e007f5bc9b62692",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
@@ -337,7 +337,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "039e3f606555283fa4b91fc4c28e507711727c9e8ace32461a493fef721331fc",
+      "outputHash": "b69e00f80a43ec4275967347bad262650d5d74065ceb9f61ae8428f66b608587",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)"
@@ -366,7 +366,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "51b50311f39beae37bff66658a56ae0971ac3be80e81b87ed177521e60fce6b2",
+      "outputHash": "04543c7e1a51469773b9f5c94217e72f75c3ef9598dd46c0c7c1dc193ad9f9eb",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
@@ -393,7 +393,7 @@
       },
       "profile": "RFB",
       "diagnostic": null,
-      "outputHash": "652979d7134736903497b23da7a30a79a1c72c704afc65113b8dacaafd4b9688",
+      "outputHash": "e80620d306d540f3263fe49d8902ce06e4e2f064d2142413c8ab22e1c359fe44",
       "evidence": [
         "docs/anatomy/official-lot-rfb.json",
         "test/anatomy.official-lot-rfb.unit.test.ts (re-runs the lot; fails on drift)",
@@ -420,7 +420,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "b49c597504f8020d5ae9f74e89ebad69cab7db6c0220c01515e6fb1ed880a77c",
+      "outputHash": "91a73210b8e71f313a3ac0ec11c422eedad04b1da72cce9e0011d4a5af08405f",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -448,7 +448,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "50128ea9b43817d12eb26a6cdc27ce503537e3b5b171c07837c880b39f916efb",
+      "outputHash": "f9969801907e733473599898471f01d7a22561b23e720adea9313ae949baf694",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -476,7 +476,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "f2e6d0a43860d5b4b47c588bf59a61e839cebed26a474aa32276ce0c5c25e801",
+      "outputHash": "e29a9f1798b08faad07c5dd855ec74e80cafab4a6486fbbcebd783040a34d7d6",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -504,7 +504,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "180c4c60df0cf68b0513724fd86ffdf0b23a68f805612873257746c68172a1e2",
+      "outputHash": "659c4fd793a490dcfb3ae2f7aa0bf8edeaaea91522ae20e8eacc345ed6720000",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -532,7 +532,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "703cc7e2810ead730b27b5398ab8575afd6a9578f53dc3fd299dabc798463502",
+      "outputHash": "2328fc45b0dbb1329e4e05d0be5e52f6426c6ec4841ec1bba2f87756f40c69ee",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -560,7 +560,7 @@
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
-      "outputHash": "6e61173a48a65a9f1c9de62716a9a1b448a3dcec4b6865af347e42171fffbaf6",
+      "outputHash": "aa4c0cc2618cb18ec5413835b6e3c13349d8340b20e92d5ff8eaf2ad8779448e",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -588,7 +588,7 @@
       },
       "profile": "NORMAS-LEG",
       "diagnostic": null,
-      "outputHash": "32e75dc0983460477533bfd3163e15fa988f03c97d0831e5ea224ca3054a1df1",
+      "outputHash": "ed7e6768eb4b8e40f9a351fd005dca485d2b378d10217a4afe6e4ad91b682212",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -644,7 +644,7 @@
       },
       "profile": "NORMAS-LEG",
       "diagnostic": null,
-      "outputHash": "a1b08e612c3ccf7f859d73ebbe84f966801fb7da58c6b9ef4674d7c55cacfc6f",
+      "outputHash": "03816c3eaa6747082da4e31f2499a07274b00f97b60096586c525d6f841575e4",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -700,7 +700,7 @@
       },
       "profile": "PLANALTO",
       "diagnostic": null,
-      "outputHash": "f623ee363c7ece65b58387c8b853dba11f0b9954f6b5388b36cd7289cbcb7889",
+      "outputHash": "40105a9553775d25e10927748d5c94acd874d5d818e06b50f661a4836bf89370",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -735,7 +735,7 @@
       },
       "profile": "PLANALTO",
       "diagnostic": null,
-      "outputHash": "f76b817aaa0ea7878f1164918d640fd679e1ea3cbb36a36067c901d702d04204",
+      "outputHash": "3a41d2c28b02d64e8602bb36ba10dd52c70e07249c4eaf646cd03421327ae32a",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -772,7 +772,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "f4f5fb3a0dd7df636e89023134df35346fa4c7922efac9261b012dff78fe4240",
+      "outputHash": "e059364b9741b9af06a48eb6e3b6777a4adc0bece01922fc596883908ca2d6af",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -801,7 +801,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "9a46a4450971c99de56f6b1cfb78b6b943c91d1949b19ad8ad31fea7647d633b",
+      "outputHash": "250ae9c4ee3fd90b47bf5736d7b0ef4dc32df8f89c11ff661b5fc783fd18b3ff",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -830,7 +830,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "509b9feaaa406c4be636d94bd4d96e5e0c3608892c90ccf4b4038e0ddd446409",
+      "outputHash": "448ae6a1aacda17637f655f9368777daded5606eca67eb56d88402ce37b727ea",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -859,7 +859,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "722bef561d862137536b4ff2b25809ce777943603386cea63772caa990ded375",
+      "outputHash": "4045f5df6b37e27671e84433e4b85db64fb275633bf716ee1a8d03fe432b8c23",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -888,7 +888,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "44fe639c172f5c6f08d30351f61ecf9323fcba079fc7fbbd85073d029206e3f6",
+      "outputHash": "4ac18edfab2f62f48c12e253e2769655145d23885825f465b900e13c0cfbf74f",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -917,7 +917,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "5e0494bdbec19c866296d789f2acba462aaf9cbafe2dfd736fa02f6c78b254fb",
+      "outputHash": "470450f3c795c0cedb8333df6c72cae9d1d6038e21f6d2bceac295991f9e92ab",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -947,7 +947,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "ad438cada13ff6dd7c7558b2dd1f9434e8c1e14dde8034a4e00d925966d18fa9",
+      "outputHash": "080d0736e8e4692f93375f096c17a594b1f9761cd6698a2dd718e93e9682606d",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -976,7 +976,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "be1dd1864ad108787e69bd54df77545bda9a659eca1d782e845d17abcaf6a58d",
+      "outputHash": "4e9477a46601a80db6ad6e4550791fd265575a5f63a2d813c9ab7add8497aefe",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1005,7 +1005,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "ced5810ebcce785580e87038d5b29efc456cce598dbb7ed7979ac23019179ff1",
+      "outputHash": "eee0b4fb3b2511d282b3949f9afa6c1a9dc817675bf55c4201dd42f1c8ac0a55",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -1035,7 +1035,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "a8a317ec6d6b7878f4ddf156a7550c6e6b3e1e929ec832c6c899cdfb682ebb28",
+      "outputHash": "6eb667b7e6a62dddf796a00e20139255f1800c15059f8b27671072f8538173be",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1064,7 +1064,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "462b2ad9bc89aebff8a446e392ebb28f2f1718fbca9d3501c69e8a2478238b4a",
+      "outputHash": "99f75802819a2243df0576a19d5b5ad35d91e6345d98ab7355579dea884d9901",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1093,7 +1093,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "de49235de423e10a25d56674ca7830b0420aba655d44dfb0a33573b18d376e41",
+      "outputHash": "11e9d6387025385e09208071e2fa6982a64147ec1c08be50ce24850578a0d18e",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1122,7 +1122,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "eeb0f80ab22ebe19680ae1a54173cbee170c53d3adad1325c6580c70d4fe2de6",
+      "outputHash": "96512a427dabd6043992609e2e54fe057313dd38e41cb88842642b90c60d0099",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1151,7 +1151,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "fa57e462e6503d2b30e3031317bd09a303d618df526605e5eee2b7f00ca7ac34",
+      "outputHash": "e9e6f00ddf7b7a2efedd818517329f9186de41d303924df0d5b8500204d0c4c5",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1180,7 +1180,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "8aecc0c6280d2556d33f3830baeb8e6faf0b098408a2288407c1c9787837184e",
+      "outputHash": "8a3276b97875655c427c9a9b5004f23d6aa45cf8eca8603a03583b06ab43d8e2",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1209,7 +1209,7 @@
       },
       "profile": "DOU",
       "diagnostic": null,
-      "outputHash": "544307636bd02fbc8302a0712f1d5b02f6505a9a47b291a9f052c8f2921c25d5",
+      "outputHash": "83319eeb2aab49c78339196e416b34dcd2db02f61e697e101467314b4ce42d51",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts",
@@ -1238,7 +1238,7 @@
       },
       "profile": "CONFAZ",
       "diagnostic": null,
-      "outputHash": "208b3289ab5eabca140e4e0ea5f6a87154d571027f3cc5522ff9aaec1b7d33b2",
+      "outputHash": "a372c2c1a5392c0372a0622fac12748c8a0fd819b6c30849e280aad0c28ca668",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
         "test/anatomy.official-coverage.unit.test.ts"
@@ -1270,7 +1270,7 @@
         "accepted": false
       },
       "profile": "PLANALTO",
-      "outputHash": "271d94e2c8cd325fd49ad278ab4e0624c76f656fb0fd480869fd43e38d033c48",
+      "outputHash": "4f99ead1ed9915c4e34f05d45ead003896620a7de1e69b45ad7f715a4353f88c",
       "notes": [
         "partial reading — never accepted as complete: status partial; 733 unidentified chars; limitations unidentified_content"
       ],
@@ -1311,7 +1311,7 @@
         "accepted": false
       },
       "profile": "PLANALTO",
-      "outputHash": "d52c76c35f216229bc7eb5b3446eec9af4d62760f9d5ed7b6fb6e69cabcc29f7",
+      "outputHash": "f5958c417d31c61d14a476824e36494c81caf00d9a8b2087fc2a77dd1eb51692",
       "notes": [
         "partial reading — never accepted as complete: status partial; 5973 unidentified chars; limitations unidentified_content"
       ],
@@ -1354,7 +1354,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "27ceb917a8ab901479342064d35386b98acbfd82b3d75c32d4ebbc7bf22611f0",
+      "outputHash": "3f5009631206bbfa1a280febedaf8adc9e829a46528e34ca5f47061b0cb20fb9",
       "notes": [
         "partial reading — never accepted as complete: status partial; 55 unidentified chars; limitations entity_extraction_failed, unidentified_content"
       ],
@@ -1385,7 +1385,7 @@
         "accepted": true
       },
       "profile": "CONFAZ",
-      "outputHash": "86a3e4ef2eb54f7b013ecd341503a824964f8c5cacd2935f4838428f7070c3d3",
+      "outputHash": "97337cd6e27f52a059fef959b6b220c574657b81fe6acbdd6f8c8137312e25ec",
       "notes": [],
       "readingComplete": true
     },
@@ -1413,7 +1413,7 @@
         "accepted": false
       },
       "profile": "CONFAZ",
-      "outputHash": "a5ec527a6e52e35cdb12ee0f9299af1b25e2e3e2c787765cec92eab184422df0",
+      "outputHash": "707ba6dfaff81473ab26eb8e4ea86ea3b0303b6b7b1b2aaa5cd58705c9ae2c0b",
       "notes": [
         "partial reading — never accepted as complete: status partial; 6002 unidentified chars; limitations image_without_ocr, unidentified_content, act_region_unproven"
       ],

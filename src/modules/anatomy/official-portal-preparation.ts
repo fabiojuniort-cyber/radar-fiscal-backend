@@ -1,5 +1,5 @@
 import { DomUtils, parseDocument } from 'htmlparser2';
-import type { Element } from 'domhandler';
+type PortalElement = ReturnType<typeof DomUtils.findAll>[number];
 
 type PortalSource = 'DOU' | 'CONFAZ' | 'PLANALTO';
 export interface OfficialActPreparation {
@@ -87,10 +87,10 @@ function measure(nodes: ReturnType<typeof parseDocument>['children']): string {
 const normalizeText = (text: string) => text.normalize('NFC').replace(/\s+/gu, ' ').trim();
 
 // The metadata can put CGSN in the resolution title while the portal prints the issuer separately.
-function matchesDouCgsnEpigraph(act: Element, expected: string): boolean {
+function matchesDouCgsnEpigraph(act: PortalElement, expected: string): boolean {
   const key = /^RESOLUÇÃO CGSN N[º°o]\s+(\d+)(?=,|$)/iu.exec(normalizeText(expected));
   if (!key) return false;
-  const headings = act.children.filter((n): n is Element => n.type === 'tag' && n.name === 'p' && hasClass(n.attribs.class, 'identifica'));
+  const headings = act.children.filter((n): n is PortalElement => n.type === 'tag' && n.name === 'p' && hasClass(n.attribs.class, 'identifica'));
   if (headings.length !== 1) return false;
   const [issuer, title] = act.children.filter((n) => normalizeText(DomUtils.textContent(n)));
   if (!title || !issuer || issuer.type !== 'tag' || issuer.name !== 'p' || !hasClass(issuer.attribs.class, 'titulo')
