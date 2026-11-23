@@ -1,0 +1,506 @@
+{
+  "base": "9c71759095be113110b2a92367cf9683a5510bf2",
+  "engine": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+  "samples": [
+    {
+      "id": "http:M1",
+      "source": "Planalto",
+      "path": "ops/anatomy/official-identification/e9-http/M1.html",
+      "meta": "ops/anatomy/official-identification/e9-http/M1.meta.json",
+      "sha256": "fcab62384ebd6846157afefe13e82dbf313b435c26cc2605b284d98aaa613f36",
+      "bytes": 238160,
+      "expected": "identity_only",
+      "metaSha256": "68fd44f64810eb74a8c39288680a6843bc54ba8df4f31f94785619680f26abca"
+    },
+    {
+      "id": "http:M2",
+      "source": "Planalto",
+      "path": "ops/anatomy/official-identification/e9-http/M2.html",
+      "meta": "ops/anatomy/official-identification/e9-http/M2.meta.json",
+      "sha256": "25b7fc2de4c59dde7e2bd1fe88ac56d8285276c1f5b856e5ea3533d88315b7e9",
+      "bytes": 533449,
+      "expected": "identity_only",
+      "metaSha256": "031452b1f2b1744b906cfbc91ae2907dab35559303ed01abfda163a7718b1db5"
+    },
+    {
+      "id": "http:M3",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/e9-http/M3.html",
+      "meta": "ops/anatomy/official-identification/e9-http/M3.meta.json",
+      "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+      "bytes": 931597,
+      "expected": "identity_only",
+      "metaSha256": "46802aab0f4698c7fa1771568896b7a716949fd4c5ee33bc4e920520358d4d77"
+    },
+    {
+      "id": "http:M4",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/e9-http/M4.html",
+      "meta": "ops/anatomy/official-identification/e9-http/M4.meta.json",
+      "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+      "bytes": 234041,
+      "expected": "r4_target",
+      "metaSha256": "551e5527c333287677578305702842d98aa13e15d373971322f9b2b7a73cd7b4"
+    },
+    {
+      "id": "http:M5",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/e9-http/M5.html",
+      "meta": "ops/anatomy/official-identification/e9-http/M5.meta.json",
+      "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+      "bytes": 193059,
+      "expected": "identity_only",
+      "metaSha256": "5d3ccd72b819e70e0e93602d19e4519a2db6082618b22a4a5fc0be957cabcca1"
+    },
+    {
+      "id": "http:M9",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/e9-http/M9.pdf",
+      "meta": "ops/anatomy/official-identification/e9-http/M9.meta.json",
+      "sha256": "09726ebc6e21652ffde6023fb906ba5ecbb3c7fa49b164271c4c629efd49e3ee",
+      "bytes": 192477,
+      "expected": "identity_only",
+      "metaSha256": "300f6718bf9fa50d25845f04ae1ad16bf855a8006dde9f66d1277cebbd917d5d"
+    },
+    {
+      "id": "http:M9-p58",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/e9-http/M9-p58.pdf",
+      "meta": "ops/anatomy/official-identification/e9-http/M9-p58.meta.json",
+      "sha256": "abe7a5836d283ecac5f528f7f49041af22b476b88e7b8a28389ba980eff9fd29",
+      "bytes": 188132,
+      "expected": "identity_only",
+      "metaSha256": "85cecfab2d3640f8a293e52e3afb5f39be28645aeb64b2bb8d69826a4a0e1f61"
+    },
+    {
+      "id": "lei-10637-2002-atualizada",
+      "source": "normas.leg.br",
+      "path": "ops/anatomy/official-identification/leg-normas/lei-10637-2002-atualizada.html",
+      "meta": "ops/anatomy/official-identification/leg-normas/lei-10637-2002-atualizada.meta.json",
+      "sha256": "8b3ccac420436c491d89df580991c859584987f0fbd9dff744bc2a381b3d3d55",
+      "bytes": 180179,
+      "expected": "identity_only",
+      "metaSha256": "f2ae2648922d832cc72ff8f0c96f7915505868a4418b382f5f8048451dd17efe"
+    },
+    {
+      "id": "lei-10637-2002-original",
+      "source": "normas.leg.br",
+      "path": "ops/anatomy/official-identification/leg-normas/lei-10637-2002-original.html",
+      "meta": "ops/anatomy/official-identification/leg-normas/lei-10637-2002-original.meta.json",
+      "sha256": "bb863c51cf4cabeed3ee34826137d6bf812e9b4fe05f8bfc9c4b45028efc71cc",
+      "bytes": 102382,
+      "expected": "identity_only",
+      "metaSha256": "ac20dffb1eaaf0b7b7ea93486d0942ec397269ba41e287b9964f2e77a7db3505"
+    },
+    {
+      "id": "lei-10833-2003-atualizada",
+      "source": "normas.leg.br",
+      "path": "ops/anatomy/official-identification/leg-normas/lei-10833-2003-atualizada.html",
+      "meta": "ops/anatomy/official-identification/leg-normas/lei-10833-2003-atualizada.meta.json",
+      "sha256": "c5ca0d93e92a5f53c3922a21aad2a606bae78cbc53374af614db3e255581feae",
+      "bytes": 388543,
+      "expected": "identity_only",
+      "metaSha256": "e8eb942fc45dc4100dd2549a5030fcd93517d363b8a5f87c9e37b031211505a8"
+    },
+    {
+      "id": "lei-10833-2003-original",
+      "source": "normas.leg.br",
+      "path": "ops/anatomy/official-identification/leg-normas/lei-10833-2003-original.html",
+      "meta": "ops/anatomy/official-identification/leg-normas/lei-10833-2003-original.meta.json",
+      "sha256": "60044e683ac4078fb90888db9986431fb96bc7b5316f0740ba638b43fd24f0d1",
+      "bytes": 308155,
+      "expected": "identity_only",
+      "metaSha256": "41d10cbb621d1e8b548e5f0707db18607ea831c1474ada548be93e5c9c61209a"
+    },
+    {
+      "id": "M10",
+      "source": "Planalto",
+      "path": "ops/anatomy/official-identification/manual/M10.html",
+      "meta": "ops/anatomy/official-identification/manual/M10.meta.json",
+      "sha256": "1bfb6dabc79c5523fd697f4d598e7171be9a0ab694d92423018c71f91bf654bf",
+      "bytes": 20282,
+      "expected": "identity_only",
+      "metaSha256": "08a8c997ea158ad88d3b618929d302be8b77a428bdff46d7aa47315ddb140db5"
+    },
+    {
+      "id": "M12",
+      "source": "Planalto",
+      "path": "ops/anatomy/official-identification/manual/M12.html",
+      "meta": "ops/anatomy/official-identification/manual/M12.meta.json",
+      "sha256": "5776d1bbd28af7567b3a1d29c385142cd5b37bce8551ae8119a1c120392c6a7f",
+      "bytes": 77417,
+      "expected": "identity_only",
+      "metaSha256": "942c3fc70a7623bbd0f1f3132eaef189ebdeecd1e983deb64a8e997946bd359b"
+    },
+    {
+      "id": "M14",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/manual/M14.html",
+      "meta": "ops/anatomy/official-identification/manual/M14.meta.json",
+      "sha256": "13bdf6fd9bbb466bea42f81cd1017969d5ac02ba5fbd333ed8ce60620afacb93",
+      "bytes": 113445,
+      "expected": "identity_only",
+      "metaSha256": "68fcc2e9b596d4b130de5a1d2ba38f038f9088d462b72ba3671489c8ff013984"
+    },
+    {
+      "id": "M16",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/manual/M16.html",
+      "meta": "ops/anatomy/official-identification/manual/M16.meta.json",
+      "sha256": "2732a2e1422a8197d560ee94745a0402ced487ee712cbf7e9d934882347c1188",
+      "bytes": 130312,
+      "expected": "identity_only",
+      "metaSha256": "835b9f80d8af847072573960ff88c4155b90c67137fe5c2085a1079fd66d536e"
+    },
+    {
+      "id": "M18",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/manual/M18.html",
+      "meta": "ops/anatomy/official-identification/manual/M18.meta.json",
+      "sha256": "f74457bdd4879560bb17d445eb5110091f356443929839f9d0c4a031c0032862",
+      "bytes": 54672,
+      "expected": "identity_only",
+      "metaSha256": "5f06794741eb3bd700a652a562cb7b7534ee00af061f52791b988ddb00bb955a"
+    },
+    {
+      "id": "M19",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/manual/M19.html",
+      "meta": "ops/anatomy/official-identification/manual/M19.meta.json",
+      "sha256": "4253e31bedb7582f55fc553b3a887a986f97f49818e747ab04448a18cd32574b",
+      "bytes": 124885,
+      "expected": "identity_only",
+      "metaSha256": "b0c6e4dfc814e718be5a8b02c792414c27d3f6d706b7f8f0938436351728a702"
+    },
+    {
+      "id": "M20",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/manual/M20.html",
+      "meta": "ops/anatomy/official-identification/manual/M20.meta.json",
+      "sha256": "6c09825912e536fd224b41437de777afd3f5eb289ac80d5b501b00fd59929a50",
+      "bytes": 99999,
+      "expected": "identity_only",
+      "metaSha256": "80285f00ff71b4a251f7c8f54a39b74f2a09b34918d833356ebac4f25599f294"
+    },
+    {
+      "id": "M21",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/manual/M21.html",
+      "meta": "ops/anatomy/official-identification/manual/M21.meta.json",
+      "sha256": "29ae2cb3dcf233ff62c41cecb8e78a338c60c63c5796624da46809a6a2744d5c",
+      "bytes": 83163,
+      "expected": "identity_only",
+      "metaSha256": "a8794d693faf75f6a059d940dc5f525778c70c7d6a7ea8cff632aec84b21a667"
+    },
+    {
+      "id": "M23",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M23.html",
+      "meta": "ops/anatomy/official-identification/manual/M23.meta.json",
+      "sha256": "31b1b1f969813af9eba6dbac0f3781d6bbdc59a5b2f3af42ec30db291974d7a8",
+      "bytes": 86545,
+      "expected": "identity_only",
+      "metaSha256": "3b9bb00fa052fde226709c50f17bcff309e124309e48c6c01ca813d477c14f3f"
+    },
+    {
+      "id": "M24",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M24.html",
+      "meta": "ops/anatomy/official-identification/manual/M24.meta.json",
+      "sha256": "2196ec600f9a1cff11047da3c467261168a1b79cd577126e3ec3e3280f206a10",
+      "bytes": 121219,
+      "expected": "identity_only",
+      "metaSha256": "d71965d6f41b21b4c7c34b8fa88b7f69d0a1b4081ed6b46ef1f076e17b3949b5"
+    },
+    {
+      "id": "M25",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M25.html",
+      "meta": "ops/anatomy/official-identification/manual/M25.meta.json",
+      "sha256": "f6fd18d1a8ea0926f1329cde48ccec6f9c251f7cee451980312d7fbd59f842c7",
+      "bytes": 1800240,
+      "expected": "identity_only",
+      "metaSha256": "84cb588274bdae87c27326bb798071ef6e6d3ae434be1c2d38deeb5d47000509"
+    },
+    {
+      "id": "M26",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M26.html",
+      "meta": "ops/anatomy/official-identification/manual/M26.meta.json",
+      "sha256": "92cb1dff9ffc240ec1c715e063a9461d4b703da4da3654fc7fce96318f5b35d4",
+      "bytes": 100726,
+      "expected": "r4_target",
+      "metaSha256": "71995607399e8cd7aec298214d7c9be67d660131fdbedb3b49dd41be2516a027"
+    },
+    {
+      "id": "M28",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M28.html",
+      "meta": "ops/anatomy/official-identification/manual/M28.meta.json",
+      "sha256": "a77a1e4e1d092ef86a3851389e6d2eae29af603b85d5e0099d099716bb5469f4",
+      "bytes": 1599964,
+      "expected": "identity_only",
+      "metaSha256": "e5db296476124774623ea7264bbc51dbf982da6292dd14f97b33af897f5c3098"
+    },
+    {
+      "id": "M29",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M29.html",
+      "meta": "ops/anatomy/official-identification/manual/M29.meta.json",
+      "sha256": "d2ca1bf2b076f678fd8e1a50554525dada0e19022d2769a8b780c6a8b1527896",
+      "bytes": 89970,
+      "expected": "identity_only",
+      "metaSha256": "df4e5d8f1991a4a931fc666a8f502342a6a45d5931f2eb89ed171b785837b163"
+    },
+    {
+      "id": "M30",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M30.html",
+      "meta": "ops/anatomy/official-identification/manual/M30.meta.json",
+      "sha256": "3629a9eb77320633d92d9d12b1d626faef2ac46627dcd3f49e75aef86a1d3a31",
+      "bytes": 109003,
+      "expected": "identity_only",
+      "metaSha256": "6185f0577d35249592910930b5e0b434118f5013896d9603a9dc4e20381a592e"
+    },
+    {
+      "id": "M32",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M32.html",
+      "meta": "ops/anatomy/official-identification/manual/M32.meta.json",
+      "sha256": "866bd1e26cfdbf15bd706f442b5f807cf6e3fb19109efc860f75b9ac957daa0d",
+      "bytes": 86811,
+      "expected": "identity_only",
+      "metaSha256": "e0fe4e8f8256bb765948f57b4a28053e04668de6f8443708e2a5f6361c537a29"
+    },
+    {
+      "id": "M33",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M33.html",
+      "meta": "ops/anatomy/official-identification/manual/M33.meta.json",
+      "sha256": "3d3c25f4310982087e0e95a74923a86701775e0280a300bac396503d2e1156b3",
+      "bytes": 86028,
+      "expected": "identity_only",
+      "metaSha256": "4b36bf50c6f4a5bd2d84b56b3552f3a272b6ac3b70eeeec5eb5fed8226fdd2a6"
+    },
+    {
+      "id": "M34",
+      "source": "DOU",
+      "path": "ops/anatomy/official-identification/manual/M34.html",
+      "meta": "ops/anatomy/official-identification/manual/M34.meta.json",
+      "sha256": "1b5b23ccbf7b97d94b020118a4106f06993454f9ea026562bbbb2bb7b1372642",
+      "bytes": 610084,
+      "expected": "r4_target",
+      "metaSha256": "998061a5f66ef7193bde883db2cd6b95f32c1ddbc476bfdffb852f4dbba723d1"
+    },
+    {
+      "id": "M5",
+      "source": "CONFAZ",
+      "path": "ops/anatomy/official-identification/manual/M5.html",
+      "meta": "ops/anatomy/official-identification/manual/M5.meta.json",
+      "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+      "bytes": 205981,
+      "expected": "identity_only",
+      "metaSha256": "fd260dbc0d66b14052fc5b0070b7d4da786fc576c1a18f43004f3746e22a3cff"
+    },
+    {
+      "id": "rfb:104314",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-normasinternet2-coleta02/104314.json",
+      "meta": "ops/anatomy/official-identification/rfb-normasinternet2-coleta02/104314.meta.json",
+      "sha256": "9005fddbc2df67e39127db7d34d2feb53ef8dfdc42bc59056862e97b9bb200b5",
+      "bytes": 2285257,
+      "expected": "identity_only",
+      "metaSha256": "d7ece98acfadf7b48a0aec0b5c3bd37f63f834473704980eeaac238c6db5d5aa"
+    },
+    {
+      "id": "rfb:108391",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-normasinternet2/108391.json",
+      "meta": "ops/anatomy/official-identification/rfb-normasinternet2/108391.meta.json",
+      "sha256": "b4042dee56a2d69ce59bde5c22a77a219668514fe0713c747c9845cde6838eb4",
+      "bytes": 7914,
+      "expected": "identity_only",
+      "metaSha256": "ca44f940931f185910b8c16c76d026d10f22c6949d7d3863888dd7588ee603be"
+    },
+    {
+      "id": "rfb:115131",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-normasinternet2/115131.json",
+      "meta": "ops/anatomy/official-identification/rfb-normasinternet2/115131.meta.json",
+      "sha256": "c07760b3ceb42030a928c0c97b9dfac44d8daca16a5dcaf611f8fe6201c8bcb2",
+      "bytes": 234565,
+      "expected": "identity_only",
+      "metaSha256": "8507d11d822ef9ecabcda3b89f98f6fb1e82d0af5fec1292cf824d09b410fc95"
+    },
+    {
+      "id": "rfb:116968",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-normasinternet2-coleta02/116968.json",
+      "meta": "ops/anatomy/official-identification/rfb-normasinternet2-coleta02/116968.meta.json",
+      "sha256": "4ca8d1d3179f32301ebaa34cc7f6eaa9936a0d20df7b44e1ead5d0b828664e78",
+      "bytes": 787461,
+      "expected": "identity_only",
+      "metaSha256": "babdb9da9974fce7b0fe90e82966c5992e84dc0d0d9a2cfcbfde9a24380bddce"
+    },
+    {
+      "id": "rfb:122645",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-p2c/122645.json",
+      "meta": "ops/anatomy/official-identification/rfb-p2c/122645.meta.json",
+      "sha256": "9565f3dbfee83ca61ce061c991e9891c1daeb50a9a86f80a8f97bc8d38129b2d",
+      "bytes": 11110,
+      "expected": "identity_only",
+      "metaSha256": "fdadc80fcbbb67d5543b76a361406a3870a8f602fdb86aa600a2332976b5aa0d"
+    },
+    {
+      "id": "rfb:127905",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-normasinternet2/127905.json",
+      "meta": "ops/anatomy/official-identification/rfb-normasinternet2/127905.meta.json",
+      "sha256": "9672e74829990edc5246b03eca3e65999499edd9d334cc988293133dbf66490b",
+      "bytes": 3530584,
+      "expected": "identity_only",
+      "metaSha256": "3fe7fbbfb75204ee8aa3af96340b8150391b5e293c7de462b2a98739fa66aeb7"
+    },
+    {
+      "id": "rfb:133898",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-normasinternet2/133898.json",
+      "meta": "ops/anatomy/official-identification/rfb-normasinternet2/133898.meta.json",
+      "sha256": "6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408",
+      "bytes": 31143,
+      "expected": "identity_only",
+      "metaSha256": "46db0ee2698bd7d837ff944b0e0eade8a62cb636d9d5462ffbec12bceb9da95b"
+    },
+    {
+      "id": "rfb:141910",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-normasinternet2/141910.json",
+      "meta": "ops/anatomy/official-identification/rfb-normasinternet2/141910.meta.json",
+      "sha256": "d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e",
+      "bytes": 144575,
+      "expected": "identity_only",
+      "metaSha256": "16dead7b9cc54a041dd74f7f2e7c7a66472006983544653b2ff2b458af65d15f"
+    },
+    {
+      "id": "rfb:142967",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-p2c/142967.json",
+      "meta": "ops/anatomy/official-identification/rfb-p2c/142967.meta.json",
+      "sha256": "db6e77240662a40e2565066012568309da34961a830ef1fe8167361efbe36b4c",
+      "bytes": 24241,
+      "expected": "identity_only",
+      "metaSha256": "1e7f75408002f1d343ec28a0aeef24306f37c408fd2904a5f41f59bed716bef2"
+    },
+    {
+      "id": "rfb:148516",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-p2c/148516.json",
+      "meta": "ops/anatomy/official-identification/rfb-p2c/148516.meta.json",
+      "sha256": "0c8788185864c520c77e907778cf15c69e1872b36f82b2313ae3f50e29386f4c",
+      "bytes": 32477,
+      "expected": "identity_only",
+      "metaSha256": "e0de281881a90f0eb01c346fdb17a9a59e45a787a2df29f6c98d090daa883aff"
+    },
+    {
+      "id": "rfb:148629",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-p2c/148629.json",
+      "meta": "ops/anatomy/official-identification/rfb-p2c/148629.meta.json",
+      "sha256": "cc3c7a1f3e77eda86fb19c9939b12aec15e3f28f9a6927e1131413da2204898f",
+      "bytes": 11638,
+      "expected": "identity_only",
+      "metaSha256": "74e54b73c34b275c645e6a02017842480ed4c2df61b035fd7eb72719041525e8"
+    },
+    {
+      "id": "rfb:148681",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-p2c/148681.json",
+      "meta": "ops/anatomy/official-identification/rfb-p2c/148681.meta.json",
+      "sha256": "d74c8f46b782cb63624ffa02f1f0ac4c575d73dc25a16e6dc7fb69ab4dbdc2c9",
+      "bytes": 8185,
+      "expected": "identity_only",
+      "metaSha256": "b6562a4778f1d9d1ccef183c7d4a1af51d86a849d31bcf0d5b01f0b0fe9a250d"
+    },
+    {
+      "id": "rfb:148693",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-p2c/148693.json",
+      "meta": "ops/anatomy/official-identification/rfb-p2c/148693.meta.json",
+      "sha256": "a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8",
+      "bytes": 73686,
+      "expected": "identity_only",
+      "metaSha256": "1d0c0122a8da7861dc12e0660aa9e8befa35214ec63e89f4ec91e1c243bbea8b"
+    },
+    {
+      "id": "rfb:37103",
+      "source": "RFB",
+      "path": "ops/anatomy/official-identification/rfb-p2c/37103.json",
+      "meta": "ops/anatomy/official-identification/rfb-p2c/37103.meta.json",
+      "sha256": "1c15767f8b2daa40a8e8e6283a1b7c49d7bd98a44aa5d19734a67987ff19b996",
+      "bytes": 11168,
+      "expected": "identity_only",
+      "metaSha256": "15a364000baa30b8c0a668bf61b83b75524d552ac6ba9357e3dce36f7439120a"
+    },
+    {
+      "id": "ricms-an1art041",
+      "source": "SEFAZ-SP-PORTAL",
+      "path": "ops/anatomy/official-identification/doesp-ricms/ricms-an1art041.html",
+      "meta": "ops/anatomy/official-identification/doesp-ricms/ricms-an1art041.meta.json",
+      "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+      "bytes": 199138,
+      "expected": "identity_only",
+      "metaSha256": "071f27f35f17e14524e4a801de09eb2feb267b7f4dc48f51831ff5acde823358"
+    },
+    {
+      "id": "ricms-an2art003",
+      "source": "SEFAZ-SP-PORTAL",
+      "path": "ops/anatomy/official-identification/doesp-ricms/ricms-an2art003.html",
+      "meta": "ops/anatomy/official-identification/doesp-ricms/ricms-an2art003.meta.json",
+      "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+      "bytes": 176447,
+      "expected": "identity_only",
+      "metaSha256": "5b846d9b99351962615d11b9f48331e109cac883b9266b7b6b4397259b1830a6"
+    },
+    {
+      "id": "ricms-an2art039",
+      "source": "SEFAZ-SP-PORTAL",
+      "path": "ops/anatomy/official-identification/doesp-ricms/ricms-an2art039.html",
+      "meta": "ops/anatomy/official-identification/doesp-ricms/ricms-an2art039.meta.json",
+      "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+      "bytes": 168294,
+      "expected": "identity_only",
+      "metaSha256": "a1a103b27facadf93385c49d3fa1ab4c47e5bbcf6d25e848322cc4e89343cc5d"
+    },
+    {
+      "id": "ricms-art007",
+      "source": "SEFAZ-SP-PORTAL",
+      "path": "ops/anatomy/official-identification/doesp-ricms/ricms-art007.html",
+      "meta": "ops/anatomy/official-identification/doesp-ricms/ricms-art007.meta.json",
+      "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+      "bytes": 165355,
+      "expected": "identity_only",
+      "metaSha256": "2ddace150c3f4cf6f6389e9fe0c81c4e485fa6321bd28e035a6652f06267c2a4"
+    },
+    {
+      "id": "ricms-art008",
+      "source": "SEFAZ-SP-PORTAL",
+      "path": "ops/anatomy/official-identification/doesp-ricms/ricms-art008.html",
+      "meta": "ops/anatomy/official-identification/doesp-ricms/ricms-art008.meta.json",
+      "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+      "bytes": 156994,
+      "expected": "identity_only",
+      "metaSha256": "5a8ab372ce4d61887d3b406685aab38d70ccc7e264e2b0d97f74d58064ba064b"
+    },
+    {
+      "id": "ricms-art009",
+      "source": "SEFAZ-SP-PORTAL",
+      "path": "ops/anatomy/official-identification/doesp-ricms/ricms-art009.html",
+      "meta": "ops/anatomy/official-identification/doesp-ricms/ricms-art009.meta.json",
+      "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+      "bytes": 154921,
+      "expected": "identity_only",
+      "metaSha256": "249920df02cc5c34ec84b8ab9fe5225920ec2d72e64e3c446940b4bf012fcd38"
+    }
+  ]
+}
