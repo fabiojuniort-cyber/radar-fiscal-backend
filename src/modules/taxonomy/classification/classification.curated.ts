@@ -171,6 +171,15 @@ export function extractCclasstribCodes(raw: string): Map<string, string> {
   return found;
 }
 
+// Require an explicit application in the title or the operative wording.
+const AUTOMOTIVE_APPLICATION = /\b(?:setor automotivo|industria automobilistica|autopecas|automoveis de passageiros|veiculos rodoviarios|transporte rodoviario|caminhoes|onibus)\b/;
+const AUTOMOTIVE_SEGMENT_LABEL = 'Automotivo e equipamentos de transporte';
+
+export function allowsDerivedSegment(label: string, automotiveApplication: boolean | null | undefined): boolean {
+  // Null identifies a classification written before this policy was recorded.
+  return label !== AUTOMOTIVE_SEGMENT_LABEL || automotiveApplication !== false;
+}
+
 export function planCuratedClassification(
   input: CuratedClassificationInput,
 ): CuratedClassificationPlan {
@@ -252,7 +261,8 @@ export function planCuratedClassification(
   }
 
   const configSnapshot = {
-    policyVersion: 3,
+    policyVersion: 4,
+    automotiveApplication: AUTOMOTIVE_APPLICATION.test(normalized.text),
     engine: CURATED_ENGINE_KEY,
     canonicalLabel: 'WHEN_CLASSIFY_BY_LABEL',
     autoAliasTypes: 'ALL',
