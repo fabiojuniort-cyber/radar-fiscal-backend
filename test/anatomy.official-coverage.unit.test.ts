@@ -524,7 +524,7 @@ test('E9-M1 baselineEntrySha256 is deterministic and equals the sha of the canon
   assert.notEqual(baselineEntrySha256(e), baselineEntrySha256({ ...e, chars: 124 }));
 });
 
-test('E9-M1 non-RFB acceptance: right digest/engine/cell on a complete reading is accepted; wrong digest/engine/cell or a partial reading is not; real non-RFB acceptances match the approved R3 samples', async () => {
+test('E9-M1 non-RFB acceptance: right digest/engine/cell on a complete reading is accepted; wrong digest/engine/cell or a partial reading is not; real non-RFB acceptances match the approved samples', async () => {
   const { ANATOMY_ENGINE_BUILD_HASH: E } = await import('../src/modules/anatomy/build-identity.js');
   const cellId = 'confaz--convenio-icms--grande';
   const entry = { id: 'synthetic', sha256: '1'.repeat(64), profile: 'CONFAZ', outputHash: '2'.repeat(64), chars: 60_000 };
@@ -547,10 +547,10 @@ test('E9-M1 non-RFB acceptance: right digest/engine/cell on a complete reading i
   const unvalidated = mk(); unvalidated.stages = { ...okStages, validated: false };
   assessNonRfbSample(unvalidated, complete, [entry], [rec()]);
   assert.deepEqual([unvalidated.readingComplete, unvalidated.stages.accepted, unvalidated.notes], [null, false, []], 'only validated samples are assessed');
-  // Real acervo: the approved complete R3 portal samples have current acceptance records.
+  const approvedNonRfb = acceptedSampleIds.filter(id => !id.startsWith('rfb:'));
   const nonRfb = real.filter((s) => s.source !== 'RFB' && s.stages.validated);
-  assert.deepEqual(nonRfb.filter((s) => s.readingComplete).map((s) => s.id).sort(), [...completePortalSamples].sort());
-  assert.ok(nonRfb.every((s) => s.stages.accepted === completePortalSamples.has(s.id) && (s.readingComplete || /^partial reading/u.test(s.notes[0]!))));
+  assert.deepEqual(nonRfb.filter((s) => s.readingComplete).map((s) => s.id).sort(), approvedNonRfb);
+  assert.ok(nonRfb.every((s) => s.stages.accepted === approvedNonRfb.includes(s.id) && (s.readingComplete || /^partial reading/u.test(s.notes[0]!))));
   assert.equal(samplesBaseline(real).samples.length, nonRfb.length, 'partial notes do not drop samples from the baseline');
   const mx = buildMatrix(real);
   for (const id of ['confaz--convenio-icms--grande', 'confaz--ajuste-sinief--grande', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio']) {
