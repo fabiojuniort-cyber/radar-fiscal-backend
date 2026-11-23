@@ -15,6 +15,47 @@ const typedPortal = (source: 'DOU' | 'CONFAZ' | 'PLANALTO', html: string, title:
   return result;
 };
 
+test('R4 DOU authentic classes preserve the signature and bare annex title', () => {
+  const title = 'DECRETO Nº 100';
+  const html = '<article id="materia"><div class="texto-dou"><p class="identifica">DECRETO Nº 100</p>'
+    + '<p>Art. 1º Dispositivo.</p><p class="assinaPr">NOME DA AUTORIDADE</p>'
+    + '<p class="anexo">ANEXO</p><table><tr><td>Dado</td></tr></table></div></article>';
+  const result = typedPortal('DOU', html, title);
+  assert.equal(result.status, 'complete');
+  assert.ok(result.parts.some((p) => p.type === 'signature' && p.context === 'prohibited'));
+  const annex = result.parts.find((p) => p.type === 'annex');
+  assert.ok(annex && result.parts.some((p) => p.type === 'table' && p.parentId === annex.id));
+  assert.equal(typedPortal('DOU', html.replace('class="assinaPr"', ''), title).status, 'partial');
+  assert.equal(typedPortal('DOU', html.replace('class="anexo"', ''), title).status, 'partial');
+});
+
+test('R4 CONFAZ appendix instructions require an annex and remain non-operative', () => {
+  const title = 'CONVÊNIO ICMS 100/26';
+  const annex = '<p>ANEXO ÚNICO</p>';
+  const appendix = '<p class="A7-2Tabelajustificado">(1) Item: informar número sequencial</p>';
+  const html = '<div id="content-core"><div id="parent-fieldname-text"><p class="A1-1TituloAcordo">' + title
+    + '</p>' + annex + appendix + '</div></div>';
+  const result = typedPortal('CONFAZ', html, title);
+  assert.equal(result.status, 'complete');
+  assert.ok(result.parts.some((p) => p.ruleId.endsWith('confaz_plone_appendix_text') && p.context === 'unknown'));
+  assert.equal(typedPortal('CONFAZ', html.replace(annex, ''), title).status, 'partial');
+});
+
+test('R4 DOU split CGSN epigraph requires one matching title and the explicit issuer', () => {
+  const title = 'RESOLUÇÃO CGSN Nº 140';
+  const heading = '<p class="identifica">RESOLUÇÃO Nº 140, DE 22 DE MAIO DE 2018</p>';
+  const html = '<div>Menu</div><article id="materia"><div class="texto-dou"><p class="dou-paragraph"></p>'
+    + '<p class="titulo">COMITÊ GESTOR DO SIMPLES NACIONAL</p>' + heading
+    + '<p>Art. 1º Dispositivo.</p></div></article><div>Rodapé</div>';
+  const result = typedPortal('DOU', html, title);
+  assert.equal(result.status, 'complete');
+  assert.ok(result.parts.some((p) => p.type === 'publication_header' && p.context === 'prohibited'));
+  assert.doesNotMatch(result.canonicalText, /Menu|Rodapé/u);
+  for (const altered of [html.replace('140,','141,'), html.replace('COMITÊ GESTOR DO SIMPLES NACIONAL','OUTRO ÓRGÃO'), html.replace(heading, heading + heading)]) {
+    assert.equal(prepareOfficialAct('DOU', 'synthetic', altered, title), null);
+  }
+});
+
 test('RFB requires a corroborated device and Roman sequence and preserves a struck block', () => {
   const html = '<section data-rfb-segment="1"><p>Art. 1º Vigência.</p></section>'
     + '<section data-rfb-segment="2" data-rfb-type="nao identificad"><p>I primeiro dispositivo;</p></section>'

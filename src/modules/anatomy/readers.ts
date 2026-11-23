@@ -633,7 +633,13 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span, text);
       const ownClasses = (node.attrs.class ?? '').split(/\s+/u);
       if (portal?.source === 'DOU' && descriptor.type === 'unidentified' && !wasQuoted && !openQuotation) {
-        if (/^ANEXO\s+(?:ÚNICO|UNICO|[IVXLCDM]+|\d+)(?:\s|$)/iu.test(text) && ownClasses.includes('anexo')) {
+        if (node.tag === 'p' && ownClasses.includes('assinaPr') && /^\p{L}[\p{L}\p{M}.'’-]*(?:\s+\p{L}[\p{L}\p{M}.'’-]*)+$/u.test(text)
+          && text === text.toUpperCase()) {
+          descriptor = { type: 'signature', context: 'prohibited', reason: 'dou_portal_assinaPr', rank: 100 };
+        } else if (node.tag === 'p' && ownClasses.includes('titulo') && /^COMITÊ\s+GESTOR\s+DO\s+SIMPLES\s+NACIONAL$/iu.test(text)
+          && layoutWhitespace.test(result.canonicalText.slice(0, node.span.start))) {
+          descriptor = { type: 'publication_header', context: 'prohibited', reason: 'dou_portal_cgsn_header', rank: 100 };
+        } else if ((/^ANEXO\s+(?:ÚNICO|UNICO|[IVXLCDM]+|\d+)(?:\s|$)/iu.test(text) || /^ANEXO$/iu.test(text)) && ownClasses.includes('anexo')) {
           descriptor = { type: 'annex', context: 'operative_candidate', reason: 'dou_portal_annex', rank: 2 };
         } else if (ownClasses.includes('dou-paragraph') || ownClasses.includes('subtitulo')) {
           const heading = ownClasses.includes('subtitulo') && /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O)\s+[IVXLCDM0-9]+\b/iu.exec(text);
@@ -659,6 +665,10 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           descriptor = { type: 'annex', context: 'operative_candidate', reason: 'confaz_plone_sole_annex', rank: 2 };
         } else if (descriptor.type === 'unidentified' && classes.some((c) => c === 'A6-1Subtitulo' || c === 'A7-1TabelaSubtitulo' || c === 'A9-1TabelaSubtituloverde')) {
           descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_subheading', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && node.tag === 'p' && insideAnnex()
+          && ownClasses.includes('A7-2Tabelajustificado')
+          && /^(?:RELAÇÃO DOS ATOS NORMATIVOS\b|Orientaç(?:ões|ão) para Preenchimento do ANEXO ÚNICO:|\(\d{1,2}\)\s+[^:\n]+:\s+\S)/iu.test(text)) {
+          descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_appendix_text', rank: 100 };
         }
       }
       if (portal?.source === 'PLANALTO' && !wasQuoted && !openQuotation) {

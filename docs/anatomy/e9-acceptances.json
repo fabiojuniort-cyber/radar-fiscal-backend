@@ -778,6 +778,388 @@
         "Aceite técnico de leitura. legalStatus permanece unknown.",
         "Válido para esta identidade do motor, condicionado à aprovação no CI integral do #333."
       ]
+    },
+    {
+      "sampleId": "rfb:108391",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "fc8a0ea8712e26645203f7a8029dc6902a3c5b726fb9fb863f4db1d5292c001e",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:108391 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "rfb:115131",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "scope": "offline",
+      "entrySha256": "e2041649a48669684ea52d1502a448b6920e98621d6e3e7118e28e35fa877221",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:115131 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "rfb:133898",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "31d59ff4564ab97f4f2b6dd7971e6bb19b54ac0dbb91866065d47df36a4eecbc",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:133898 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "rfb:142967",
+      "cellId": "rfb--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "7fbfd0424d5abe1dedd36e1f81a03e585499d600a3fff5be8619de7bb905f4c2",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:142967 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "rfb:148693",
+      "cellId": "rfb--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "7d80b45d543f3f598015316ea1ea5939c5f6e440fe1f93c0df7615c3064aa868",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:148693 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "rfb:37103",
+      "cellId": "rfb--ato-declaratorio-interpretativo--pequeno",
+      "scope": "offline",
+      "entrySha256": "4730343b9d8d9ba15b0d093f28708df7fd5ba39f0a71ec926e46bfe96ac7f975",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:37103 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "rfb:148629",
+      "cellId": "rfb--ato-declaratorio-executivo--pequeno",
+      "scope": "offline",
+      "entrySha256": "b99d35e51fedfaf0165e7e79bdd3f26e7182de12483df078f79a23c7faa13bb3",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:148629 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "rfb:122645",
+      "cellId": "rfb--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "35fee486f08208dff3805e8a3073447cdd32670b6a4d2874f03d3bcb898a34d5",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:122645 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M14",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "9118e993b27301b374181594128e160f7f76907d7022aa04ead68717c87ca487",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M14 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M16",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "d8d935a6848732e71a7a225aafe71e827094ad5305f62cba06241fa3c61ae97b",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M16 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M18",
+      "cellId": "confaz--ajuste-sinief--pequeno",
+      "scope": "offline",
+      "entrySha256": "62e888388a2c39124da91cfb91942e945af2eb29484d12910b452c25211f8bf9",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M18 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M19",
+      "cellId": "confaz--ajuste-sinief--grande",
+      "scope": "offline",
+      "entrySha256": "4d2f82713257656fce41edad178acda46a1b3e0c8db9795530ce5b1a16609f2b",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M19 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M20",
+      "cellId": "confaz--protocolo-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "c4c32fed1b3dcaddf851a1b88165f705998ebbbc8cfd7e7e43e3596641e136b5",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M20 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M23",
+      "cellId": "dou--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "6cb03863b981b6d120d94b32ed9825fab162be5720e2c177bb82418756232434",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M23 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M24",
+      "cellId": "dou--instrucao-normativa--medio",
+      "scope": "offline",
+      "entrySha256": "a9bbb152274098da9e6ff311e1752aadda2ce05059ef89653eedde237f7605ba",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M24 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M28",
+      "cellId": "dou--decreto--grande",
+      "scope": "offline",
+      "entrySha256": "f6950b6808bcc86f8291202d52b80791d8bb0200ca0e40ce0e2a2ef7d236335d",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M28 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M29",
+      "cellId": "dou--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "ed54adc69bacef0353ab53af9a56f0bd4f6a3ede27ee5f17119d4dea2b1d4598",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M29 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M30",
+      "cellId": "dou--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "e115440ca5196e3e7f0322372c7743c3467d5de090b5a2d6b60528b6feb73da0",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M30 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M32",
+      "cellId": "dou--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "f4f5872397523b52d80ef88773ca427a38e8a0532fbc978a7bf0abc5924fb06c",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M32 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M33",
+      "cellId": "dou--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "8a4bedded30a39608bec092ca8e8dcfe0038937aa7b7a99be6b10840b398e8f6",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M33 @ 7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23"
+    },
+    {
+      "sampleId": "M26",
+      "cellId": "dou--decreto--pequeno",
+      "scope": "offline",
+      "entrySha256": "420590017b24a13fff4714b2d71ca97f2aa4e0eaded7302850d8e3d5e24f27df",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Somente o tipo e porte registrados para o HTML oficial comprovado do DOU, incluindo os anexos preservados na mesma representação.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ]
+    },
+    {
+      "sampleId": "http:M4",
+      "cellId": "confaz--convenio-icms--grande",
+      "scope": "offline",
+      "entrySha256": "4c21edb635c3bd505edfd7c4bf78b210b17fc0dd6d18a43dea589515de937012",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Convênio ICMS de porte grande no HTML Plone comprovado do CONFAZ, incluindo os apêndices e suas instruções preservadas.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ]
+    },
+    {
+      "sampleId": "M34",
+      "cellId": "dou--resolucao--grande",
+      "scope": "offline",
+      "entrySha256": "64a6ce45d01c2b4269f4ce719c2945154855eda8fbae7191675eed7e1822bb1d",
+      "engineBuildHash": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R4)",
+      "decidedOn": "2026-11-22",
+      "ref": "COORD — lote R4 aprovado offline em 22/11/2026 | tribusca-control#116 c.7088347595 (base R3) | ops/anatomy/e9-acervo/motor-r4/equivalence.json",
+      "limits": [
+        "Somente o tipo e porte registrados para o HTML oficial comprovado do DOU, incluindo os anexos preservados na mesma representação.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ]
     }
   ]
 }

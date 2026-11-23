@@ -1,4 +1,5 @@
 import { DomUtils, parseDocument } from 'htmlparser2';
+type PortalElement = ReturnType<typeof DomUtils.findAll>[number];
 
 type PortalSource = 'DOU' | 'CONFAZ' | 'PLANALTO';
 export interface OfficialActPreparation {
@@ -56,7 +57,8 @@ export function prepareOfficialAct(source: PortalSource, resourceId: string, htm
   if (!new RegExp(`^</${act.name}\\s*>$`, 'iu').test(closingTag)) return null;
 
   const visible = measure(act.children);
-  if (!visible || (epigraph && !matchesEpigraph(source, visible.slice(0, 1600), epigraph))) return null;
+  if (!visible || (epigraph && !matchesEpigraph(source, visible.slice(0, 1600), epigraph)
+    && !(source === 'DOU' && matchesDouCgsnEpigraph(act, epigraph)))) return null;
   const result = Object.freeze({ source, resourceId, start: act.startIndex, end: act.endIndex + 1, chars: visible.length });
   if (epigraph) issued.set(result, html);
   return result;
@@ -83,6 +85,22 @@ function measure(nodes: ReturnType<typeof parseDocument>['children']): string {
 }
 
 const normalizeText = (text: string) => text.normalize('NFC').replace(/\s+/gu, ' ').trim();
+
+// The metadata can put CGSN in the resolution title while the portal prints the issuer separately.
+function matchesDouCgsnEpigraph(act: PortalElement, expected: string): boolean {
+  const key = /^RESOLUÇÃO CGSN N[º°o]\s+(\d+)(?=,|$)/iu.exec(normalizeText(expected));
+  if (!key) return false;
+  const headings = act.children.filter((n): n is PortalElement => n.type === 'tag' && n.name === 'p' && hasClass(n.attribs.class, 'identifica'));
+  if (headings.length !== 1) return false;
+  const [issuer, title] = act.children.filter((n) => normalizeText(DomUtils.textContent(n)));
+  if (!title || !issuer || issuer.type !== 'tag' || issuer.name !== 'p' || !hasClass(issuer.attribs.class, 'titulo')
+    || !/^COMITÊ GESTOR DO SIMPLES NACIONAL$/iu.test(normalizeText(DomUtils.textContent(issuer))) || title !== headings[0]) return false;
+  const literal = normalizeText(DomUtils.textContent(title));
+  const number = /^RESOLUÇÃO N[º°o]\s+(\d+), DE \d{1,2} DE \p{L}+ DE \d{4}$/iu.exec(literal);
+  if (number?.[1] !== key[1]) return false;
+  return normalizeText(expected).length === key[0].length
+    || literal.toUpperCase() === normalizeText(expected).replace(/ CGSN /iu, ' ').toUpperCase();
+}
 
 function matchesEpigraph(source: PortalSource, visible: string, expected: string): boolean {
   const wanted = normalizeText(expected);
