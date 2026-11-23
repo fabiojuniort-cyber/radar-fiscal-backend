@@ -151,3 +151,29 @@ test('R3 walks a proved nested DOU body and preserves quotes, tables and origina
     + '<p class="A1-1TituloAcordo">' + confazTitle + '</p><p>Cl\u00e1usula primeira Teor.</p></body></html></div></main>';
   assert.ok(typedPortal('CONFAZ', confaz, confazTitle).parts.every((part) => part.type !== 'clause'));
 });
+
+test('R5 Planalto requires chapter, signature and strike evidence without dropping live text', () => {
+  const title = 'LEI N\u00ba 100, DE 1 DE JANEIRO DE 2026';
+  const read = (body: string) => typedPortal('PLANALTO', '<html><body><p>Casa Civil</p><p>' + title + '</p>'
+    + '<p>Art. 1\u00ba Exemplo.</p>' + body + '</body></html>', title);
+  const chapter = '<p align="center">cap\u00edtulo II</p>';
+  const heading = '<p align="center">DO IMPOSTO SOBRE A RENDA</p>';
+  const oldText = '<p><s>XI</s> <span style="text-decoration: line-through">Reda\u00e7\u00e3o anterior.</span></p>';
+  const date = '<p>Bras\u00edlia, 1 de janeiro de 2026; 205o da Independ\u00eancia e 138o da Rep\u00fablica.</p>';
+  const signature = '<p>NOME DO PRESIDENTE<br><em>Outro Signat\u00e1rio</em></p>';
+  const complete = read(chapter + heading + oldText + date + signature + '<p>&nbsp;</p>');
+  assert.equal(complete.status, 'complete');
+  for (const reason of ['planalto_chapter_title', 'planalto_struck_block', 'planalto_signatories']) {
+    const part = complete.parts.find(p => p.contextReasons.includes(reason));
+    assert.equal(part?.context, 'prohibited', reason);
+    assert.ok(part?.sourcePointers[0]?.sourceSpan, reason);
+  }
+  assert.match(complete.canonicalText, /Reda\u00e7\u00e3o anterior/u);
+  for (const unproven of [heading, signature, oldText.replace('</p>', ' Texto vivo.</p>'),
+    chapter + '<p align="center">Da obriga\u00e7\u00e3o geral</p>', '<p>*</p>', '<p>\u200b</p>']) {
+    assert.equal(read(unproven).status, 'partial', unproven);
+  }
+  const quote = read('<blockquote>' + chapter + heading + '</blockquote>');
+  assert.ok(quote.parts.some(part => part.type === 'quoted_text' && part.context === 'prohibited'));
+  assert.ok(!quote.parts.some(part => part.contextReasons.includes('planalto_chapter_title')));
+});

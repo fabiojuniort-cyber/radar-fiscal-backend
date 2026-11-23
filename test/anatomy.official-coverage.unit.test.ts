@@ -16,14 +16,14 @@ import { portalActChars } from '../ops/anatomy/official-act-size.js';
 const r2AcceptedSampleIds = ['rfb:108391', 'rfb:115131', 'rfb:122645', 'rfb:133898', 'rfb:142967', 'rfb:148629', 'rfb:148693', 'rfb:37103'];
 const r2Engine = '817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe';
 const completePortalSamples = new Set(['M14', 'M16', 'M18', 'M19', 'M20', 'M23', 'M24', 'M26', 'M28', 'M29', 'M30', 'M32', 'M33', 'M34', 'http:M4']);
-const acceptedSampleIds = [...r2AcceptedSampleIds, ...completePortalSamples].sort();
+const acceptedSampleIds = [...r2AcceptedSampleIds, ...completePortalSamples, 'M10', 'M12', 'http:M1'].sort();
 const acceptedCellIds = [
   'confaz--convenio-icms--grande', 'dou--decreto--pequeno', 'dou--resolucao--grande',
   'confaz--ajuste-sinief--grande', 'confaz--ajuste-sinief--pequeno', 'confaz--convenio-icms--pequeno', 'confaz--protocolo-icms--pequeno',
   'dou--decreto--grande', 'dou--instrucao-normativa--medio', 'dou--instrucao-normativa--pequeno', 'dou--portaria--medio',
   'dou--portaria--pequeno', 'dou--resolucao--pequeno', 'rfb--ato-declaratorio-executivo--pequeno', 'rfb--ato-declaratorio-interpretativo--pequeno',
   'rfb--instrucao-normativa--grande', 'rfb--instrucao-normativa--pequeno', 'rfb--portaria--medio', 'rfb--portaria--pequeno',
-  'rfb--resolucao--pequeno',
+  'rfb--resolucao--pequeno', 'planalto--lei--pequeno', 'planalto--lei--medio', 'planalto--lei--grande',
 ].sort();
 const real = collectSamples();
 test('E9 matrix and samples baseline are regenerated identical to the committed files', () => {
@@ -47,7 +47,7 @@ test('E9 motor R3: measured layouts, complete readings and acceptance remain dis
   for (const id of ['M10', 'M12']) {
     const x = real.find((s) => s.id === id)!;
     assert.deepEqual(x.decoding, { encoding: 'windows-1252', encodingSource: 'approved_local_fallback', confidence: 'tentative', declaredCharset: null });
-    assert.deepEqual([x.stages.identified, x.stages.read, x.stages.validated, x.stages.accepted, x.size], [true, true, true, false, id === 'M10' ? 'pequeno' : 'médio']);
+    assert.deepEqual([x.stages.identified, x.stages.read, x.stages.validated, x.stages.accepted, x.size], [true, true, true, true, id === 'M10' ? 'pequeno' : 'médio']);
   }
   assert.equal(m.e9MatrixComplete, false);
   assert.ok(!m.requiredPending.includes('planalto--lei--grande'), 'measured large Planalto layouts');
@@ -63,8 +63,12 @@ test('E9 motor R3: measured layouts, complete readings and acceptance remain dis
     : !s.stages.read && !s.stages.validated && s.diagnostic?.profile.startsWith('DOU'))));
   assert.equal(real.find((s) => s.id === 'M5')!.size, 'grande', 'the measured size decides, not the list label (M5 was listed as "pequeno")');
   assert.deepEqual([sizeOf(9_999), sizeOf(10_000), sizeOf(49_999), sizeOf(50_000)], ['pequeno', 'médio', 'médio', 'grande']);
-  // HTTP captures of the other session: Planalto not decoded (no declared charset), DOU PDF page identified but not validated
+  // The two large Planalto captures are validated separately. DOU PDF pages are identified only.
   for (const id of ['http:M1', 'http:M2']) { const x = real.find((s) => s.id === id)!; assert.deepEqual([x.source, x.stages.identified, x.stages.read], ['Planalto', true, true]); }
+  assert.deepEqual(['http:M1', 'http:M2'].map(id => {
+    const sample = real.find(s => s.id === id)!;
+    return [sample.readingComplete, sample.stages.accepted];
+  }), [[true, true], [false, false]]);
   const m9 = real.find((s) => s.id === 'http:M9')!;
   assert.deepEqual([m9.source, m9.layout, m9.stages.identified, m9.stages.validated], ['DOU', LAYOUT.DOU_PDF_PAGE, true, false]); assert.match(m9.notes[0]!, /CONTINUA/u);
   const p58 = real.find((s) => s.id === 'http:M9-p58')!;
@@ -323,7 +327,7 @@ test('E9 acceptance B4: the committed file is the append-only union with #305/#3
   const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string; entrySha256: string; revalidates?: string }[] };
   // composition gate (tribusca-control#116, after c.6965245285): append-only — the 2026-11-11 Portaria record at 0e009431 is
   // PRESERVED and a revalidation record pins the composed engine; only the record on the current engine makes it accepted
-  assert.equal(file.acceptances.length, 69, '46 prior records and 23 appended for R4');
+  assert.equal(file.acceptances.length, 95, '69 prior records and 26 appended for R5');
   assert.deepEqual(file.acceptances.slice(18, 26).map((r) => r.sampleId).sort(), r2AcceptedSampleIds);
   assert.ok(file.acceptances.slice(18, 26).every((r) => r.engineBuildHash === r2Engine));
   assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);

@@ -50,6 +50,21 @@ const groupLevel = (word: string) => GROUP_RANK[word.normalize('NFD').replace(/\
 const GROUP = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|Livro|T[íi]tulo|Cap[íi]tulo|Se[çc][ãa]o|Subse[çc][ãa]o)\s+(?:[IVXLCDM]+|\d+|[ÚU]NIC[OA]|[ÚU]nic[oa])(?:\s*[-–—:.]|\s*$)/u;
 type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number; itemNumber?: string };
 const blocks = new Set(['p', 'div', 'section', 'h1', 'h2', 'h3', 'h4', 'li', 'table', 'tr', 'td', 'th', 'article']);
+// Attested headings for the compiled ccivil_03 chapter layout. Standalone matches
+// lack proof: the reader also requires a centered paragraph immediately after a chapter.
+const planaltoChapterTitles = new Set([
+  'DA CONTRIBUIÇÃO PARA O PIS/PASEP E COFINS',
+  'DO IMPOSTO SOBRE A RENDA',
+  'DO IMPOSTO SOBRE OPERAÇÕES DE CRÉDITO, CÂMBIO E SEGURO, OU RELATIVAS A TÍTULOS OU VALORES MOBILIÁRIOS',
+  'DA COBRANÇA NÃO-CUMULATIVA DO PIS E DO PASEP',
+  'DA COBRANÇA NÃO-CUMULATIVA DA COFINS',
+  'DAS OUTRAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO',
+  'DAS OUTRAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO TRIBUTÁRIA',
+  'DAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO ADUANEIRA',
+  'DISPOSIÇÕES FINAIS',
+  'DAS DISPOSIÇÕES FINAIS',
+  'DAS DISPOSIÇÕES GERAIS E FINAIS',
+]);
 const layoutWhitespace = /^[\p{White_Space}]*$/u;
 
 // Only the direct document wrapper of a verified DOU fragment is transparent. Embedded images
@@ -66,6 +81,16 @@ function hasNestedDouBody(node: Node): boolean {
     for (const nested of child.children) pending.push(nested);
   }
   return true;
+}
+
+// A layout block may be treated as struck only when every nonblank text node carries
+// the source's strike markup. A live fragment in the same paragraph keeps the block unresolved.
+function isEntirelyStruck(node: Node, inherited = false): boolean {
+  if (node.blocked) return true;
+  const struck = inherited || /^(?:s|strike|del)$/u.test(node.tag)
+    || /(?:^|;)\s*text-decoration(?:-line)?\s*:\s*line-through\s*(?:;|$)/iu.test(node.attrs.style ?? '');
+  if (node.text !== null) return struck || layoutWhitespace.test(node.text);
+  return node.children.every((child) => isEntirelyStruck(child, struck));
 }
 
 const excluded = new Set(['script', 'style', 'noscript', 'template', 'iframe', 'object', 'head']);
@@ -234,7 +259,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   if (input.source === 'PLANALTO' && !portal) throw new TypeError('PLANALTO requires issued official act preparation');
   const raw = portal ? full.slice(portal.start, portal.end) : full;
   const originOffset = portal?.start ?? 0;
-  const portalLayout = portal?.source === 'DOU' || portal?.source === 'CONFAZ';
+  const portalLayout = portal?.source === 'DOU' || portal?.source === 'CONFAZ' || portal?.source === 'PLANALTO';
   const maxNodes = portal ? PORTAL_MAX_NODES : ANATOMY_READER_LIMITS.maxNodes;
   const childOrders = new Map<string | null, number>();
   const pointer = (locator: string, start: number | null = null, end: number | null = null): Pointer => ({
@@ -598,6 +623,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   const spProven = input.source === 'SEFAZ-SP-PORTAL';
   const spPortalWrapper = (node: Node) => spProven && node.attrs['data-sefaz-sp-portal'] === 'legislacao-consolidada'
     && dom.children.length === 1 && dom.children[0] === node;
+  let planaltoPrevious: { node: Node; reason: string; rank: number } | undefined;
   const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null, spPortal = false): void => {
     if (node.blocked || node.text !== null) return;
     if (!spPortal && spPortalWrapper(node)) spPortal = true;
@@ -675,9 +701,37 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
         if (node.start === 0 && /^LEI\s+N/iu.test(text)) descriptor = { type: 'epigraph', context: 'prohibited', reason: 'planalto_epigraph', rank: 100 };
         else if (/^(?:Este texto não substitui|Mensagem de Veto|Conversão da MPv|Produção de efeitos?|Vigência|Vide\b|Regulamento\s*$)/iu.test(text)) {
           descriptor = { type: 'editorial_note', context: 'prohibited', reason: 'planalto_notice', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && node.tag === 'p') {
+          const centered = /^center$/iu.test(node.attrs.align ?? '');
+          const previous = planaltoPrevious?.node;
+          const adjacent = previous && previous.span.end <= node.span.start && containerOf(previous.path) === containerOf(node.path)
+            && layoutWhitespace.test(result.canonicalText.slice(previous.span.end, node.span.start));
+          const chapter = centered && /^CAP[IÍ]TULO\s+[IVXLCDM]+$/iu.test(text);
+          const titleText = text.replace(/\s+/gu, ' ');
+          const title = centered && planaltoChapterTitles.has(titleText.toUpperCase());
+          if (chapter) {
+            descriptor = { type: 'group', context: 'prohibited', reason: 'planalto_chapter', rank: groupLevel('CAPITULO')[1] };
+          } else if (adjacent && centered && ((planaltoPrevious?.rank === groupLevel('CAPITULO')[1] && title)
+            || (planaltoPrevious?.reason === 'planalto_chapter_title'
+              && /^DAS OUTRAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO$/iu.test(matchText(previous!).trim().replace(/\s+/gu, ' '))
+              && titleText === 'TRIBUTÁRIA E ADUANEIRA'))) {
+            descriptor = { type: 'body', context: 'prohibited', reason: 'planalto_chapter_title', rank: 100 };
+          } else if (/^Brasília,\s+\d{1,2}\s+de\s+\p{L}+\s+de\s+\d{4};\s+\d{1,3}\s*[oº°]\s+da\s+Independência\s+e\s+\d{1,3}\s*[oº°]\s+da\s+República\.$/iu.test(text)) {
+            descriptor = { type: 'signature', context: 'prohibited', reason: 'planalto_signature_date', rank: 100 };
+          } else if (adjacent && planaltoPrevious?.reason === 'planalto_signature_date'
+            && /<br\b[^>]*>[\s\S]*<em\b/iu.test(raw.slice(node.start, node.end))
+            && /^(?:\p{Lu}[\p{Lu}\p{M}]+[ \t]+){2,}\p{Lu}[\p{Lu}\p{M}]+(?:\s+[\p{L}\p{M}.-]+)+$/u.test(result.canonicalText.slice(node.span.start, node.span.end).trim())) {
+            descriptor = { type: 'signature', context: 'prohibited', reason: 'planalto_signatories', rank: 100 };
+          } else if (adjacent && planaltoPrevious?.reason === 'planalto_notice' && centered && text === '*'
+            && /\bcolor\s*=\s*["']#ff0000["']/iu.test(raw.slice(node.start, node.end))) {
+            descriptor = { type: 'editorial_note', context: 'prohibited', reason: 'planalto_notice_marker', rank: 100 };
+          } else if (/^[IVXLCDM]+\s+\p{L}/u.test(text) && isEntirelyStruck(node)) {
+            descriptor = { type: 'body', context: 'prohibited', reason: 'planalto_struck_block', rank: 100 };
+          }
         } else if (descriptor.type !== 'unidentified' && node.tag === 'p' && /<(?:strike|s|del)\b/iu.test(raw.slice(node.start, node.end))) {
           descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_historical_markup' };
-        } else if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
+        }
+        if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
           descriptor = { type: 'annex', context: 'operative_candidate', reason: 'planalto_sole_annex', rank: 2 };
         }
       }
@@ -729,6 +783,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       }
       if (portalLayout && descriptor.type === 'unidentified'
           && layoutWhitespace.test(result.canonicalText.slice(node.span.start, node.span.end))) return;
+      if (portal?.source === 'PLANALTO') planaltoPrevious = { node, reason: descriptor.reason, rank: descriptor.rank };
       const part = attach(node, descriptor);
       if (llegPlaceholder) for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_revoked_placeholder');
       if (llegAmbiguous) {
