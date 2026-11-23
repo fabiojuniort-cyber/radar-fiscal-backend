@@ -171,7 +171,8 @@ export function extractCclasstribCodes(raw: string): Map<string, string> {
   return found;
 }
 
-// Require an explicit application in the title or the operative wording.
+// Require an explicit application in the title or opening subject line.
+// Later mentions may be incidental or part of a historical redaction.
 const AUTOMOTIVE_APPLICATION = /\b(?:setor automotivo|industria automobilistica|autopecas|automoveis de passageiros|veiculos rodoviarios|transporte rodoviario|caminhoes|onibus)\b/;
 const AUTOMOTIVE_SEGMENT_LABEL = 'Automotivo e equipamentos de transporte';
 
@@ -262,7 +263,10 @@ export function planCuratedClassification(
 
   const configSnapshot = {
     policyVersion: 4,
-    automotiveApplication: AUTOMOTIVE_APPLICATION.test(normalized.text),
+    automotiveApplication: AUTOMOTIVE_APPLICATION.test(normalizeWithIndex([
+      input.title,
+      input.contentText?.trim().split(/\r?\n/, 1)[0] ?? '',
+    ].join('\n')).text),
     engine: CURATED_ENGINE_KEY,
     canonicalLabel: 'WHEN_CLASSIFY_BY_LABEL',
     autoAliasTypes: 'ALL',
