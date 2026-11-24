@@ -1160,6 +1160,431 @@
         "Somente o tipo e porte registrados para o HTML oficial comprovado do DOU, incluindo os anexos preservados na mesma representação.",
         "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
       ]
+    },
+    {
+      "sampleId": "rfb:108391",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "455c0bd8f8940ecde98b20a78c1bfa6a58f7b064004c529e7d083515d34e120a",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:108391 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "rfb:115131",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "scope": "offline",
+      "entrySha256": "54b3b1e7366d28111bfe8764e0afcbe477f19d981ba7eff4218fd4674b318bc3",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:115131 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "rfb:133898",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "503f4d6ec245dcbff96a4186d9e4b835ed084907c3c0fa32630e62799fb96e13",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:133898 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "rfb:142967",
+      "cellId": "rfb--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "c7edc7acac66aa5ca6b709d20f0f5c1e78dc4e7dcb4e654198d17870064d62d8",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:142967 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "rfb:148693",
+      "cellId": "rfb--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "60d7b6d6df533fec350ffd2c51697ddeb7d1dfc1aa15b1e59ec923768da5d357",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:148693 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "rfb:37103",
+      "cellId": "rfb--ato-declaratorio-interpretativo--pequeno",
+      "scope": "offline",
+      "entrySha256": "6b3a1b86e2be26fd874db78cef524978d97b4aa404ebd8308f85779b7dbfab23",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:37103 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "rfb:148629",
+      "cellId": "rfb--ato-declaratorio-executivo--pequeno",
+      "scope": "offline",
+      "entrySha256": "f50d71e6075dbebaf6b079e58545d9255f10bef01b3cdbdf88cecb7b514bb00f",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:148629 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "rfb:122645",
+      "cellId": "rfb--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "2f7792a6fb5f28b8f5164d22173fe10009f717441056233c6f0d5fa8f31250d5",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "A amostra comprova somente o respectivo porte e tipo no layout JSON multivigente da API normasinternet2, com preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "rfb:122645 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M14",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "ea2665182926f464c41af8a151b6d2feac58d8a9d070ff406be7574389d14b1f",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M14 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M16",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "fec729f6b76f365d6f8e4f929256cec4e81a0e1230bfaefc42f89e43b255e25f",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M16 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M18",
+      "cellId": "confaz--ajuste-sinief--pequeno",
+      "scope": "offline",
+      "entrySha256": "3f892a8c5481b915298fa39960bb777f77144c4eafaa84a6c5988719a585e71a",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M18 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M19",
+      "cellId": "confaz--ajuste-sinief--grande",
+      "scope": "offline",
+      "entrySha256": "f92b0bbb91ff78642174b27866dde1e895118447b2f079dbc600b20d5b1139d3",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M19 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M20",
+      "cellId": "confaz--protocolo-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "2019ad5acc2cbaf3b7132d36bfaf224dd996dd968e021f65427ed045e6f3f0dc",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML Plone do CONFAZ, no recorte comprovado do ato. Não abrange outros portais ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M20 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M23",
+      "cellId": "dou--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "3102746dfe671b1f3c770e9e81357237e2a19c1df0ab4c20f3c6bf6799e4f615",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M23 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M24",
+      "cellId": "dou--instrucao-normativa--medio",
+      "scope": "offline",
+      "entrySha256": "021983ad77cf35a316ef13a47bd76528fc63026f252016b8409575aa18580765",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M24 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M28",
+      "cellId": "dou--decreto--grande",
+      "scope": "offline",
+      "entrySha256": "e55cb96e60ef508e2f0110dac86c82b08d0c1f490980d3f8f17266b6a6bf49a2",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M28 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M29",
+      "cellId": "dou--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "a197caff5809c48eb61b5b3251f1eac89f7a486578a01e943310b2776ef6b3b9",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M29 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M30",
+      "cellId": "dou--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "7f9eaab443dd1e49ab136a63aac91f6903ebdf32aaddcdce88087b5133a5176f",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M30 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M32",
+      "cellId": "dou--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "1b33c1d9eb4422bcf53a590f7bc48f1b6ce89d75aee4a0852b917dfeb875544e",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M32 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M33",
+      "cellId": "dou--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "43bad96535fcb37c277b6cd8135d7ef3ddcaea1b2018078db5a2a66260fea166",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Somente o respectivo tipo e porte no HTML da página do ato no in.gov.br, no recorte comprovado do ato. Não abrange página PDF, XML ou recursos externos.",
+        "Aceite técnico de leitura. legalStatus permanece unknown.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M33 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M26",
+      "cellId": "dou--decreto--pequeno",
+      "scope": "offline",
+      "entrySha256": "6f487f2bac50949d3ca02e097d531464f1e693b564c285869a686d057aa4b1f2",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Somente o tipo e porte registrados para o HTML oficial comprovado do DOU, incluindo os anexos preservados na mesma representação.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M26 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "http:M4",
+      "cellId": "confaz--convenio-icms--grande",
+      "scope": "offline",
+      "entrySha256": "e654d38a75d9503643946107ebceafbb636bba011db88a190ee715bd72d9cae8",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Convênio ICMS de porte grande no HTML Plone comprovado do CONFAZ, incluindo os apêndices e suas instruções preservadas.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "http:M4 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M34",
+      "cellId": "dou--resolucao--grande",
+      "scope": "offline",
+      "entrySha256": "e9e062e091caa2741989db2331baaed189c9f2b6cb8979d752ad8ac34bdaaad7",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Somente o tipo e porte registrados para o HTML oficial comprovado do DOU, incluindo os anexos preservados na mesma representação.",
+        "Leitura offline. legalStatus permanece unknown. Revisão independente e autorização explícita para merge."
+      ],
+      "revalidates": "M34 @ 9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa"
+    },
+    {
+      "sampleId": "M10",
+      "cellId": "planalto--lei--pequeno",
+      "scope": "offline",
+      "entrySha256": "2fd6631fd41ac0ba51f5430b3834826a4b6b06246698e11769f20ad05a84edaa",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline e limitado ao HTML preservado do Planalto ccivil_03, com decodificação aprovada por amostra. legalStatus permanece unknown."
+      ]
+    },
+    {
+      "sampleId": "M12",
+      "cellId": "planalto--lei--medio",
+      "scope": "offline",
+      "entrySha256": "ee52e3c493beca11f89ca869930c3bc16b267689db3c20ab3ecebd9759f5a822",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline e limitado ao HTML preservado do Planalto ccivil_03, com decodificação aprovada por amostra. legalStatus permanece unknown."
+      ]
+    },
+    {
+      "sampleId": "http:M1",
+      "cellId": "planalto--lei--grande",
+      "scope": "offline",
+      "entrySha256": "656b9a174bf1a2847bde05915adadd6cdccc1d25715a5cd1868c2721f053e1b1",
+      "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R5)",
+      "decidedOn": "2026-11-22",
+      "ref": "Mandato COORD R5 offline de 22/11/2026 | tribusca-control#116 c.7089603345 (base R4) | ops/anatomy/e9-acervo/motor-r5/equivalence.json",
+      "limits": [
+        "Escopo offline e limitado ao HTML preservado do Planalto ccivil_03, com decodificação aprovada por amostra. legalStatus permanece unknown.",
+        "A célula grande é sustentada somente por http:M1 (Lei 10.637/2002). http:M2 (Lei 10.833/2003) permanece parcial por itens numerados não classificados, tabela TIPI aninhada e resíduos editoriais."
+      ]
     }
   ]
 }
