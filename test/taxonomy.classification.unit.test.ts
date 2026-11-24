@@ -185,6 +185,10 @@ test('automotive application needs an affirmative clause in the title or first n
     ['Convênio ICMS', 'Os valores das saídas de caminhões não integram a base de cálculo.', true, 'exclusion from tax base applies to trucks'],
     ['Convênio ICMS', 'Concede isenção a caminhões e não a reboques.', true, 'first object remains in scope'],
     ['Convênio ICMS', 'Concede isenção a máquinas agrícolas e não a caminhões.', false, 'second object is outside scope'],
+    ['Convênio ICMS', 'Dispõe sobre operações com veículos automotores.', true, 'automotive terminology in use in official acts'],
+    ['Convênio ICMS', 'É vedado o crédito nas operações com autopeças.', true, 'prohibition applies to automotive goods'],
+    ['Convênio ICMS', 'Concede isenção a caminhões conforme o Convênio ICMS 133/02.', true, 'trailing reference preserves scope'],
+    ['Convênio ICMS', 'Concede isenção a máquinas conforme o Convênio ICMS 133/02 sobre caminhões.', false, 'reference alone does not establish scope'],
   ];
   for (const [title, text, expected, why] of cases) assert.equal(hasAutomotiveApplication(title, text), expected, why);
   for (const exclusion of ['não se aplica a', 'não alcança', 'não abrange', 'não compreende', 'não inclui', 'não se estende a', 'não beneficia', 'exceto', 'salvo', 'ressalvados', 'excluídos', 'com exceção de']) {

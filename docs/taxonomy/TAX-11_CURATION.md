@@ -128,6 +128,10 @@ site os filtrava e nunca salvou códigos dessas dimensões).
 
 ### Segmento "Automotivo e equipamentos de transporte" (#336)
 
+- **Pré-requisito do TAX-11:** o teste de integração usa a edição `CURRENT` do catálogo oficial `NCM`
+  e insere nela o item sintético `8704.21.10` caso ainda não exista. A edição deve estar disponível
+  no banco descartável antes da execução do teste, como na sequência de atualização do catálogo do CI.
+
 - **Alcance:** vale para **todas** as promoções desse segmento derivadas dos produtos marcados (qualquer grupo
   ligado a ele, não só "Veículos"/capítulo 87). As tags de produto, os NCMs e o grupo continuam registrados como
   evidência do ato; só a promoção do segmento muda.
