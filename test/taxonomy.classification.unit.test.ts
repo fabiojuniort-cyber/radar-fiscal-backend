@@ -179,6 +179,15 @@ test('automotive application needs an affirmative clause in the title or first n
     ['Convênio ICMS', '\n\nConcede isenção nas saídas de caminhões.', true, 'first non-blank line'],
     ['Isenção para caminhões', null, true, 'title'],
     ['Convênio ICMS', 'Concede isenção a caminhões, não se aplicando a reboques.', true, 'affirmative clause next to an exclusion'],
+    ['Convênio ICMS', 'Não incide ICMS nas saídas de caminhões.', true, 'non-incidence applies to trucks'],
+    ['Convênio ICMS', 'Regime não cumulativo nas operações com autopeças.', true, 'non-cumulative regime applies to parts'],
+    ['Convênio ICMS', 'O benefício não deixa de alcançar caminhões.', true, 'scope remains affirmative'],
+    ['Convênio ICMS', 'Os valores das saídas de caminhões não integram a base de cálculo.', true, 'exclusion from tax base applies to trucks'],
+    ['Convênio ICMS', 'Concede isenção a caminhões e não a reboques.', true, 'first object remains in scope'],
+    ['Convênio ICMS', 'Concede isenção a máquinas agrícolas e não a caminhões.', false, 'second object is outside scope'],
   ];
   for (const [title, text, expected, why] of cases) assert.equal(hasAutomotiveApplication(title, text), expected, why);
+  for (const exclusion of ['não se aplica a', 'não alcança', 'não abrange', 'não compreende', 'não inclui', 'não se estende a', 'não beneficia', 'exceto', 'salvo', 'ressalvados', 'excluídos', 'com exceção de']) {
+    assert.equal(hasAutomotiveApplication('Convênio ICMS', `O benefício ${exclusion} caminhões.`), false, exclusion);
+  }
 });

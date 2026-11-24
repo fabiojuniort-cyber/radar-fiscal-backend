@@ -42,6 +42,16 @@ if (!process.env.DB_CURATOR_RUNTIME_PASSWORD) {
   throw new Error('DB_CURATOR_RUNTIME_PASSWORD is required for the curation gate');
 }
 
+assert.equal(process.env.CI, 'true', 'TAX-11 requires disposable CI');
+assert.equal(process.env.NODE_ENV, 'test', 'TAX-11 requires NODE_ENV=test');
+for (const connectionString of [adminUrl, process.env.DATABASE_URL, process.env.DATABASE_CURATOR_URL]) {
+  if (!connectionString) continue;
+  const url = new URL(connectionString);
+  assert.ok(['localhost', '127.0.0.1'].includes(url.hostname), 'TAX-11 requires a loopback database');
+  assert.equal(url.pathname, '/radar_fiscal_test', 'TAX-11 requires the disposable test database');
+  assert.equal(url.search, '', 'TAX-11 forbids connection override parameters');
+}
+
 const PASSWORD = 'Curadoria-Segura-2026!';
 let MAJOR = 70;
 
