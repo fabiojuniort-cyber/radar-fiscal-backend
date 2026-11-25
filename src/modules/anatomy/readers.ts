@@ -627,12 +627,45 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     }
     return null;
   };
+  const rfbListPeer = (seg: RfbSeg, step: 1 | -1): number => {
+    const start = dom.children.indexOf(seg.section);
+    if (start < 0) return 0;
+    for (let i = start + step; i >= 0 && i < dom.children.length; i += step) {
+      const sibling = dom.children[i]!;
+      if (sibling.attrs['data-rfb-segment'] === undefined || sibling.attrs['data-rfb-type-issue']) return 0;
+      const type = (sibling.attrs['data-rfb-type'] ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+      if (type === 'alinea' || type === 'item') continue;
+      if (type !== 'inciso' && !type.startsWith('nao identific')) return 0;
+      const text = matchText(sibling).trim();
+      if (!text) continue;
+      // The current list skips superseded versions; a historical inciso can use a
+      // corroborating adjacent replacement at the same ordinal or a prior peer.
+      if (!seg.tachado && sibling.attrs['data-rfb-tachado'] === 'true') continue;
+      return roman(/^([IVXLCDM]+)(?:\s*[-–—]\s*|\s+)[\p{L}\d]/u.exec(text)?.[1] ?? '');
+    }
+    return 0;
+  };
+  const rfbListIntroductions = new Set<string>();
+  const rfbCorroborateListItem = (seg: RfbSeg, type: string, text: string): Descriptor | null => {
+    if (!type.startsWith('nao identific')) return null;
+    const ordinal = roman(/^([IVXLCDM]+)\s+[\p{L}\d]/u.exec(text)?.[1] ?? '');
+    const device = logical.findLast(({ part }) => part.type === 'article' || part.type === 'paragraph' || part.type === 'clause');
+    if (!ordinal || !device || device.part.context === 'prohibited') return null;
+    const next = rfbListPeer(seg, 1);
+    const previous = rfbListPeer(seg, -1);
+    const introduced = rfbListIntroductions.has(device.part.id);
+    const first = ordinal === 1 && next === 2 && introduced;
+    const continuation = ordinal > 1 && previous === ordinal - 1 && (!seg.tachado || introduced);
+    const replacement = seg.tachado && next === ordinal;
+    if (!first && !continuation && !replacement) return null;
+    return { type: 'inciso', context: seg.tachado ? 'historical' : 'operative_candidate', reason: 'rfb_corroborated_inciso_list', rank: 5 };
+  };
   const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }, text: string): Descriptor => {
     if (seg.issue) { limitation(`rfb_segment_${seg.issue}`, `RFB segment ${seg.pointer ?? '?'}: declared type ${seg.issue.replace(/_/gu, ' ')}; no type was guessed.`, span); return current; }
     const sig = (seg.type ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
     if (!sig) return current;
     if (current.type === 'unidentified') {
-      const corroborated = rfbContent(seg, sig, text);
+      const corroborated = rfbContent(seg, sig, text) ?? rfbCorroborateListItem(seg, sig, text);
       if (corroborated) return corroborated;
     }
     if (sig.startsWith('nao identific')) { if (current.type === 'unidentified') limitation('rfb_segment_type_unidentified_by_source', `RFB segment ${seg.pointer ?? '?'}: the source itself declares the type as not identified.`, span); return current; }
@@ -681,7 +714,9 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const hasBlock = node.children.some((child) => blocks.has(child.tag))
       || (portal?.source === 'DOU' && hasNestedDouBody(node));
     const quotedDom = quotedAncestor || node.tag === 'blockquote' || node.tag === 'q';
-    if (blocks.has(node.tag) && !hasBlock && node.span.end > node.span.start) {
+    const spPageTitle = spPortal && node.tag === 'title' && dom.children[0]?.children.includes(node)
+      && /^(?:LIVRO|T[IÍ]TULO|CAP[IÍ]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|ANEXO)\s+(?:[IVXLCDM]+|\d+)\s*[-–—]\s*\p{L}/iu.test(matchText(node).trim());
+    if ((blocks.has(node.tag) || spPageTitle) && !hasBlock && node.span.end > node.span.start) {
       const text = matchText(node).trim();
       const inlineQuote = hasInlineQuote(node);
       const wasQuoted = openQuotation || inlineQuote || quotedDom;
@@ -779,6 +814,9 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           descriptor = { type: 'annex', context: 'operative_candidate', reason: 'planalto_sole_annex', rank: 2 };
         }
       }
+      if (spPageTitle && !wasQuoted && !openQuotation) {
+        descriptor = { type: 'publication_header', context: 'prohibited', reason: 'sefaz_sp_portal_page_title', rank: 100 };
+      }
       if (spPortal && !markerText(node).trim()) return;
       const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(leadingZwsp ? markerText(node).trim() : text));
       if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
@@ -829,6 +867,8 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           && layoutWhitespace.test(result.canonicalText.slice(node.span.start, node.span.end))) return;
       if (portal?.source === 'PLANALTO') planaltoPrevious = { node, reason: descriptor.reason, rank: descriptor.rank };
       const part = attach(node, descriptor);
+      if (rfbSeg && (part.type === 'article' || part.type === 'paragraph' || part.type === 'clause')
+        && /:\s*$/u.test(text)) rfbListIntroductions.add(part.id);
       if (llegPlaceholder) for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_revoked_placeholder');
       if (llegAmbiguous) {
         for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_note_ambiguous');
@@ -910,7 +950,9 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const owner = owners.sort((a, b) => (a.end - a.start) - (b.end - b.start) || Number(b.part.id.slice(5)) - Number(a.part.id.slice(5)))[0]?.part;
     if (!owner) {
       // Avoid overlapping siblings: uncovered pieces belong to the root, whose recognition is only structural.
-      const structural = portalLayout && layoutWhitespace.test(result.canonicalText.slice(start, end));
+      const text = result.canonicalText.slice(start, end);
+      const structural = (portalLayout || spProven) && layoutWhitespace.test(text)
+        || spProven && start === 0 && /^[\p{White_Space}\u200B]*$/u.test(text);
       result.coverage.segments.push({ span: { start, end }, partId: root.id, classification: structural ? 'recognized' : 'unidentified' });
       if (structural) result.coverage.recognizedLength += end - start;
     } else {

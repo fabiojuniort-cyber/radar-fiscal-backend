@@ -224,3 +224,24 @@ test('R5 Planalto preserves ordinal-only strike and restores anchored article in
       .every(part => part.context === 'prohibited'));
   }
 });
+
+test('R6 RFB corroborates bare ordinals without promoting historical versions or crossing devices', () => {
+  const segment = (n: number, type: string, text: string, struck = false) =>
+    '<section data-rfb-segment="' + n + '" data-rfb-type="' + type + '"'
+    + (struck ? ' data-rfb-tachado="true"' : '') + '><p>' + text + '</p></section>';
+  const unknown = 'nao identificad';
+  const html = segment(1, 'artigo', 'Art. 1 Applies to the following:')
+    + segment(2, unknown, 'I Descri\u00e7\u00e3o:')
+    + segment(3, 'alinea', 'a) condi\u00e7\u00e3o;')
+    + segment(4, unknown, 'II 50% do valor.', true)
+    + segment(5, 'inciso', 'II - 25% do valor.')
+    + segment(6, 'artigo', 'Art. 2 Dispositivo seguinte.')
+    + segment(7, unknown, 'III Texto isolado.');
+  const r = readAnatomyInput({ source: 'RFB', representationId: 'r6-fixture', html });
+  const part = (label: string) => r.parts.find(p => p.label.startsWith(label));
+  assert.equal(part('I Descri')?.type, 'inciso');
+  assert.equal(part('a) condi')?.parentId, part('I Descri')?.id);
+  assert.equal(part('II 50%')?.context, 'historical');
+  assert.equal(part('II - 25%')?.context, 'operative_candidate');
+  assert.equal(part('III Texto')?.type, 'unidentified');
+});

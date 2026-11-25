@@ -146,3 +146,18 @@ test('R2-SP-01 adversarial (L17): forged wrapper / declared source / look-alike 
   // control: the genuine issued preparation does enable them
   assert.equal(at(readPrepared(real), 'II - segunda hipótese, redação anterior').context, 'historical');
 });
+
+test('R6 recognizes only a proven SEFAZ-SP page title and structural separators', () => {
+  const heading = '<title>SE\u00c7\u00c3O III - DA ISEN\u00c7\u00c3O</title>';
+  const article = '<p><b>Artigo 1\u00ba</b> - Dispositivo de teste.</p>';
+  const rendered = readPrepared(prep(page(heading + '  \n  ' + article)));
+  const title = rendered.parts.find(p => p.contextReasons.includes('sefaz_sp_portal_page_title'));
+  assert.equal(title?.type, 'publication_header');
+  assert.equal(title.context, 'prohibited');
+  assert.ok(rendered.coverage.segments.every(segment => segment.classification !== 'unidentified'));
+  assert.ok(rendered.limitations.some(l => l.code === 'sefaz_sp_portal_local_preparation_only'));
+  const nested = readPrepared(prep(page('<section>' + heading + article + '</section>')));
+  assert.ok(!nested.parts.some(p => p.contextReasons.includes('sefaz_sp_portal_page_title')));
+  const unrecognized = readPrepared(prep(page('<title>Texto sem evid\u00eancia estrutural</title>' + article)));
+  assert.ok(unrecognized.coverage.segments.some(segment => segment.classification === 'unidentified'));
+});
