@@ -12,11 +12,19 @@
   "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
   "bytes": 156994,
   "consultedAt": "2026-11-05T18:22:01.564Z",
-  "urlStatus": "candidate",
-  "urlVerified": false,
+  "urlStatus": "verified",
+  "urlVerified": true,
   "representation": "html",
-  "verified": false,
+  "verified": true,
   "reason": "COLETA-02 item 6 (L21/regressão L14–L17): artigo sem escolha dirigida",
   "origin": "automated fetch via consultOfficial (COLETA-02)",
-  "promoted": false
+  "promoted": false,
+  "manualCorroboration": {
+    "commit": "7c5271a5efb0b953bf10cd9b47effe86ebc83bd8",
+    "url": "https://legislacao.fazenda.sp.gov.br:443/Paginas/art008.aspx",
+    "receivedBy": "2026-11-25T02:22:26Z",
+    "bytes": 155425,
+    "sha256": "75c5ffda5c6e13f77bb018d70429573ce48ca3ec412583ce97d574d82b9b3a32",
+    "regionSha256": "b9c0d6d9c1a8dae88652d366a5f4fccdf3f5e36aee0a9482a2499b548357e038"
+  }
 }

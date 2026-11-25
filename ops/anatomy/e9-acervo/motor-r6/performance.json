@@ -1,0 +1,7 @@
+{
+  "baseMilliseconds": 36350,
+  "candidateMilliseconds": 37203,
+  "combinedPeakRssKiB": 801264,
+  "node": "v24.21.0",
+  "platform": "win32"
+}

@@ -4,6 +4,8 @@ import { ANATOMY_CONTRACT_VERSION, anatomyIdentityHash, anatomyOutputHash, canon
   validateAnatomyResult, type AnatomyResult } from './contract.js';
 import { extractAnatomyEntities, extractRecoveredEntities } from './entities.js';
 import { NfcQuarantineError } from './nfc-recovery.js';
+import type { NormasLegPreparation } from './normas-leg-preparation.js';
+import type { OfficialActPreparation } from './official-portal-preparation.js';
 import { readAnatomyInput, identifyNcmPartIds, ANATOMY_READER_LIMITS, NON_NFC_TEXT, shadowContextOf } from './readers.js';
 import { DEFAULT_PROFILES, PROFILE_FORMAT_VERSION, resolveEffectiveProfile } from './profile.js';
 import { compileProfileRules } from './profile-rules.js';
@@ -15,8 +17,10 @@ const requestSchema = z.strictObject({
   publicationVersionId: z.string().min(1).max(256),
   referenceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   ruleSet: z.strictObject({ id: z.string().min(1).max(256), version: z.string().min(1).max(256) }),
-  input: z.strictObject({ source: z.enum(['CONFAZ', 'DOU', 'DOE-SP', 'RFB', 'SEFAZ-SP-PORTAL']), representationId: z.string().min(1).max(256),
+  input: z.strictObject({ source: z.enum(['NORMAS-LEG', 'PLANALTO', 'CONFAZ', 'DOU', 'DOE-SP', 'RFB', 'SEFAZ-SP-PORTAL']), representationId: z.string().min(1).max(256),
     html: z.string().optional(), text: z.string().optional(), missingResources: z.array(z.string().min(1)).optional(),
+    normasLeg: z.custom<NormasLegPreparation>((v) => v !== null && typeof v === 'object').optional(),
+    officialAct: z.custom<OfficialActPreparation>((v) => v !== null && typeof v === 'object').optional(),
     // ANAT-L17: out-of-band provenance for SEFAZ-SP-PORTAL. Kept by reference (never cloned or rebuilt from data), so
     // only the object issued by prepareSefazSpPortalPage can pass verification; serialized JSON never does.
     sefazSpPortal: z.custom<SefazSpPortalPreparation>((v) => typeof v === 'object' && v !== null).optional(),
@@ -57,6 +61,9 @@ export function analyzeAnatomy(rawRequest: AnatomyRequest): AnatomyResult {
     const options = { ncmPartIds: identifyNcmPartIds(read, rules), ...(catalog ? { catalog } : {}), rules };
     entities = recovered ? extractRecoveredEntities(read, options)
       : extractAnatomyEntities({ canonicalText: read.canonicalText, parts: read.parts, ...options });
+    if (new Set(entities.map((entity) => entity.id)).size !== entities.length) {
+      throw new TypeError('Entity extraction produced conflicting spans');
+    }
   } catch (error) {
     entities = [];
     read.status = 'partial';

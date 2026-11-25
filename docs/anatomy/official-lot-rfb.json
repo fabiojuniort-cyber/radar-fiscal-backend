@@ -1,5 +1,5 @@
 {
-  "engineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+  "engineBuildHash": "a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
   "acts": [
     {
       "idAto": 37103,
@@ -16,9 +16,9 @@
       "preparationReconciliation": "identical",
       "preparationVersion": "rfb-api-original/0.2.0-provisional",
       "preparedHtmlSha256": "5497716e92ccfe3067f84215b423b3d93a23c579f50a58f64293152534e10c01",
-      "status": "partial",
+      "status": "complete",
       "canonicalChars": 3106,
-      "unidentifiedChars": 31,
+      "unidentifiedChars": 0,
       "partTypes": {
         "document": 1,
         "summary": 1,
@@ -27,18 +27,15 @@
         "caput": 3,
         "paragraph": 1,
         "inciso": 3,
-        "unidentified": 1
+        "signature": 1
       },
-      "limitations": {
-        "rfb_segment_type_unmapped": 1,
-        "unidentified_content": 1
-      },
+      "limitations": {},
       "historicalByTachado": 2,
       "historicalContextParts": 3,
       "struckSegments": 2,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "16178793cc25b02306c51121556053049b2c4d3521ffaa90a790361c7567beee",
+      "outputHash": "63b6f9e6170e5f341900e8f9e6f95625b049a4d872e7aa6fd56f7019217eeb9e",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -88,7 +85,7 @@
       "struckSegments": 4002,
       "attachmentsWithoutContent": 30,
       "missingSegments": 0,
-      "outputHash": "79ecd0a80d370a8abb01e5e4fedfd90b0a2693971c7b58b749fbd068bbb741fb",
+      "outputHash": "c2fc06f1fd14d638ba18675dbbf6fd4d7fbf1ff7fbdb6b83aee51a1636493f5c",
       "inlineAttachments": {
         "total": 30,
         "states": {
@@ -130,7 +127,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "6a89b040df113d0ba55dca792fdd6159131fe4dda63903b1a9f13df4050168a4",
+      "outputHash": "3583b7dcbd50d076c6c190a932e7b7681cc814ebc2314a927c4e47f7efc1cdf6",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -173,7 +170,7 @@
       "struckSegments": 343,
       "attachmentsWithoutContent": 0,
       "missingSegments": 1,
-      "outputHash": "eafc0e6099a5297089bf872a48f5484e2567e75723f50cb15032c797581d3f19",
+      "outputHash": "3f3196a67c627915c79981e4272c713539c5649b51bff7577ff327ed94687099",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -224,7 +221,7 @@
       "struckSegments": 136,
       "attachmentsWithoutContent": 35,
       "missingSegments": 0,
-      "outputHash": "4da0129345ab36d1fddbe7ebb13614bd6e738771acadd90d59d451e882ee9172",
+      "outputHash": "f2e3cf3fa63b4ff1df98a9ea10d97d6a1411273de22e2f525482e2bdcf34372c",
       "inlineAttachments": {
         "total": 35,
         "states": {
@@ -248,28 +245,25 @@
       "preparationReconciliation": "identical",
       "preparationVersion": "rfb-api-original/0.2.0-provisional",
       "preparedHtmlSha256": "ca7a127719047228d85dc98a622c34a0c906dfd2828b39fdefbdc78c5be07e2b",
-      "status": "partial",
+      "status": "complete",
       "canonicalChars": 2167,
-      "unidentifiedChars": 272,
+      "unidentifiedChars": 0,
       "partTypes": {
         "document": 1,
         "summary": 1,
-        "unidentified": 1,
+        "preamble": 1,
         "article": 3,
         "caput": 3,
         "quoted_text": 4,
         "signature": 1
       },
-      "limitations": {
-        "rfb_segment_type_unidentified_by_source": 1,
-        "unidentified_content": 1
-      },
+      "limitations": {},
       "historicalByTachado": 1,
       "historicalContextParts": 2,
       "struckSegments": 1,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "682cd98a357e730c27da5e59a8b327a69145b5dc1a037c39acffffb98382cc42",
+      "outputHash": "f3d92939cb0cc1c97092bd789eda03c0361c7d2b288766309ceb57c9f7bc3aa2",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -318,7 +312,7 @@
       "struckSegments": 608,
       "attachmentsWithoutContent": 31,
       "missingSegments": 0,
-      "outputHash": "072df832520c424baff8b36c27706897e9fad2a226790927748749e2dcf329d7",
+      "outputHash": "1dd23c90ff92a4c408fefccce4284678c12931b197cda170772f46bc3dcbcecb",
       "inlineAttachments": {
         "total": 31,
         "states": {
@@ -371,7 +365,7 @@
       "struckSegments": 19,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "6a09eb3e6a607c98de566da588dc44d3171ac96e6bca011319eba8487137214c",
+      "outputHash": "99e03c78601d84174ea767796463b371bc5114622395c2ad4564a8a666120dfa",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -393,9 +387,9 @@
       "preparationReconciliation": "identical",
       "preparationVersion": "rfb-api-original/0.2.0-provisional",
       "preparedHtmlSha256": "96fa2cdc42cfea85a5bc65f06d5cece9304713f7b091218d1e31bc351624fa6f",
-      "status": "partial",
+      "status": "complete",
       "canonicalChars": 31389,
-      "unidentifiedChars": 11279,
+      "unidentifiedChars": 0,
       "partTypes": {
         "document": 1,
         "summary": 1,
@@ -404,23 +398,18 @@
         "article": 22,
         "caput": 22,
         "paragraph": 66,
-        "unidentified": 85,
+        "inciso": 88,
         "alinea": 27,
-        "inciso": 3,
         "item": 2,
         "signature": 1
       },
-      "limitations": {
-        "rfb_segment_type_unidentified_by_source": 85,
-        "rfb_tachado_evidence": 4,
-        "unidentified_content": 1
-      },
+      "limitations": {},
       "historicalByTachado": 10,
       "historicalContextParts": 12,
       "struckSegments": 10,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "fb822c6494cb018dfec5dfe8c328c5a5f5bf7005fce0d8e53a4dc76377c6f63b",
+      "outputHash": "9db9dc958fd582b0e858be12d15f9db64675bed71a1bf96913c88e6c4e23e3d4",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -460,7 +449,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "ad5fbe2b65a7307746330626b2e705ee8612d8b79499fc33d6ac59f57aa21433",
+      "outputHash": "b5a51693b1cb723c66ea047d6b54b6841fe1bda2b4ac07883582c4a72347d7f2",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -482,29 +471,26 @@
       "preparationReconciliation": "identical",
       "preparationVersion": "rfb-api-original/0.2.0-provisional",
       "preparedHtmlSha256": "bb6b7ac3e00593d95f73248188c6839ccdc672d9cdebba3ec29a8b96fd31e5c2",
-      "status": "partial",
+      "status": "complete",
       "canonicalChars": 10620,
-      "unidentifiedChars": 262,
+      "unidentifiedChars": 0,
       "partTypes": {
         "document": 1,
         "summary": 1,
-        "unidentified": 2,
+        "preamble": 2,
         "article": 18,
         "caput": 18,
         "paragraph": 12,
         "inciso": 17,
         "signature": 1
       },
-      "limitations": {
-        "rfb_segment_type_unidentified_by_source": 2,
-        "unidentified_content": 1
-      },
+      "limitations": {},
       "historicalByTachado": 0,
       "historicalContextParts": 0,
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "904e9567c56bd85cf99096d70ac45559b9045f57577a7f1fc815485d8a6416bc",
+      "outputHash": "ca4399f75e64e380960a2eeb6768e8518f876db4a065c4bd9824b1dca8a33943",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -526,27 +512,24 @@
       "preparationReconciliation": "identical",
       "preparationVersion": "rfb-api-original/0.2.0-provisional",
       "preparedHtmlSha256": "35c3ee36dd403472450fa2c70b86e99ce2e1b3bae3d91d635a824f9c6a61333e",
-      "status": "partial",
+      "status": "complete",
       "canonicalChars": 1140,
-      "unidentifiedChars": 415,
+      "unidentifiedChars": 0,
       "partTypes": {
         "document": 1,
         "summary": 1,
-        "unidentified": 1,
+        "preamble": 1,
         "article": 3,
         "caput": 3,
         "signature": 1
       },
-      "limitations": {
-        "rfb_segment_type_unidentified_by_source": 1,
-        "unidentified_content": 1
-      },
+      "limitations": {},
       "historicalByTachado": 0,
       "historicalContextParts": 0,
       "struckSegments": 0,
       "attachmentsWithoutContent": 1,
       "missingSegments": 0,
-      "outputHash": "4e986af6cb55e1485216729d0b4dc6c99f325e93629fd87a7ae652e829d242a9",
+      "outputHash": "e2ddf2a743a777c2793353f95e15a3708154755e6b4fac628e52dbecca744f5d",
       "inlineAttachments": {
         "total": 1,
         "states": {
@@ -595,7 +578,7 @@
       "struckSegments": 2,
       "attachmentsWithoutContent": 2,
       "missingSegments": 0,
-      "outputHash": "de08121b3053dbd45da2d55bc78458cb94366788db3f0b17cfa3ad8ba5e702c3",
+      "outputHash": "453f91ed2cbb921a149be3bb4f65193b79daab7873ce2e755a218c6005c1e40c",
       "inlineAttachments": {
         "total": 2,
         "states": {
@@ -641,7 +624,7 @@
       "struckSegments": 2,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "fce0294f4abc8963d1a88e7000d7bddb81d42d5ca32b1573a366f77b005187bb",
+      "outputHash": "7bf27f8d5e2fc88628db3d54e909de11d9f60bdd4d9045807f6ef8dcc4a05822",
       "inlineAttachments": {
         "total": 0,
         "states": {},

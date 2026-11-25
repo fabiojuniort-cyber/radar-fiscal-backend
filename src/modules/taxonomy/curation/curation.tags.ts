@@ -1,5 +1,6 @@
 import { collectionFilterCatalogVisibilitySql } from '../../collection/collection-filter.catalog-visibility.js';
 import {
+  allowsDerivedSegment,
   CURATED_ENGINE_KEY,
   CURATED_ENGINE_VERSION,
 } from '../classification/classification.curated.js';
@@ -153,9 +154,15 @@ export async function loadPublicationTaxonomy(
       status: 'SUCCESS' | 'FAILED';
       run_id: string | null;
       scanned_at: Date | string;
+      automotive_application: boolean | null;
     }>(
       `
-        SELECT status, run_id, scanned_at
+        SELECT status, run_id, scanned_at,
+          (
+            SELECT (r.config_snapshot ->> 'automotiveApplication')::boolean
+            FROM publication_taxonomy_runs r
+            WHERE r.id = publication_taxonomy_scans.run_id
+          ) AS automotive_application
         FROM publication_taxonomy_scans
         WHERE publication_version_id = $1::uuid
           AND taxonomy_release_id = $2::uuid
@@ -372,6 +379,7 @@ export async function loadPublicationTaxonomy(
     for (const [segmentCode, products] of productsBySegment) {
       const segment = conceptByCode.get(segmentCode);
       if (!segment || tags.has(segment.releaseConceptId)) continue;
+      if (!allowsDerivedSegment(segment.label, scan?.automotive_application)) continue;
       // A curator who removed the segment from this act has the last word.
       const removed = decisionByCode.get(segment.code)?.action === 'REMOVE';
       if (removed && !options.includeRemoved) continue;

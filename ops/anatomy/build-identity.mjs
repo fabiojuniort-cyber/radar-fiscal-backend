@@ -7,6 +7,7 @@ const files = ['package-lock.json', 'src/modules/anatomy/contract.ts', 'src/modu
   'src/modules/anatomy/entities.ts', 'src/modules/anatomy/engine.ts', 'src/modules/anatomy/consumer.ts', 'src/modules/anatomy/dou-preparation.ts', 'src/modules/anatomy/gold.ts', 'src/modules/anatomy/json-preparation.ts', 'src/modules/anatomy/sefaz-sp-preparation.ts', 'src/modules/anatomy/rfb-quote-resume.ts', 'src/modules/anatomy/rfb-inline-attachments.ts', 'src/modules/anatomy/profile.ts', 'src/modules/anatomy/profile-rules.ts',
   // UNICODE-01b/B2: NFC recovery path, its Unicode 17.0 table and the component manifest (Unicode version, UCD input hashes).
   'src/modules/anatomy/nfc-recovery.ts', 'src/modules/anatomy/nfc-shadow.ts', 'src/modules/anatomy/nfc-shadow-table.ts', 'docs/anatomy/nfc-shadow-manifest.json',
+  'src/modules/anatomy/official-portal-preparation.ts', 'src/modules/anatomy/normas-leg-preparation.ts',
   'ops/anatomy/build-identity.mjs'];
 const root = new URL('../../', import.meta.url);
 const digest = value => createHash('sha256').update(value, 'utf8').digest('hex');

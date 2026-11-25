@@ -1,0 +1,56 @@
+{
+  "originalLedgerSha256": "905930e58b8d13d988f88e1d912272087d9e8b76c4c3761ca83167246e186ac1",
+  "records": [
+    {
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "engineBuildHash": "817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe",
+      "entrySha256": "553caa08b3c86fb47c9f8f603016c5609ccb9f5565dd2564cc59a1fdc4b41aab",
+      "priorEngineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "priorEntrySha256": "370dbe3a7ba06c1e40a3bb2c664c2b9ef1da366dcfef1ae2c277ebb320a3f680",
+      "review": "proposed_append_only",
+      "sampleId": "rfb:108391",
+      "scope": "offline"
+    },
+    {
+      "cellId": "rfb--instrucao-normativa--grande",
+      "engineBuildHash": "817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe",
+      "entrySha256": "5913ae97522c29f723264822857cd8858143c0e27b9a215696124f3be996a718",
+      "priorEngineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "priorEntrySha256": "e1720a89b8dc84f8177f7b90403b50fdba0f9f7a5a5ac53db76751c51dc0976e",
+      "review": "proposed_append_only",
+      "sampleId": "rfb:115131",
+      "scope": "offline"
+    },
+    {
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "engineBuildHash": "817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe",
+      "entrySha256": "8fda4f6ae49f45f12791eca041a5181eb7e0736d53b799a59f7cb2834a45c222",
+      "priorEngineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "priorEntrySha256": "b2e3e81ea87e286c1bc7f2b6109f2c03549dce0beacecfb48ed5115851a449d7",
+      "review": "proposed_append_only",
+      "sampleId": "rfb:133898",
+      "scope": "offline"
+    },
+    {
+      "cellId": "rfb--portaria--pequeno",
+      "engineBuildHash": "817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe",
+      "entrySha256": "000ab717a271649aa6e53a3b2a4556b8d0af3a409416f6edeaf9dc41d180aa00",
+      "priorEngineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "priorEntrySha256": "9e1376e226813c02e187ad5759b445884f2744c56ee7ad27b692c713cbe310d7",
+      "review": "proposed_append_only",
+      "sampleId": "rfb:142967",
+      "scope": "offline"
+    },
+    {
+      "cellId": "rfb--portaria--medio",
+      "engineBuildHash": "817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe",
+      "entrySha256": "644f7870dcd899f4d794e252c9edda48711ccc64c9da9863a63519e6ed0ce1c6",
+      "priorEngineBuildHash": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+      "priorEntrySha256": "2958bdb0c4c1f9c30dfd98bc48263be23828db10063f4cc794f8463d975c1996",
+      "review": "proposed_append_only",
+      "sampleId": "rfb:148693",
+      "scope": "offline"
+    }
+  ],
+  "status": "proposal_only"
+}

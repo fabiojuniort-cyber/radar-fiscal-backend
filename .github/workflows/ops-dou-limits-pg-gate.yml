@@ -42,7 +42,7 @@ jobs:
           --health-retries 15
     env:
       NODE_ENV: test
-      MAIN_STATE_SHA: ee2e49d701c917b9bd9713db4b0c1c2d99315bc8
+      MAIN_STATE_SHA: 1d7eb224cba5b1d0befd8e03fc3ec03cc45673ee
       OPS_MIGRATION: 087_ops_dou_download_limits.sql
       DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
       DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test

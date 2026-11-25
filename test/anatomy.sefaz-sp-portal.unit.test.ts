@@ -95,7 +95,7 @@ test('L16 negative: quotation keeps precedence; unidentified revogado stays unkn
 const D = new URL('../ops/anatomy/official-identification/doesp-ricms/', import.meta.url);
 const official = (id: string) => {
   const meta = JSON.parse(readFileSync(new URL(`${id}.meta.json`, D), 'utf8')); const bytes = new Uint8Array(readFileSync(new URL(`${id}.html`, D)));
-  assert.equal(meta.promoted, false); assert.equal(meta.verified, false);
+  assert.equal(meta.promoted, false); assert.equal(meta.verified, true); assert.equal(meta.urlVerified, true); assert.match(meta.manualCorroboration?.sha256 ?? '', /^[a-f0-9]{64}$/u);
   assert.equal(createHash('sha256').update(bytes).digest('hex'), meta.sha256, 'raw snapshot untouched');
   const p = prepareSefazSpPortalPage({ resourceId: id, url: meta.url, bytes });
   const run = (html: string) => analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-05', ruleSet: { id: 'sp', version: '1' },
@@ -122,7 +122,7 @@ test('L14–L16 official RICMS/2000 art. 7º: unidentified 20.065 → 0 chars (1
 test('L14–L16 official RICMS/2000 Anexo II art. 39: inciso II current operative + two earlier wordings historical', () => {
   const { after, before, engine, unid } = official('ricms-an2art039');
   assert.equal(unid(engine), 974, 'DOE-SP reading: L14 only'); assert.ok(!engine.parts.some((x) => x.type === 'editorial_note' || x.context === 'historical'));
-  assert.equal(unid(before), 18519); assert.equal(unid(after), 68);
+  assert.equal(unid(before), 18519); assert.equal(unid(after), 0, 'the annex context heading is identified');
   const inc2 = after.parts.filter((x) => x.type === 'inciso' && /^II - /u.test(after.canonicalText.slice(x.span.start, x.span.end)));
   assert.equal(inc2.length, 3);
   assert.deepEqual(inc2.map((x) => x.context), ['operative_candidate', 'historical', 'historical']);
@@ -145,4 +145,19 @@ test('R2-SP-01 adversarial (L17): forged wrapper / declared source / look-alike 
   }
   // control: the genuine issued preparation does enable them
   assert.equal(at(readPrepared(real), 'II - segunda hipótese, redação anterior').context, 'historical');
+});
+
+test('R6 recognizes only a proven SEFAZ-SP page title and structural separators', () => {
+  const heading = '<title>SE\u00c7\u00c3O III - DA ISEN\u00c7\u00c3O</title>';
+  const article = '<p><b>Artigo 1\u00ba</b> - Dispositivo de teste.</p>';
+  const rendered = readPrepared(prep(page(heading + '  \n  ' + article)));
+  const title = rendered.parts.find(p => p.contextReasons.includes('sefaz_sp_portal_page_title'));
+  assert.equal(title?.type, 'publication_header');
+  assert.equal(title.context, 'prohibited');
+  assert.ok(rendered.coverage.segments.every(segment => segment.classification !== 'unidentified'));
+  assert.ok(rendered.limitations.some(l => l.code === 'sefaz_sp_portal_local_preparation_only'));
+  const nested = readPrepared(prep(page('<section>' + heading + article + '</section>')));
+  assert.ok(!nested.parts.some(p => p.contextReasons.includes('sefaz_sp_portal_page_title')));
+  const unrecognized = readPrepared(prep(page('<title>Texto sem evid\u00eancia estrutural</title>' + article)));
+  assert.ok(unrecognized.coverage.segments.some(segment => segment.classification === 'unidentified'));
 });

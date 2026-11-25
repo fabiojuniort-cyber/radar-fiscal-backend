@@ -1,4 +1,6 @@
 import { Parser } from 'htmlparser2';
+import { verifyNormasLegPreparation, type NormasLegBlock, type NormasLegPreparation } from './normas-leg-preparation.js';
+import { PORTAL_MAX_NODES, verifyOfficialAct, type OfficialActPreparation } from './official-portal-preparation.js';
 import type { AnatomyPart, AnatomyResult } from './contract.js';
 import { NfcQuarantineError, NFC_DIAGNOSTICS, decideRecovery, exactToShadow, type RecoveryDecision, type ShadowContext } from './nfc-recovery.js';
 import { assertCompiledRules, defaultRules, type CompiledRules } from './profile-rules.js';
@@ -11,11 +13,13 @@ export class SefazSpProvenanceError extends TypeError {
 }
 
 export interface AnatomyReaderInput {
-  source: 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
+  source: 'NORMAS-LEG' | 'PLANALTO' | 'CONFAZ' | 'DOU' | 'DOE-SP' | 'RFB' | 'SEFAZ-SP-PORTAL';
   representationId: string;
   html?: string | undefined;
   text?: string | undefined;
   missingResources?: string[];
+  officialAct?: OfficialActPreparation | undefined;
+  normasLeg?: NormasLegPreparation | undefined;
   /** Compiled effective profile for this source; defaults to the shipped DEFAULT_PROFILES. */
   rules?: CompiledRules;
   /**
@@ -46,6 +50,74 @@ const groupLevel = (word: string) => GROUP_RANK[word.normalize('NFD').replace(/\
 const GROUP = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|Livro|T[íi]tulo|Cap[íi]tulo|Se[çc][ãa]o|Subse[çc][ãa]o)\s+(?:[IVXLCDM]+|\d+|[ÚU]NIC[OA]|[ÚU]nic[oa])(?:\s*[-–—:.]|\s*$)/u;
 type Descriptor = { type: AnatomyPart['type']; context: AnatomyPart['context']; reason: string; rank: number; itemNumber?: string };
 const blocks = new Set(['p', 'div', 'section', 'h1', 'h2', 'h3', 'h4', 'li', 'table', 'tr', 'td', 'th', 'article']);
+// Attested headings for the compiled ccivil_03 chapter layout. Standalone matches
+// lack proof: the reader also requires a centered paragraph immediately after a chapter.
+const planaltoChapterTitles = new Set([
+  'DA CONTRIBUIÇÃO PARA O PIS/PASEP E COFINS',
+  'DO IMPOSTO SOBRE A RENDA',
+  'DO IMPOSTO SOBRE OPERAÇÕES DE CRÉDITO, CÂMBIO E SEGURO, OU RELATIVAS A TÍTULOS OU VALORES MOBILIÁRIOS',
+  'DA COBRANÇA NÃO-CUMULATIVA DO PIS E DO PASEP',
+  'DA COBRANÇA NÃO-CUMULATIVA DA COFINS',
+  'DAS OUTRAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO',
+  'DAS OUTRAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO TRIBUTÁRIA',
+  'DAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO ADUANEIRA',
+  'DISPOSIÇÕES FINAIS',
+  'DAS DISPOSIÇÕES FINAIS',
+  'DAS DISPOSIÇÕES GERAIS E FINAIS',
+]);
+const layoutWhitespace = /^[\p{White_Space}]*$/u;
+
+// Only the direct document wrapper of a verified DOU fragment is transparent. Embedded images
+// keep the previous path until their role and the completeness of the act can be assessed.
+function hasNestedDouBody(node: Node): boolean {
+  if (node.tag !== 'div' || node.start !== 0) return false;
+  const documents = node.children.filter((child) => child.tag === 'html');
+  if (documents.length !== 1 || documents[0]!.children.filter((child) => child.tag === 'body').length !== 1) return false;
+  const pending = [...node.children];
+  while (pending.length) {
+    const child = pending.pop()!;
+    if (child.blocked) continue;
+    if (child.tag === 'img') return false;
+    for (const nested of child.children) pending.push(nested);
+  }
+  return true;
+}
+
+const struckMarkup = (node: Node): boolean => /^(?:s|strike|del)$/u.test(node.tag)
+  || /(?:^|;)\s*text-decoration(?:-line)?\s*:\s*line-through\s*(?:;|$)/iu.test(node.attrs.style ?? '');
+
+// Some compiled Planalto pages strike the ordinal glyph itself. That is not evidence
+// of an earlier wording. Any other visible struck text retains the existing guard.
+function hasSubstantivePlanaltoStrike(node: Node): boolean {
+  let previousText = '';
+  function visit(current: Node, inherited: boolean): boolean {
+    if (current.blocked) return false;
+    const struck = inherited || struckMarkup(current);
+    if (current.text === null) return current.children.some(child => visit(child, struck));
+    const text = current.text;
+    const substantive = struck && !layoutWhitespace.test(text)
+      && !(/^[º°]$/u.test(text) && /\d$/u.test(previousText));
+    previousText = text || previousText;
+    return substantive;
+  }
+  return visit(node, false);
+}
+
+function hasPlanaltoAnchor(node: Node, name: string): boolean {
+  if (node.blocked) return false;
+  return (node.tag === 'a' && node.attrs.name?.toLowerCase() === name)
+    || node.children.some(child => hasPlanaltoAnchor(child, name));
+}
+
+// A layout block may be treated as struck only when every nonblank text node carries
+// the source's strike markup. A live fragment in the same paragraph keeps the block unresolved.
+function isEntirelyStruck(node: Node, inherited = false): boolean {
+  if (node.blocked) return true;
+  const struck = inherited || struckMarkup(node);
+  if (node.text !== null) return struck || layoutWhitespace.test(node.text);
+  return node.children.every((child) => isEntirelyStruck(child, struck));
+}
+
 const excluded = new Set(['script', 'style', 'noscript', 'template', 'iframe', 'object', 'head']);
 const textOf = (node: Node): string => {
   const stack = [node]; let text = '';
@@ -196,15 +268,28 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     || !verifySefazSpPortalProvenance(input.sefazSpPortal, input.html, input.representationId))) {
     throw new SefazSpProvenanceError('SEFAZ-SP-PORTAL requires the preparation issued by prepareSefazSpPortalPage for this exact HTML and representationId');
   }
+  if (input.source === 'NORMAS-LEG' && (input.html === undefined
+    || !verifyNormasLegPreparation(input.normasLeg, input.html, input.representationId))) {
+    throw new TypeError('NORMAS-LEG requires the preparation issued by prepareNormasLegPage for this exact HTML and representationId');
+  }
   const result: AnatomyReaderResult = { canonicalText: '', parts: [], sourceMap: [],
     coverage: { unit: 'UTF-16', textLength: 0, accountedLength: 0, recognizedLength: 0, segments: [], missingResources: [...(input.missingResources ?? [])] },
     limitations: [], status: 'complete' };
   const representation = input.html !== undefined ? 'html' : 'text';
-  const raw = input.html ?? input.text ?? '';
+  const full = input.html ?? input.text ?? '';
+  const portal = input.officialAct;
+  if (portal && (!input.html || !verifyOfficialAct(portal, input.source, input.representationId, input.html))) {
+    throw new TypeError('Official act preparation must be issued for this source, representation and HTML');
+  }
+  if (input.source === 'PLANALTO' && !portal) throw new TypeError('PLANALTO requires issued official act preparation');
+  const raw = portal ? full.slice(portal.start, portal.end) : full;
+  const originOffset = portal?.start ?? 0;
+  const portalLayout = portal?.source === 'DOU' || portal?.source === 'CONFAZ' || portal?.source === 'PLANALTO';
+  const maxNodes = portal ? PORTAL_MAX_NODES : ANATOMY_READER_LIMITS.maxNodes;
   const childOrders = new Map<string | null, number>();
   const pointer = (locator: string, start: number | null = null, end: number | null = null): Pointer => ({
     resourceId: input.representationId, representation, locator,
-    sourceSpan: start !== null && end !== null ? { start, end } : null,
+    sourceSpan: start !== null && end !== null ? { start: start + originOffset, end: end + originOffset } : null,
   });
   const limitation = (code: string, message: string, span: { start: number; end: number } | null = null): void => {
     result.limitations.push({ code, message, partId: null, span }); result.status = 'partial';
@@ -241,6 +326,10 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   if (!raw) return fallback('missing_body', 'No readable body supplied.');
   if (representation === 'text') return fallback('plain_text_unidentified', 'Plain text is accounted for without inventing structural markup.');
 
+  // L-LEG-01: the verified plan, keyed by the raw start of each planned block; elements are found by raw offset.
+  const llegPlan = input.source === 'NORMAS-LEG' ? new Map(input.normasLeg!.plan.blocks.map((b) => [b.htmlSpan.start, b])) : null;
+  const nodeAt = new Map<number, Node>();
+  const llegSeen = new Set<NormasLegBlock>();
   const dom: Node = { tag: 'root', attrs: {}, path: '', start: 0, end: raw.length, children: [], text: null, span: { start: 0, end: 0 }, blocked: false };
   const stack = [dom]; let nodeCount = 0; let exceeded = false;
   const childCounts = new Map<Node, Map<string, number>>();
@@ -251,7 +340,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   };
   const parser = new Parser({
     onopentag(tag, attrs) {
-      if (++nodeCount > ANATOMY_READER_LIMITS.maxNodes || stack.length > ANATOMY_READER_LIMITS.maxDepth) { exceeded = true; parser.pause(); return; }
+      if (++nodeCount > maxNodes || stack.length > ANATOMY_READER_LIMITS.maxDepth) { exceeded = true; parser.pause(); return; }
       const parent = stack[stack.length - 1]!;
       // Every decoded attribute name/value is checked (a superset of the class attributes the reader consumes).
       if (!seen.decodedAttributeNonNfc && Object.entries(attrs).some(([k, v]) => isNonNfcText(k) || isNonNfcText(v))) seen.decodedAttributeNonNfc = true;
@@ -259,10 +348,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (parent.path.length + tag.length + 16 > 4096) { exceeded = true; parser.pause(); return; }
       const node: Node = { tag, attrs, path: `${parent.path}/${tag}[${index}]`, start: parser.startIndex,
         end: parser.endIndex + 1, children: [], text: null, span: { start: 0, end: 0 }, blocked: parent.blocked || excluded.has(tag) };
+      if (llegPlan && tag === 'a') nodeAt.set(node.start, node);
       parent.children.push(node); stack.push(node);
     },
     ontext(text) {
-      if (++nodeCount > ANATOMY_READER_LIMITS.maxNodes) { exceeded = true; parser.pause(); return; }
+      if (++nodeCount > maxNodes) { exceeded = true; parser.pause(); return; }
       const parent = stack[stack.length - 1]!;
       parent.children.push({ tag: '#text', attrs: {}, path: `${parent.path}/text()[${childIndex(parent, '#text')}]`,
         start: parser.startIndex, end: parser.endIndex + 1, children: [], text, span: { start: 0, end: 0 }, blocked: parent.blocked });
@@ -357,6 +447,20 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
         while (logical.length > 1 && logical[logical.length - 1]!.part.type === 'item') logical.pop()!.part.span.end = node.span.start;
         itemParentMissing = true;
         limitation('item_parent_missing', `Item ${desc.itemNumber} has no open parent item ${expected}; attached to the enclosing device.`, { ...node.span });
+      }
+    }
+    // A new inciso I with the explicit artNNi. anchor resumes the operative article
+    // after its superseded sole paragraph (the following incisos then use normal ranks).
+    const top = logical[logical.length - 1]!.part;
+    if (portal?.source === 'PLANALTO' && desc.type === 'inciso' && desc.context === 'operative_candidate'
+      && top.type === 'paragraph' && top.context === 'prohibited' && top.contextReasons.includes('planalto_historical_markup')
+      && /^Parágrafo\s+único\b/iu.test(top.label) && /^I\s*[-–—]/u.test(textOf(node).trim())
+      && !hasSubstantivePlanaltoStrike(node)) {
+      const article = logical[logical.length - 2]?.part;
+      const number = /^Art\.\s*(\d+)\./iu.exec(article?.label ?? '')?.[1];
+      if (article?.type === 'article' && article.context === 'operative_candidate' && number
+        && hasPlanaltoAnchor(node, 'art' + number + 'i.')) {
+        logical.pop()!.part.span.end = node.span.start;
       }
     }
     const parent = logical[logical.length - 1]!.part;
@@ -474,15 +578,96 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   // unidentified. A declared type that contradicts the grammar, a missing/unknown/conflicting type, or the source's own
   // "não identificado" type is recorded as a limitation, never guessed. tachado → context historical
   // (rfb_tachado_source); legalStatus is never touched.
-  type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null };
+  type RfbSeg = { type: string | null; issue: string | null; tachado: boolean; pointer: string | null; section: Node };
   const RFB_TYPE: Record<string, Descriptor['type']> = { artigo: 'article', paragrafo: 'paragraph', inciso: 'inciso', alinea: 'alinea',
     item: 'item', ementa: 'summary', fecho: 'signature', capitulo: 'group', secao: 'group', subsecao: 'group', titulo: 'group', livro: 'group', parte: 'group', anexo: 'annex' };
   const RFB_GROUP_WORD: Record<string, string> = { parte: 'PARTE', capitulo: 'CAPITULO', secao: 'SECAO', subsecao: 'SUBSECAO', titulo: 'TITULO', livro: 'LIVRO' };
   const RFB_RANK: Partial<Record<Descriptor['type'], number>> = { article: 3, paragraph: 4, inciso: 5, alinea: 6, item: 7, summary: 100, signature: 100 };
-  const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }): Descriptor => {
+  const rfbSibling = (seg: RfbSeg, step: 1 | -1): string => {
+    let index = dom.children.indexOf(seg.section);
+    if (index < 0) return '';
+    for (index += step; index >= 0 && index < dom.children.length; index += step) {
+      const sibling = dom.children[index]!;
+      if (sibling.attrs['data-rfb-segment'] === undefined || sibling.attrs['data-rfb-tachado'] === 'true') return '';
+      const text = matchText(sibling).trim();
+      if (text) return text;
+    }
+    return '';
+  };
+  const roman = (word: string): number => {
+    if (!/^(?=[IVXLCDM]+$)M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})$/u.test(word)) return 0;
+    const values: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+    return [...word].reduce((total, letter, index) => {
+      const value = values[letter]!;
+      return total + (value < (values[word[index + 1] ?? ''] ?? 0) ? -value : value);
+    }, 0);
+  };
+  const rfbContent = (seg: RfbSeg, word: string, text: string): Descriptor | null => {
+    if (seg.tachado) return null;
+    const hasDevice = logical.some(({ part }) => ['article', 'paragraph', 'clause'].includes(part.type));
+    if (word === 'assinatura' && hasDevice && /^(?:[\p{Lu}][\p{Lu}\p{M}.'’-]*\s+){1,12}[\p{Lu}][\p{Lu}\p{M}.'’-]*$/u.test(text)) {
+      const next = rfbSibling(seg, 1);
+      if (!next || /^(?:ANEXO|Este texto não substitui)\b/iu.test(next)) return { type: 'signature', context: 'prohibited', reason: 'rfb_declared_final_signature', rank: 100 };
+    }
+    if (!word.startsWith('nao identific')) return null;
+    if (!hasDevice && /^(?:O|A)\s+(?:(?:COMITÊ|COORDENADOR(?:A)?(?:-GERAL)?|SECRETÁRI[OA]|PRESIDENTE)(?![\p{L}-]))[\s\S]{0,350},\s+(?:no uso d[ae]s?|no exercício d[ae]s?)/iu.test(text)) {
+      return { type: 'preamble', context: 'prohibited', reason: 'rfb_authority_formula', rank: 100 };
+    }
+    if (!hasDevice && /^(?:DECLARA|RESOLVE)\s*:\s*$/u.test(text) && rules.article.test(rfbSibling(seg, 1))) {
+      return { type: 'preamble', context: 'prohibited', reason: 'rfb_promulgation_before_article', rank: 100 };
+    }
+    const position = /^([IVXLCDM]+)\s+\p{Ll}/u.exec(text)?.[1];
+    if (position && hasDevice) {
+      const before = /^([IVXLCDM]+)(?:\s*[-–—]\s*|\s+)\p{L}/u.exec(rfbSibling(seg, -1))?.[1];
+      const after = /^([IVXLCDM]+)(?:\s*[-–—]\s*|\s+)\p{L}/u.exec(rfbSibling(seg, 1))?.[1];
+      const current = roman(position);
+      if (current > 0 && ((current === 1 && after && roman(after) === 2) || (before && roman(before) === current - 1))) {
+        return { type: 'inciso', context: 'operative_candidate', reason: 'rfb_roman_sequence_under_device', rank: 5 };
+      }
+    }
+    return null;
+  };
+  const rfbListPeer = (seg: RfbSeg, step: 1 | -1): number => {
+    const start = dom.children.indexOf(seg.section);
+    if (start < 0) return 0;
+    for (let i = start + step; i >= 0 && i < dom.children.length; i += step) {
+      const sibling = dom.children[i]!;
+      if (sibling.attrs['data-rfb-segment'] === undefined || sibling.attrs['data-rfb-type-issue']) return 0;
+      const type = (sibling.attrs['data-rfb-type'] ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+      if (type === 'alinea' || type === 'item') continue;
+      if (type !== 'inciso' && !type.startsWith('nao identific')) return 0;
+      const text = matchText(sibling).trim();
+      if (!text) continue;
+      // The current list skips superseded versions; a historical inciso can use a
+      // corroborating adjacent replacement at the same ordinal or a prior peer.
+      if (!seg.tachado && sibling.attrs['data-rfb-tachado'] === 'true') continue;
+      return roman(/^([IVXLCDM]+)(?:\s*[-–—]\s*|\s+)[\p{L}\d]/u.exec(text)?.[1] ?? '');
+    }
+    return 0;
+  };
+  const rfbListIntroductions = new Set<string>();
+  const rfbCorroborateListItem = (seg: RfbSeg, type: string, text: string): Descriptor | null => {
+    if (!type.startsWith('nao identific')) return null;
+    const ordinal = roman(/^([IVXLCDM]+)\s+[\p{L}\d]/u.exec(text)?.[1] ?? '');
+    const device = logical.findLast(({ part }) => part.type === 'article' || part.type === 'paragraph' || part.type === 'clause');
+    if (!ordinal || !device || device.part.context === 'prohibited') return null;
+    const next = rfbListPeer(seg, 1);
+    const previous = rfbListPeer(seg, -1);
+    const introduced = rfbListIntroductions.has(device.part.id);
+    const first = ordinal === 1 && next === 2 && introduced;
+    const continuation = ordinal > 1 && previous === ordinal - 1 && (!seg.tachado || introduced);
+    const replacement = seg.tachado && next === ordinal;
+    if (!first && !continuation && !replacement) return null;
+    return { type: 'inciso', context: seg.tachado ? 'historical' : 'operative_candidate', reason: 'rfb_corroborated_inciso_list', rank: 5 };
+  };
+  const rfbDeclared = (seg: RfbSeg, current: Descriptor, span: { start: number; end: number }, text: string): Descriptor => {
     if (seg.issue) { limitation(`rfb_segment_${seg.issue}`, `RFB segment ${seg.pointer ?? '?'}: declared type ${seg.issue.replace(/_/gu, ' ')}; no type was guessed.`, span); return current; }
     const sig = (seg.type ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
     if (!sig) return current;
+    if (current.type === 'unidentified') {
+      const corroborated = rfbContent(seg, sig, text) ?? rfbCorroborateListItem(seg, sig, text);
+      if (corroborated) return corroborated;
+    }
     if (sig.startsWith('nao identific')) { if (current.type === 'unidentified') limitation('rfb_segment_type_unidentified_by_source', `RFB segment ${seg.pointer ?? '?'}: the source itself declares the type as not identified.`, span); return current; }
     const mapped = RFB_TYPE[sig];
     if (!mapped) { if (current.type === 'unidentified') limitation('rfb_segment_type_unmapped', `RFB segment ${seg.pointer ?? '?'}: declared type "${seg.type}" has no structural mapping.`, span); return current; }
@@ -510,11 +695,12 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   const spProven = input.source === 'SEFAZ-SP-PORTAL';
   const spPortalWrapper = (node: Node) => spProven && node.attrs['data-sefaz-sp-portal'] === 'legislacao-consolidada'
     && dom.children.length === 1 && dom.children[0] === node;
+  let planaltoPrevious: { node: Node; reason: string; rank: number } | undefined;
   const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null, spPortal = false): void => {
     if (node.blocked || node.text !== null) return;
     if (!spPortal && spPortalWrapper(node)) spPortal = true;
     if (input.source === 'RFB' && node.attrs['data-rfb-segment'] !== undefined) rfbSeg = { type: node.attrs['data-rfb-type'] ?? null, issue: node.attrs['data-rfb-type-issue'] ?? null,
-      tachado: node.attrs['data-rfb-tachado'] === 'true', pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
+      tachado: node.attrs['data-rfb-tachado'] === 'true', section: node, pointer: `ordemSegmentoAto ${node.attrs['data-rfb-segment']}` };
     let context = domContext(node, inheritedContext);
     // D04-R1-01: tables of a tachado segment take the historical zone like any block (prohibited stays prohibited).
     if (node.tag === 'table') {
@@ -525,9 +711,12 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (rfbSeg?.tachado) for (const x of result.parts.slice(before)) if (x.context === 'historical' && !x.contextReasons.includes('rfb_tachado_source')) x.contextReasons.push('rfb_tachado_source');
       return;
     }
-    const hasBlock = node.children.some((child) => blocks.has(child.tag));
+    const hasBlock = node.children.some((child) => blocks.has(child.tag))
+      || (portal?.source === 'DOU' && hasNestedDouBody(node));
     const quotedDom = quotedAncestor || node.tag === 'blockquote' || node.tag === 'q';
-    if (blocks.has(node.tag) && !hasBlock && node.span.end > node.span.start) {
+    const spPageTitle = spPortal && node.tag === 'title' && dom.children[0]?.children.includes(node)
+      && /^(?:LIVRO|T[IÍ]TULO|CAP[IÍ]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O|ANEXO)\s+(?:[IVXLCDM]+|\d+)\s*[-–—]\s*\p{L}/iu.test(matchText(node).trim());
+    if ((blocks.has(node.tag) || spPageTitle) && !hasBlock && node.span.end > node.span.start) {
       const text = matchText(node).trim();
       const inlineQuote = hasInlineQuote(node);
       const wasQuoted = openQuotation || inlineQuote || quotedDom;
@@ -541,11 +730,112 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       let descriptor: Descriptor = wasQuoted || openQuotation
         ? { type: 'quoted_text' as const, context: 'prohibited' as const, reason: 'quoted_block', rank: 100 }
         : describe(node, rules, markerText);
-      if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span);
+      if (rfbSeg && !wasQuoted && !openQuotation) descriptor = rfbDeclared(rfbSeg, descriptor, node.span, text);
       const ownClasses = (node.attrs.class ?? '').split(/\s+/u);
+      if (portal?.source === 'DOU' && descriptor.type === 'unidentified' && !wasQuoted && !openQuotation) {
+        if (node.tag === 'p' && ownClasses.includes('assinaPr') && /^\p{L}[\p{L}\p{M}.'’-]*(?:\s+\p{L}[\p{L}\p{M}.'’-]*)+$/u.test(text)
+          && text === text.toUpperCase()) {
+          descriptor = { type: 'signature', context: 'prohibited', reason: 'dou_portal_assinaPr', rank: 100 };
+        } else if (node.tag === 'p' && ownClasses.includes('titulo') && /^COMITÊ\s+GESTOR\s+DO\s+SIMPLES\s+NACIONAL$/iu.test(text)
+          && layoutWhitespace.test(result.canonicalText.slice(0, node.span.start))) {
+          descriptor = { type: 'publication_header', context: 'prohibited', reason: 'dou_portal_cgsn_header', rank: 100 };
+        } else if ((/^ANEXO\s+(?:ÚNICO|UNICO|[IVXLCDM]+|\d+)(?:\s|$)/iu.test(text) || /^ANEXO$/iu.test(text)) && ownClasses.includes('anexo')) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'dou_portal_annex', rank: 2 };
+        } else if (ownClasses.includes('dou-paragraph') || ownClasses.includes('subtitulo')) {
+          const heading = ownClasses.includes('subtitulo') && /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O)\s+[IVXLCDM0-9]+\b/iu.exec(text);
+          if (heading) {
+            const [level, rank] = groupLevel(heading[1]!);
+            descriptor = { type: 'group', context: 'operative_candidate', reason: 'dou_portal_' + level, rank };
+          } else {
+            descriptor = { type: 'body', context: 'unknown', reason: 'dou_portal_text_block', rank: 100 };
+          }
+        }
+      }
+      if (portal?.source === 'CONFAZ' && !wasQuoted && !openQuotation) {
+        const classes = classesOf(node);
+        if (classes.includes('A1-1TituloAcordo')) {
+          descriptor = { type: 'epigraph', context: 'prohibited', reason: 'confaz_plone_epigraph', rank: 100 };
+        } else if (classes.includes('A3Ementa')) {
+          descriptor = { type: 'summary', context: 'prohibited', reason: 'confaz_plone_summary', rank: 100 };
+        } else if (classes.includes('A5-2NovaRedacao')) {
+          descriptor = { type: 'quoted_text', context: 'prohibited', reason: 'confaz_plone_cited_wording', rank: 100 };
+        } else if (classes.includes('A4AcordoTipo') && /^(CONVÊNIO|AJUSTE|PROTOCOLO)(?:SINIEF|ICMS)?$/iu.test(text.replace(/\s/gu, ''))) {
+          descriptor = { type: 'epigraph', context: 'prohibited', reason: 'confaz_plone_act_kind', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'confaz_plone_sole_annex', rank: 2 };
+        } else if (descriptor.type === 'unidentified' && classes.some((c) => c === 'A6-1Subtitulo' || c === 'A7-1TabelaSubtitulo' || c === 'A9-1TabelaSubtituloverde')) {
+          descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_subheading', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && node.tag === 'p' && insideAnnex()
+          && ownClasses.includes('A7-2Tabelajustificado')
+          && /^(?:RELAÇÃO DOS ATOS NORMATIVOS\b|Orientaç(?:ões|ão) para Preenchimento do ANEXO ÚNICO:|\(\d{1,2}\)\s+[^:\n]+:\s+\S)/iu.test(text)) {
+          descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_appendix_text', rank: 100 };
+        }
+      }
+      if (portal?.source === 'PLANALTO' && !wasQuoted && !openQuotation) {
+        if (node.start === 0 && /^LEI\s+N/iu.test(text)) descriptor = { type: 'epigraph', context: 'prohibited', reason: 'planalto_epigraph', rank: 100 };
+        else if (/^(?:Este texto não substitui|Mensagem de Veto|Conversão da MPv|Produção de efeitos?|Vigência|Vide\b|Regulamento\s*$)/iu.test(text)) {
+          descriptor = { type: 'editorial_note', context: 'prohibited', reason: 'planalto_notice', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && node.tag === 'p') {
+          const centered = /^center$/iu.test(node.attrs.align ?? '');
+          const previous = planaltoPrevious?.node;
+          const adjacent = previous && previous.span.end <= node.span.start && containerOf(previous.path) === containerOf(node.path)
+            && layoutWhitespace.test(result.canonicalText.slice(previous.span.end, node.span.start));
+          const chapter = centered && /^CAP[IÍ]TULO\s+[IVXLCDM]+$/iu.test(text);
+          const titleText = text.replace(/\s+/gu, ' ');
+          const title = centered && planaltoChapterTitles.has(titleText.toUpperCase());
+          if (chapter) {
+            descriptor = { type: 'group', context: 'operative_candidate', reason: 'planalto_chapter', rank: groupLevel('CAPITULO')[1] };
+          } else if (adjacent && centered && ((planaltoPrevious?.rank === groupLevel('CAPITULO')[1] && title)
+            || (planaltoPrevious?.reason === 'planalto_chapter_title'
+              && /^DAS OUTRAS DISPOSIÇÕES RELATIVAS À LEGISLAÇÃO$/iu.test(matchText(previous!).trim().replace(/\s+/gu, ' '))
+              && titleText === 'TRIBUTÁRIA E ADUANEIRA'))) {
+            descriptor = { type: 'body', context: 'prohibited', reason: 'planalto_chapter_title', rank: 100 };
+          } else if (/^Brasília,\s+\d{1,2}\s+de\s+\p{L}+\s+de\s+\d{4};\s+\d{1,3}\s*[oº°]\s+da\s+Independência\s+e\s+\d{1,3}\s*[oº°]\s+da\s+República\.$/iu.test(text)) {
+            descriptor = { type: 'signature', context: 'prohibited', reason: 'planalto_signature_date', rank: 100 };
+          } else if (adjacent && planaltoPrevious?.reason === 'planalto_signature_date'
+            && /<br\b[^>]*>[\s\S]*<em\b/iu.test(raw.slice(node.start, node.end))
+            && /^(?:\p{Lu}[\p{Lu}\p{M}]+[ \t]+){2,}\p{Lu}[\p{Lu}\p{M}]+(?:\s+[\p{L}\p{M}.-]+)+$/u.test(result.canonicalText.slice(node.span.start, node.span.end).trim())) {
+            descriptor = { type: 'signature', context: 'prohibited', reason: 'planalto_signatories', rank: 100 };
+          } else if (adjacent && planaltoPrevious?.reason === 'planalto_notice' && centered && text === '*'
+            && /\bcolor\s*=\s*["']#ff0000["']/iu.test(raw.slice(node.start, node.end))) {
+            descriptor = { type: 'editorial_note', context: 'prohibited', reason: 'planalto_notice_marker', rank: 100 };
+          } else if (/^[IVXLCDM]+\s+\p{L}/u.test(text) && isEntirelyStruck(node)) {
+            descriptor = { type: 'body', context: 'prohibited', reason: 'planalto_struck_block', rank: 100 };
+          }
+        } else if (descriptor.type !== 'unidentified' && node.tag === 'p') {
+          if (/<(?:strike|s|del)\b/iu.test(raw.slice(node.start, node.end)) && hasSubstantivePlanaltoStrike(node)) {
+            descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_historical_markup' };
+          } else if ((descriptor.type === 'paragraph' || descriptor.type === 'inciso')
+            && /^(?:§\s*\d+[º°o]?|[IVXLCDM]+\s*[-–—])\s*\.?\s*\(Revogad[oa]\s+pel[ao]\s+[^()]+\)(?:\s*\(Vigência\))?\s*\.?$/iu.test(text)) {
+            descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_repealed_placeholder' };
+          }
+        }
+        if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
+          descriptor = { type: 'annex', context: 'operative_candidate', reason: 'planalto_sole_annex', rank: 2 };
+        }
+      }
+      if (spPageTitle && !wasQuoted && !openQuotation) {
+        descriptor = { type: 'publication_header', context: 'prohibited', reason: 'sefaz_sp_portal_page_title', rank: 100 };
+      }
+      if (spPortal && !markerText(node).trim()) return;
       const spNote = spPortal && !wasQuoted && !openQuotation && (ownClasses.includes(SP_NOTE_CLASS) || SP_NOTE_TEXT.test(leadingZwsp ? markerText(node).trim() : text));
       if (spNote) descriptor = { type: 'editorial_note', context: 'prohibited', reason: ownClasses.includes(SP_NOTE_CLASS) ? 'sefaz_sp_portal_nota' : 'sefaz_sp_portal_nota_text', rank: 100 };
       const spEarlier = spPortal && !spNote && ownClasses.some((c) => SP_HISTORICAL_CLASSES.includes(c));
+      if (spPortal && !wasQuoted && !openQuotation && descriptor.type === 'unidentified') {
+        const heading = /^(LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O)\s+(?:[IVXLCDM]+|\d+|ÚNIC[OA])(?:\s|$)/iu.exec(text.replace(/^[\s\u200B]+/u, ''));
+        if (heading && !spEarlier) {
+          const [level, rank] = groupLevel(heading[1]!);
+          descriptor = { type: 'group', context: 'prohibited', reason: 'sefaz_sp_portal_context_' + level, rank };
+        } else if (spEarlier && /^(?:\(\s*)?revogad[oa]s?\s*[).]?$/iu.test(text)) {
+          descriptor = { type: 'editorial_note', context: 'historical', reason: 'sefaz_sp_portal_revoked_placeholder', rank: 100 };
+        } else if (spEarlier && /^(?:Art\.|§|Parágrafo|NOTA|Redação)\s/iu.test(text)) {
+          descriptor = { type: 'body', context: 'historical', reason: 'sefaz_sp_portal_earlier_wording', rank: 100 };
+        } else if (!spEarlier && logical.at(-1)?.part.type === 'annex'
+          && (ownClasses.includes('centro') && /^\((?:Relação|isenções) a que se refere o artigo \d/iu.test(text)
+          || /^[\p{Lu}\p{M}0-9 ()/,–—-]{4,220}$/u.test(text) && /\p{Lu}{3}/u.test(text))) {
+          descriptor = { type: 'body', context: 'prohibited', reason: 'sefaz_sp_portal_annex_subtitle', rank: 100 };
+        }
+      }
       if (spEarlier && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'historical' };
       const rfbStruck = rfbSeg?.tachado === true;
       // ANAT-D05: a struck block becomes historical; an unidentified struck block keeps its type (no guess) and becomes
@@ -554,7 +844,48 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       if (rfbStruck && (descriptor.context === 'operative_candidate' || struckUnidentified)) descriptor = { ...descriptor, context: 'historical' };
       if (descriptor.type !== 'unidentified' && context !== 'operative_candidate') descriptor.context = context;
       if (wasQuoted || openQuotation) descriptor.context = 'prohibited';
+      // L-LEG-01 (design §3, §11): only through the verified plan, only for this exact block. Never promotes.
+      const lleg = llegPlan?.get(node.start);
+      let llegNotes: { note: NormasLegBlock['notes'][number]; nodes: Node[] }[] = [];
+      let llegAmbiguous: string | null = null; let llegPlaceholder = false;
+      if (lleg) {
+        llegSeen.add(lleg);
+        if (lleg.htmlSpan.end !== node.end) llegAmbiguous = 'the planned block does not coincide with the element read';
+        else if (lleg.ambiguous) llegAmbiguous = `${lleg.ambiguous.code}: ${lleg.ambiguous.detail}`;
+        else {
+          llegNotes = lleg.notes.map((note) => ({ note, nodes: note.anchors.map((a) => nodeAt.get(a.htmlSpan.start)).filter((n): n is Node => !!n && n.tag === 'a') }));
+          if (llegNotes.some((x, i) => x.nodes.length !== lleg.notes[i]!.anchors.length || x.nodes.some((n, k) => n.end !== lleg.notes[i]!.anchors[k]!.htmlSpan.end))) {
+            llegNotes = []; llegAmbiguous = 'a planned note does not coincide with the anchors read';
+          } else if (lleg.placeholder) {
+            if (['article', 'paragraph', 'inciso', 'alinea', 'item'].includes(descriptor.type)) { llegPlaceholder = true; descriptor = { ...descriptor, context: 'prohibited' }; }
+            else llegAmbiguous = `revoked placeholder on a block read as ${descriptor.type}, not as a device`;
+          }
+        }
+        if (llegAmbiguous && descriptor.context === 'operative_candidate') descriptor = { ...descriptor, context: 'unknown' };
+      }
+      if (portalLayout && descriptor.type === 'unidentified'
+          && layoutWhitespace.test(result.canonicalText.slice(node.span.start, node.span.end))) return;
+      if (portal?.source === 'PLANALTO') planaltoPrevious = { node, reason: descriptor.reason, rank: descriptor.rank };
       const part = attach(node, descriptor);
+      if (rfbSeg && (part.type === 'article' || part.type === 'paragraph' || part.type === 'clause')
+        && /:\s*$/u.test(text)) rfbListIntroductions.add(part.id);
+      if (llegPlaceholder) for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_revoked_placeholder');
+      if (llegAmbiguous) {
+        for (const x of [part, result.parts.find((y) => y.id === `${part.id}-caput`)]) x?.contextReasons.push('normas_leg_note_ambiguous');
+        limitation('normas_leg_note_ambiguous', `normas.leg.br compilation note not proven (${llegAmbiguous}); the block is kept out of operative_candidate and nothing was cut.`, { ...node.span });
+      }
+      // §11.3/§11.5: one editorial_note per planned region, child of the part that IS the block (the caput, for an article
+      // or clause opening block, so siblings never overlap); creating it does not close the caput continuation.
+      const blockPart = result.parts.find((y) => y.id === `${part.id}-caput`) ?? part;
+      for (const { note, nodes } of llegNotes) {
+        const caput = openCaput.get(part.id);
+        const first = nodes[0]!; const last = nodes[nodes.length - 1]!;
+        const np = newPart('editorial_note', first.span.start, last.span.end, blockPart.id, 'prohibited', note.kind === 'vide' ? 'normas_leg_vide' : 'normas_leg_editorial_note',
+          pointer(first.path, first.start, first.end), note.text.slice(0, 256));
+        np.sourcePointers = nodes.map((n) => pointer(n.path, n.start, n.end));
+        if (caput) openCaput.set(part.id, caput);
+        addOwnership(np);
+      }
       if (context !== 'operative_candidate') part.contextReasons.push('inherited_dom_zone');
       if (rfbStruck) part.contextReasons.push('rfb_tachado_source');
       if (spEarlier && part.context === 'historical') part.contextReasons.push('sefaz_sp_portal_revogado');
@@ -569,6 +900,22 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     for (const child of node.children) walk(child, context, quotedDom, rfbSeg, spPortal);
   };
   walk(dom);
+  if (portal?.source === 'PLANALTO') {
+    // Parts are emitted parent first. Propagate the selection guard through the logical tree,
+    // including descendants of older struck devices and nested table parts.
+    const prohibited = new Set<string>();
+    for (const part of result.parts) {
+      if (part.parentId !== null && prohibited.has(part.parentId)) {
+        if (part.context === 'operative_candidate') {
+          part.context = 'prohibited';
+          part.contextReasons.push('planalto_prohibited_ancestor');
+        }
+        prohibited.add(part.id);
+      } else if (part.context === 'prohibited') {
+        prohibited.add(part.id);
+      }
+    }
+  }
   // ANAT-L20 (#293 §17): review signal only. With a verified plan whose candidate opening is the segment where the
   // reader's quotation opened and stayed open to the end, record the candidate and its evidence. No part is touched.
   const resume = input.source === 'RFB' && input.html !== undefined
@@ -603,7 +950,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
     const owner = owners.sort((a, b) => (a.end - a.start) - (b.end - b.start) || Number(b.part.id.slice(5)) - Number(a.part.id.slice(5)))[0]?.part;
     if (!owner) {
       // Avoid overlapping siblings: uncovered pieces belong to the root, whose recognition is only structural.
-      result.coverage.segments.push({ span: { start, end }, partId: root.id, classification: 'unidentified' });
+      const text = result.canonicalText.slice(start, end);
+      const structural = (portalLayout || spProven) && layoutWhitespace.test(text)
+        || spProven && start === 0 && /^[\p{White_Space}\u200B]*$/u.test(text);
+      result.coverage.segments.push({ span: { start, end }, partId: root.id, classification: structural ? 'recognized' : 'unidentified' });
+      if (structural) result.coverage.recognizedLength += end - start;
     } else {
       if (owner.type === 'unidentified') unidentified = owner;
       const classification = owner.type === 'unidentified' ? 'unidentified' : 'recognized';
@@ -613,6 +964,11 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   }
   result.coverage.textLength = length; result.coverage.accountedLength = length;
   // R1-SP-03: the proof is local (preparation ↔ HTML ↔ resource), not a verification of the official collection.
+  if (llegPlan) {
+    const unmatched = [...llegPlan.values()].filter((b) => !llegSeen.has(b)).length;
+    if (unmatched) limitation('normas_leg_plan_block_unmatched', `${unmatched} planned normas.leg.br block(s) were not read as leaf blocks; no rule was applied to them.`);
+    limitation('normas_leg_local_preparation_only', 'normas.leg.br provenance is a local preparation proof (bytes, URL, URN, version, plan); the official collection of these bytes is not verified here.');
+  }
   if (input.source === 'SEFAZ-SP-PORTAL') limitation('sefaz_sp_portal_local_preparation_only', 'Sefaz-SP portal provenance is a local preparation proof (bytes, URL, hash, region); the official collection of these bytes is not verified here.');
   if (unidentified || result.coverage.segments.some((segment) => segment.classification === 'unidentified')) limitation('unidentified_content', 'Unrecognized text is fully accounted for and is not a successful identification.');
   if (result.coverage.missingResources.length) limitation('missing_resources', 'Referenced resources were not supplied; no fetch was attempted.');

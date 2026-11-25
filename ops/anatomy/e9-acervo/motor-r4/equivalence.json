@@ -1,0 +1,2799 @@
+{
+  "base": "9c71759095be113110b2a92367cf9683a5510bf2",
+  "baseEngine": "7b7260b22ff8ba73d15277c8d5a7919bd277f913f347e7194648fab4c132cb23",
+  "candidateEngine": "9469ef07a55429acb2cdf50dee72bd350d435c8849a8ec24829faf9cb8a481fa",
+  "cells": [
+    {
+      "after": true,
+      "before": true,
+      "id": "confaz--convenio-icms--pequeno",
+      "partialSamples": [],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M14",
+        "M16"
+      ]
+    },
+    {
+      "after": true,
+      "before": false,
+      "id": "confaz--convenio-icms--grande",
+      "partialSamples": [
+        "http:M3"
+      ],
+      "reason": "r4_target",
+      "supportingSamples": [
+        "http:M4"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "confaz--ajuste-sinief--pequeno",
+      "partialSamples": [],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M18"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "confaz--ajuste-sinief--grande",
+      "partialSamples": [
+        "M5",
+        "http:M5"
+      ],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M19"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "confaz--protocolo-icms--pequeno",
+      "partialSamples": [
+        "M21"
+      ],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M20"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "dou--instrucao-normativa--pequeno",
+      "partialSamples": [],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M23"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "dou--instrucao-normativa--medio",
+      "partialSamples": [],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M24"
+      ]
+    },
+    {
+      "after": false,
+      "before": false,
+      "id": "dou--instrucao-normativa--grande",
+      "partialSamples": [
+        "M25"
+      ],
+      "reason": "remains_partial",
+      "supportingSamples": []
+    },
+    {
+      "after": true,
+      "before": false,
+      "id": "dou--decreto--pequeno",
+      "partialSamples": [],
+      "reason": "r4_target",
+      "supportingSamples": [
+        "M26"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "dou--decreto--grande",
+      "partialSamples": [],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M28"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "dou--portaria--pequeno",
+      "partialSamples": [],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M29"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "dou--portaria--medio",
+      "partialSamples": [],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M30"
+      ]
+    },
+    {
+      "after": true,
+      "before": true,
+      "id": "dou--resolucao--pequeno",
+      "partialSamples": [],
+      "reason": "identity_only",
+      "supportingSamples": [
+        "M32",
+        "M33"
+      ]
+    },
+    {
+      "after": true,
+      "before": false,
+      "id": "dou--resolucao--grande",
+      "partialSamples": [],
+      "reason": "r4_target",
+      "supportingSamples": [
+        "M34"
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "after": {
+        "bytes": 238160,
+        "cell": "planalto--lei--grande",
+        "chars": 114163,
+        "entrySha256": "2a70a0b97b6baed526f1f6b840a624eac7980f7a44d115bdcacf2fcc831eed49",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 733 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "4f99ead1ed9915c4e34f05d45ead003896620a7de1e69b45ad7f715a4353f88c",
+        "preparation": null,
+        "profile": "PLANALTO",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "68cf8671ce42a659626b887127a3a9792daef4851c08e1ace45e5de84b32d2b3",
+          "status": "partial",
+          "unidentified": 2877
+        },
+        "readingComplete": false,
+        "semanticSha256": "11a8d80180ea715bd2fc9525fe12d33e5846d55131210d5293b180e3435497f1",
+        "sha256": "fcab62384ebd6846157afefe13e82dbf313b435c26cc2605b284d98aaa613f36",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 238160,
+        "cell": "planalto--lei--grande",
+        "chars": 114163,
+        "entrySha256": "ebbfb217496fcd03ba6b400da9ddb549eb5a6a648c3e1cfcd27d8c503082acbf",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 733 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "0e079e6b7509ba64d84f45fc4cbdfe6525719f4a8419019402d3ed9733b70233",
+        "preparation": null,
+        "profile": "PLANALTO",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "68cf8671ce42a659626b887127a3a9792daef4851c08e1ace45e5de84b32d2b3",
+          "status": "partial",
+          "unidentified": 2877
+        },
+        "readingComplete": false,
+        "semanticSha256": "11a8d80180ea715bd2fc9525fe12d33e5846d55131210d5293b180e3435497f1",
+        "sha256": "fcab62384ebd6846157afefe13e82dbf313b435c26cc2605b284d98aaa613f36",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "http:M1",
+      "source": "Planalto",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 533449,
+        "cell": "planalto--lei--grande",
+        "chars": 256474,
+        "entrySha256": "5c21aaffd54970a69ceb807ea65f371ee9aa431eccebd598e0266abaf72dbe18",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 5973 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "f5958c417d31c61d14a476824e36494c81caf00d9a8b2087fc2a77dd1eb51692",
+        "preparation": null,
+        "profile": "PLANALTO",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "3bae1f9ed413e185ce3a4a456aaf6de06c037bda8d3e9caa773f85a4430ad0fa",
+          "status": "partial",
+          "unidentified": 10837
+        },
+        "readingComplete": false,
+        "semanticSha256": "6740e8d2d534a6455086be3c441b2e9d0aa4864b256fc77b774028b28a3310a1",
+        "sha256": "25b7fc2de4c59dde7e2bd1fe88ac56d8285276c1f5b856e5ea3533d88315b7e9",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 533449,
+        "cell": "planalto--lei--grande",
+        "chars": 256474,
+        "entrySha256": "f4c92ca2992af0070e323df31f167b0ad7c6a58002d9bab7d5069bb744b55baf",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 5973 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "a09a3f53abc26eccbbe453b3b21f1f2a968e417a9281759196ca14c2a48e53ac",
+        "preparation": null,
+        "profile": "PLANALTO",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "3bae1f9ed413e185ce3a4a456aaf6de06c037bda8d3e9caa773f85a4430ad0fa",
+          "status": "partial",
+          "unidentified": 10837
+        },
+        "readingComplete": false,
+        "semanticSha256": "6740e8d2d534a6455086be3c441b2e9d0aa4864b256fc77b774028b28a3310a1",
+        "sha256": "25b7fc2de4c59dde7e2bd1fe88ac56d8285276c1f5b856e5ea3533d88315b7e9",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "http:M2",
+      "source": "Planalto",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 931597,
+        "cell": "confaz--convenio-icms--grande",
+        "chars": 325058,
+        "entrySha256": "14954c941655a5c07a2211a5e8c680df148579f76336a4f3f0c14ddb39a77abe",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 55 unidentified chars; limitations entity_extraction_failed, unidentified_content"
+        ],
+        "outputHash": "3f5009631206bbfa1a280febedaf8adc9e829a46528e34ca5f47061b0cb20fb9",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "entity_extraction_failed",
+            "unidentified_content"
+          ],
+          "quoteHash": "59efd315516c7fee28ab917af42c9f209359d160a0e547e3b63ead937169df43",
+          "status": "partial",
+          "unidentified": 55
+        },
+        "readingComplete": false,
+        "semanticSha256": "b34cdc3de625f6196a840c95da62f4c610f77f5618359dea6a637c389fbabba6",
+        "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 931597,
+        "cell": "confaz--convenio-icms--grande",
+        "chars": 325058,
+        "entrySha256": "347297495b3845ea337126c6503a5a744b250ece31ed0c7065efaebd5c402bc9",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 55 unidentified chars; limitations entity_extraction_failed, unidentified_content"
+        ],
+        "outputHash": "ccbe01d12ded418e4fbf80581412e228f651291f99d165cfe7c972cd780e5fe9",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "entity_extraction_failed",
+            "unidentified_content"
+          ],
+          "quoteHash": "59efd315516c7fee28ab917af42c9f209359d160a0e547e3b63ead937169df43",
+          "status": "partial",
+          "unidentified": 55
+        },
+        "readingComplete": false,
+        "semanticSha256": "b34cdc3de625f6196a840c95da62f4c610f77f5618359dea6a637c389fbabba6",
+        "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "http:M3",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 234041,
+        "cell": "confaz--convenio-icms--grande",
+        "chars": 54704,
+        "entrySha256": "4c21edb635c3bd505edfd7c4bf78b210b17fc0dd6d18a43dea589515de937012",
+        "notes": [],
+        "outputHash": "97337cd6e27f52a059fef959b6b220c574657b81fe6acbdd6f8c8137312e25ec",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "075426b94c4f688434fc0fa68bcb5a902ace00c7730201bc2345b00e49cf1722",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "dc39970287da0a786882741a586878063f6cb6127ca577336ea77d88b3aaed54",
+        "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 234041,
+        "cell": "confaz--convenio-icms--grande",
+        "chars": 54704,
+        "entrySha256": "e6239b57ebc09ebcd7ab84c780b6fe3ca4434ce3eff01f2d88cbc5d5ee7ccf2b",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 1529 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "9310542009ff233dfcbf8eea16283c62eb8e141a6766a82cf47eb38e22ef8a6c",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "075426b94c4f688434fc0fa68bcb5a902ace00c7730201bc2345b00e49cf1722",
+          "status": "partial",
+          "unidentified": 1529
+        },
+        "readingComplete": false,
+        "semanticSha256": "48d8942df9f5548a2f501c30a8296dc34cdfdceeee06996296ac53285d7cee8d",
+        "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+        "size": "grande"
+      },
+      "changedFields": [
+        "coverage",
+        "limitations",
+        "parts",
+        "status"
+      ],
+      "expected": "r4_target",
+      "id": "http:M4",
+      "source": "CONFAZ",
+      "verdict": "intended"
+    },
+    {
+      "after": {
+        "bytes": 193059,
+        "cell": "confaz--ajuste-sinief--grande",
+        "chars": 119682,
+        "entrySha256": "479141f73f299e135bbf2c4945a073cd43aaf8bfc4148a84bcd821482415e557",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 6002 unidentified chars; limitations image_without_ocr, unidentified_content, act_region_unproven"
+        ],
+        "outputHash": "707ba6dfaff81473ab26eb8e4ea86ea3b0303b6b7b1b2aaa5cd58705c9ae2c0b",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 8438
+        },
+        "readingComplete": false,
+        "semanticSha256": "58657e6f22f5df01789cec6d575282890b9fc38d4167c7759445047d3ab58986",
+        "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 193059,
+        "cell": "confaz--ajuste-sinief--grande",
+        "chars": 119682,
+        "entrySha256": "e2e6e8aa0d036587b5dac3ed2f1b607bfa4b4454ba7634c15eb67dab3950c308",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 6002 unidentified chars; limitations image_without_ocr, unidentified_content, act_region_unproven"
+        ],
+        "outputHash": "6dab6a96027ba062db9889fa26e154a45e0d92cc2fb1be1e9555b798f9c4ac68",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 8438
+        },
+        "readingComplete": false,
+        "semanticSha256": "58657e6f22f5df01789cec6d575282890b9fc38d4167c7759445047d3ab58986",
+        "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "http:M5",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 192477,
+        "cell": null,
+        "chars": null,
+        "entrySha256": null,
+        "notes": [
+          "uma página (57) do DOU: cabeçalho e rodapé identificados; o ato começa nesta página e CONTINUA nas seguintes (não é o ato completo); o topo da página traz o fim de outra publicação; a extração mistura colunas na mesma linha, então a leitura da anatomia não é validada"
+        ],
+        "outputHash": null,
+        "preparation": null,
+        "profile": null,
+        "reading": null,
+        "readingComplete": null,
+        "semanticSha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "sha256": "09726ebc6e21652ffde6023fb906ba5ecbb3c7fa49b164271c4c629efd49e3ee",
+        "size": null
+      },
+      "before": {
+        "bytes": 192477,
+        "cell": null,
+        "chars": null,
+        "entrySha256": null,
+        "notes": [
+          "uma página (57) do DOU: cabeçalho e rodapé identificados; o ato começa nesta página e CONTINUA nas seguintes (não é o ato completo); o topo da página traz o fim de outra publicação; a extração mistura colunas na mesma linha, então a leitura da anatomia não é validada"
+        ],
+        "outputHash": null,
+        "preparation": null,
+        "profile": null,
+        "reading": null,
+        "readingComplete": null,
+        "semanticSha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "sha256": "09726ebc6e21652ffde6023fb906ba5ecbb3c7fa49b164271c4c629efd49e3ee",
+        "size": null
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "http:M9",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 188132,
+        "cell": null,
+        "chars": null,
+        "entrySha256": null,
+        "notes": [
+          "página 58: continua o art. 8º (inciso XV) e vai ao art. 19 e à assinatura; depois da assinatura só o rodapé. Com a página 57: epígrafe → arts. 1–19 → assinatura, sem anexo mencionado. NÃO se presume ato completo: anexos publicados em outro lugar, ordem visual (colunas misturadas na extração) e assinatura criptográfica não foram verificados"
+        ],
+        "outputHash": null,
+        "preparation": null,
+        "profile": null,
+        "reading": null,
+        "readingComplete": null,
+        "semanticSha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "sha256": "abe7a5836d283ecac5f528f7f49041af22b476b88e7b8a28389ba980eff9fd29",
+        "size": null
+      },
+      "before": {
+        "bytes": 188132,
+        "cell": null,
+        "chars": null,
+        "entrySha256": null,
+        "notes": [
+          "página 58: continua o art. 8º (inciso XV) e vai ao art. 19 e à assinatura; depois da assinatura só o rodapé. Com a página 57: epígrafe → arts. 1–19 → assinatura, sem anexo mencionado. NÃO se presume ato completo: anexos publicados em outro lugar, ordem visual (colunas misturadas na extração) e assinatura criptográfica não foram verificados"
+        ],
+        "outputHash": null,
+        "preparation": null,
+        "profile": null,
+        "reading": null,
+        "readingComplete": null,
+        "semanticSha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "sha256": "abe7a5836d283ecac5f528f7f49041af22b476b88e7b8a28389ba980eff9fd29",
+        "size": null
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "http:M9-p58",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 180179,
+        "cell": "normas-leg-br--lei--grande",
+        "chars": 74715,
+        "entrySha256": "468eeee127f13c6b98ed72e424d87f965ad200766ffbb4c1fe3430ddbbcbde8b",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 1200 unidentified chars; limitations image_without_ocr, normas_leg_local_preparation_only, normas_leg_note_ambiguous, unidentified_content"
+        ],
+        "outputHash": "ed7e6768eb4b8e40f9a351fd005dca485d2b378d10217a4afe6e4ad91b682212",
+        "preparation": null,
+        "profile": "NORMAS-LEG",
+        "reading": {
+          "limitations": [
+            "image_without_ocr",
+            "normas_leg_local_preparation_only",
+            "normas_leg_note_ambiguous",
+            "unidentified_content"
+          ],
+          "quoteHash": "39f4ece98de6dd094e45bf7904be226b5470158c8b1a587c01fd2dba29f6a984",
+          "status": "partial",
+          "unidentified": 1202
+        },
+        "readingComplete": false,
+        "semanticSha256": "3d81b588f25ded789ad5a8618dd74adf57ed925c60db6125cb704129be127352",
+        "sha256": "8b3ccac420436c491d89df580991c859584987f0fbd9dff744bc2a381b3d3d55",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 180179,
+        "cell": "normas-leg-br--lei--grande",
+        "chars": 74715,
+        "entrySha256": "129cb3e16825253a16b592b6f8a5540d9779fc4fbd9e7f2a5f289c0924965c14",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 1200 unidentified chars; limitations image_without_ocr, normas_leg_local_preparation_only, normas_leg_note_ambiguous, unidentified_content"
+        ],
+        "outputHash": "10fc923953c3d9e78b632d63cbf5a5470f1c40540c62041428b470ee6ce17649",
+        "preparation": null,
+        "profile": "NORMAS-LEG",
+        "reading": {
+          "limitations": [
+            "image_without_ocr",
+            "normas_leg_local_preparation_only",
+            "normas_leg_note_ambiguous",
+            "unidentified_content"
+          ],
+          "quoteHash": "39f4ece98de6dd094e45bf7904be226b5470158c8b1a587c01fd2dba29f6a984",
+          "status": "partial",
+          "unidentified": 1202
+        },
+        "readingComplete": false,
+        "semanticSha256": "3d81b588f25ded789ad5a8618dd74adf57ed925c60db6125cb704129be127352",
+        "sha256": "8b3ccac420436c491d89df580991c859584987f0fbd9dff744bc2a381b3d3d55",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "lei-10637-2002-atualizada",
+      "source": "normas.leg.br",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 102382,
+        "cell": null,
+        "chars": null,
+        "entrySha256": null,
+        "notes": [
+          "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
+        ],
+        "outputHash": null,
+        "preparation": null,
+        "profile": null,
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "69593b7b2d7e82c612cd06460b5507ca6e557427dced3f19d8c0d7d30101355a",
+          "status": "partial",
+          "unidentified": 816
+        },
+        "readingComplete": null,
+        "semanticSha256": "e0819cb9572d52f2829c275c7fbb3565f09288fef8a046e845437a99a834ba92",
+        "sha256": "bb863c51cf4cabeed3ee34826137d6bf812e9b4fe05f8bfc9c4b45028efc71cc",
+        "size": null
+      },
+      "before": {
+        "bytes": 102382,
+        "cell": null,
+        "chars": null,
+        "entrySha256": null,
+        "notes": [
+          "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
+        ],
+        "outputHash": null,
+        "preparation": null,
+        "profile": null,
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "69593b7b2d7e82c612cd06460b5507ca6e557427dced3f19d8c0d7d30101355a",
+          "status": "partial",
+          "unidentified": 816
+        },
+        "readingComplete": null,
+        "semanticSha256": "e0819cb9572d52f2829c275c7fbb3565f09288fef8a046e845437a99a834ba92",
+        "sha256": "bb863c51cf4cabeed3ee34826137d6bf812e9b4fe05f8bfc9c4b45028efc71cc",
+        "size": null
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "lei-10637-2002-original",
+      "source": "normas.leg.br",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 388543,
+        "cell": "normas-leg-br--lei--grande",
+        "chars": 167570,
+        "entrySha256": "5cb9c1af5538341e009030190a4b26847bc19d0c3da41df4bc3cf22903a14e3b",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 908 unidentified chars; limitations image_without_ocr, normas_leg_local_preparation_only, normas_leg_note_ambiguous, unidentified_content"
+        ],
+        "outputHash": "03816c3eaa6747082da4e31f2499a07274b00f97b60096586c525d6f841575e4",
+        "preparation": null,
+        "profile": "NORMAS-LEG",
+        "reading": {
+          "limitations": [
+            "image_without_ocr",
+            "normas_leg_local_preparation_only",
+            "normas_leg_note_ambiguous",
+            "unidentified_content"
+          ],
+          "quoteHash": "d7a3b03a6357da21cd6c98064ce956f9f2448445b1be9f74c5750d44c52e4d7a",
+          "status": "partial",
+          "unidentified": 866
+        },
+        "readingComplete": false,
+        "semanticSha256": "9bdac533b726f36c9dc4aed801b441d7d7f6927f323b4cd583f3048da749d079",
+        "sha256": "c5ca0d93e92a5f53c3922a21aad2a606bae78cbc53374af614db3e255581feae",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 388543,
+        "cell": "normas-leg-br--lei--grande",
+        "chars": 167570,
+        "entrySha256": "72ca7de74e627f17711055abbe67ae86cb76ebe1e74909db31f5f6eb0b4580ca",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 908 unidentified chars; limitations image_without_ocr, normas_leg_local_preparation_only, normas_leg_note_ambiguous, unidentified_content"
+        ],
+        "outputHash": "dd89c8ade555103e728c3d64387c38aa40ea89f79c83016e7d75f04e39f2897a",
+        "preparation": null,
+        "profile": "NORMAS-LEG",
+        "reading": {
+          "limitations": [
+            "image_without_ocr",
+            "normas_leg_local_preparation_only",
+            "normas_leg_note_ambiguous",
+            "unidentified_content"
+          ],
+          "quoteHash": "d7a3b03a6357da21cd6c98064ce956f9f2448445b1be9f74c5750d44c52e4d7a",
+          "status": "partial",
+          "unidentified": 866
+        },
+        "readingComplete": false,
+        "semanticSha256": "9bdac533b726f36c9dc4aed801b441d7d7f6927f323b4cd583f3048da749d079",
+        "sha256": "c5ca0d93e92a5f53c3922a21aad2a606bae78cbc53374af614db3e255581feae",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "lei-10833-2003-atualizada",
+      "source": "normas.leg.br",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 308155,
+        "cell": null,
+        "chars": null,
+        "entrySha256": null,
+        "notes": [
+          "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
+        ],
+        "outputHash": null,
+        "preparation": null,
+        "profile": null,
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "8c4e3902854359ce09f393c949afdef35824b166626cb62df6d6b3b9c9c75dd3",
+          "status": "partial",
+          "unidentified": 551
+        },
+        "readingComplete": null,
+        "semanticSha256": "ad801889ddebd311c60167c1a4b3f1e3114a133e103576dec27c52a75be1554d",
+        "sha256": "60044e683ac4078fb90888db9986431fb96bc7b5316f0740ba638b43fd24f0d1",
+        "size": null
+      },
+      "before": {
+        "bytes": 308155,
+        "cell": null,
+        "chars": null,
+        "entrySha256": null,
+        "notes": [
+          "sem perfil de leitura próprio (L-LEG-01); porte não atribuído sem leitura própria"
+        ],
+        "outputHash": null,
+        "preparation": null,
+        "profile": null,
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "8c4e3902854359ce09f393c949afdef35824b166626cb62df6d6b3b9c9c75dd3",
+          "status": "partial",
+          "unidentified": 551
+        },
+        "readingComplete": null,
+        "semanticSha256": "ad801889ddebd311c60167c1a4b3f1e3114a133e103576dec27c52a75be1554d",
+        "sha256": "60044e683ac4078fb90888db9986431fb96bc7b5316f0740ba638b43fd24f0d1",
+        "size": null
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "lei-10833-2003-original",
+      "source": "normas.leg.br",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 20282,
+        "cell": "planalto--lei--pequeno",
+        "chars": 9391,
+        "entrySha256": "12593c51c3c808603ded46234e312d900b7b910ab8fc4e0b8db1b07cecc3a9bc",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 284 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "40105a9553775d25e10927748d5c94acd874d5d818e06b50f661a4836bf89370",
+        "preparation": null,
+        "profile": "PLANALTO",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 430
+        },
+        "readingComplete": false,
+        "semanticSha256": "4e217f64749d2d826e858d3ed31098c99a0a1000ee9df8315408da2af9251164",
+        "sha256": "1bfb6dabc79c5523fd697f4d598e7171be9a0ab694d92423018c71f91bf654bf",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 20282,
+        "cell": "planalto--lei--pequeno",
+        "chars": 9391,
+        "entrySha256": "8d481f581106b3c0698a07025aed49e285d0e581884844f6001a725327d88b6c",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 284 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "860cf350f7c1124c24deb7239415ca43213b3db4590e3bdd54bcc68819f65eec",
+        "preparation": null,
+        "profile": "PLANALTO",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 430
+        },
+        "readingComplete": false,
+        "semanticSha256": "4e217f64749d2d826e858d3ed31098c99a0a1000ee9df8315408da2af9251164",
+        "sha256": "1bfb6dabc79c5523fd697f4d598e7171be9a0ab694d92423018c71f91bf654bf",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M10",
+      "source": "Planalto",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 77417,
+        "cell": "planalto--lei--medio",
+        "chars": 34582,
+        "entrySha256": "c98e2a0a54048d526c1b68d84879b5957beda7e89abda291f1bdbf4c58c8c3a2",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 326 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "3a41d2c28b02d64e8602bb36ba10dd52c70e07249c4eaf646cd03421327ae32a",
+        "preparation": null,
+        "profile": "PLANALTO",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "97a8109724686046c991a3209e2ccb5d994483b3967284ee40247893228b6f17",
+          "status": "partial",
+          "unidentified": 989
+        },
+        "readingComplete": false,
+        "semanticSha256": "37aef21313c1d8b801f36fa4fd89f0a0491b84e5d8c937ce974f3772a17c10a4",
+        "sha256": "5776d1bbd28af7567b3a1d29c385142cd5b37bce8551ae8119a1c120392c6a7f",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 77417,
+        "cell": "planalto--lei--medio",
+        "chars": 34582,
+        "entrySha256": "55d029645cb5940eff66b2838f1631a9614133ff6bcfbdaaca29739601aab90b",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 326 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "804ae597d0b6e6725b114920a10ca8c8ed14614ad210aafbac8317f6d91dfa25",
+        "preparation": null,
+        "profile": "PLANALTO",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "97a8109724686046c991a3209e2ccb5d994483b3967284ee40247893228b6f17",
+          "status": "partial",
+          "unidentified": 989
+        },
+        "readingComplete": false,
+        "semanticSha256": "37aef21313c1d8b801f36fa4fd89f0a0491b84e5d8c937ce974f3772a17c10a4",
+        "sha256": "5776d1bbd28af7567b3a1d29c385142cd5b37bce8551ae8119a1c120392c6a7f",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M12",
+      "source": "Planalto",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 113445,
+        "cell": "confaz--convenio-icms--pequeno",
+        "chars": 1657,
+        "entrySha256": "9118e993b27301b374181594128e160f7f76907d7022aa04ead68717c87ca487",
+        "notes": [],
+        "outputHash": "e059364b9741b9af06a48eb6e3b6777a4adc0bece01922fc596883908ca2d6af",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "a91484269f45f70d8d8e4e1a2fcc8c4943fb12a258418a13025608302effc286",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "94b721b52446fa7dfdfae6b3b2635de4f537b6b1b83ab60daefd6e21e3a58ea3",
+        "sha256": "13bdf6fd9bbb466bea42f81cd1017969d5ac02ba5fbd333ed8ce60620afacb93",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 113445,
+        "cell": "confaz--convenio-icms--pequeno",
+        "chars": 1657,
+        "entrySha256": "73ad5b450ccec29c70ce18f9d8d89ce5caf9d6d698c23aa31858076a28439bae",
+        "notes": [],
+        "outputHash": "5ebb7ee9902cb2aa58a516d33542753d0e72b2399632c6d56cadffe5bd6a518b",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "a91484269f45f70d8d8e4e1a2fcc8c4943fb12a258418a13025608302effc286",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "94b721b52446fa7dfdfae6b3b2635de4f537b6b1b83ab60daefd6e21e3a58ea3",
+        "sha256": "13bdf6fd9bbb466bea42f81cd1017969d5ac02ba5fbd333ed8ce60620afacb93",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M14",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 130312,
+        "cell": "confaz--convenio-icms--pequeno",
+        "chars": 1814,
+        "entrySha256": "d8d935a6848732e71a7a225aafe71e827094ad5305f62cba06241fa3c61ae97b",
+        "notes": [],
+        "outputHash": "250ae9c4ee3fd90b47bf5736d7b0ef4dc32df8f89c11ff661b5fc783fd18b3ff",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "01f2e853d3ebbfd0d70f9cf9c9c3572fced66da757ad4df94949f833b655c888",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "05a2851a147363e731139bc8673080080c2aff3bb1bef49d68b73faccd2e8663",
+        "sha256": "2732a2e1422a8197d560ee94745a0402ced487ee712cbf7e9d934882347c1188",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 130312,
+        "cell": "confaz--convenio-icms--pequeno",
+        "chars": 1814,
+        "entrySha256": "31846480cf24098462063210be0b417c7de7367acf39ac69eaeaf83398f8048c",
+        "notes": [],
+        "outputHash": "af49bb2fca99620a2b801f255946a16269010d293574ed70b645370fd79e73f8",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "01f2e853d3ebbfd0d70f9cf9c9c3572fced66da757ad4df94949f833b655c888",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "05a2851a147363e731139bc8673080080c2aff3bb1bef49d68b73faccd2e8663",
+        "sha256": "2732a2e1422a8197d560ee94745a0402ced487ee712cbf7e9d934882347c1188",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M16",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 54672,
+        "cell": "confaz--ajuste-sinief--pequeno",
+        "chars": 1318,
+        "entrySha256": "62e888388a2c39124da91cfb91942e945af2eb29484d12910b452c25211f8bf9",
+        "notes": [],
+        "outputHash": "448ae6a1aacda17637f655f9368777daded5606eca67eb56d88402ce37b727ea",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "a4da5ce0189519abdfe4942565ed7d1da0b7b1c2c46ffe6d1a8966716bd8a0cd",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "6f97a76c713f5b639515f43f04975367cf43323f2d86564c7d73305986041875",
+        "sha256": "f74457bdd4879560bb17d445eb5110091f356443929839f9d0c4a031c0032862",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 54672,
+        "cell": "confaz--ajuste-sinief--pequeno",
+        "chars": 1318,
+        "entrySha256": "3ce1cb6f00ef08f65bad5758151e707ed064b1c5fd3a6c67cc25fd1f93ec9da9",
+        "notes": [],
+        "outputHash": "79584d5cd3ce8650b03093f31d44bed6af95b566340ec684810486008985fa3d",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "a4da5ce0189519abdfe4942565ed7d1da0b7b1c2c46ffe6d1a8966716bd8a0cd",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "6f97a76c713f5b639515f43f04975367cf43323f2d86564c7d73305986041875",
+        "sha256": "f74457bdd4879560bb17d445eb5110091f356443929839f9d0c4a031c0032862",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M18",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 124885,
+        "cell": "confaz--ajuste-sinief--grande",
+        "chars": 60404,
+        "entrySha256": "4d2f82713257656fce41edad178acda46a1b3e0c8db9795530ce5b1a16609f2b",
+        "notes": [],
+        "outputHash": "4045f5df6b37e27671e84433e4b85db64fb275633bf716ee1a8d03fe432b8c23",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "fdd732779e42b76779ec82da00b119fd5324f4d16e330a176860990eb2c619ce",
+        "sha256": "4253e31bedb7582f55fc553b3a887a986f97f49818e747ab04448a18cd32574b",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 124885,
+        "cell": "confaz--ajuste-sinief--grande",
+        "chars": 60404,
+        "entrySha256": "f55f4f14f11bde8bec9c12a0f879f9e0dc6f75800e7025ebd5bb44d7ca75ee22",
+        "notes": [],
+        "outputHash": "e9ddda6e2cc79ddaadafdff68a1ffbb11e399f3ccff9bc3da7e3fab2d4a47596",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "fdd732779e42b76779ec82da00b119fd5324f4d16e330a176860990eb2c619ce",
+        "sha256": "4253e31bedb7582f55fc553b3a887a986f97f49818e747ab04448a18cd32574b",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M19",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 99999,
+        "cell": "confaz--protocolo-icms--pequeno",
+        "chars": 1244,
+        "entrySha256": "c4c32fed1b3dcaddf851a1b88165f705998ebbbc8cfd7e7e43e3596641e136b5",
+        "notes": [],
+        "outputHash": "4ac18edfab2f62f48c12e253e2769655145d23885825f465b900e13c0cfbf74f",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "3b5aa887573cab4b064b742d5945f36970a4bb376351dcd51d8e3645817b7301",
+        "sha256": "6c09825912e536fd224b41437de777afd3f5eb289ac80d5b501b00fd59929a50",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 99999,
+        "cell": "confaz--protocolo-icms--pequeno",
+        "chars": 1244,
+        "entrySha256": "56dfc3049d2e5b3247279619c1c377c91eb76365fde2da30c036c045c8631ad6",
+        "notes": [],
+        "outputHash": "375dfc75956aadbf9d0eb2b20dcde5d053c374c297b3c289ec3c0a8c3aec30e4",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "3b5aa887573cab4b064b742d5945f36970a4bb376351dcd51d8e3645817b7301",
+        "sha256": "6c09825912e536fd224b41437de777afd3f5eb289ac80d5b501b00fd59929a50",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M20",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 83163,
+        "cell": "confaz--protocolo-icms--pequeno",
+        "chars": 25573,
+        "entrySha256": "e71549dd99d0a689de7ab61fd29b820b96299a734f81bf9979361c6579cea2f7",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 16070 unidentified chars; limitations image_without_ocr, unidentified_content, act_region_unproven"
+        ],
+        "outputHash": "470450f3c795c0cedb8333df6c72cae9d1d6038e21f6d2bceac295991f9e92ab",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 17748
+        },
+        "readingComplete": false,
+        "semanticSha256": "724c789094fae20dfd0964e84fcc10f767703daefb0a8484cd0502b4e8b6a2cf",
+        "sha256": "29ae2cb3dcf233ff62c41cecb8e78a338c60c63c5796624da46809a6a2744d5c",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 83163,
+        "cell": "confaz--protocolo-icms--pequeno",
+        "chars": 25573,
+        "entrySha256": "f32eb83238ea571e9e35a293c1f0595286630d14d5023070e8926a2d74b75b7d",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 16070 unidentified chars; limitations image_without_ocr, unidentified_content, act_region_unproven"
+        ],
+        "outputHash": "7657f6c378e34aee3f7af38163effb40559887ecd4ef73c78f124496af3f1a49",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 17748
+        },
+        "readingComplete": false,
+        "semanticSha256": "724c789094fae20dfd0964e84fcc10f767703daefb0a8484cd0502b4e8b6a2cf",
+        "sha256": "29ae2cb3dcf233ff62c41cecb8e78a338c60c63c5796624da46809a6a2744d5c",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M21",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 86545,
+        "cell": "dou--instrucao-normativa--pequeno",
+        "chars": 2056,
+        "entrySha256": "6cb03863b981b6d120d94b32ed9825fab162be5720e2c177bb82418756232434",
+        "notes": [],
+        "outputHash": "080d0736e8e4692f93375f096c17a594b1f9761cd6698a2dd718e93e9682606d",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "b9537c4a0f51badd4414698e04ffbc378eaaf954069399701e57e7b057fa2067",
+        "sha256": "31b1b1f969813af9eba6dbac0f3781d6bbdc59a5b2f3af42ec30db291974d7a8",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 86545,
+        "cell": "dou--instrucao-normativa--pequeno",
+        "chars": 2056,
+        "entrySha256": "9325f5867f7ff80de6c16e0801e695e1b19e90d8b4cf2a355b233e3206ac644b",
+        "notes": [],
+        "outputHash": "f84d8ed6fe6ab8fa5976475cf6100cf948bb22b4a2ece113ae82d5a4bcb9ca6e",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "b9537c4a0f51badd4414698e04ffbc378eaaf954069399701e57e7b057fa2067",
+        "sha256": "31b1b1f969813af9eba6dbac0f3781d6bbdc59a5b2f3af42ec30db291974d7a8",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M23",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 121219,
+        "cell": "dou--instrucao-normativa--medio",
+        "chars": 29447,
+        "entrySha256": "a9bbb152274098da9e6ff311e1752aadda2ce05059ef89653eedde237f7605ba",
+        "notes": [],
+        "outputHash": "4e9477a46601a80db6ad6e4550791fd265575a5f63a2d813c9ab7add8497aefe",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "8e9b0948da7a6d220a073a4449f281be3576bcd4575b33bdc3a9332debc0dca6",
+        "sha256": "2196ec600f9a1cff11047da3c467261168a1b79cd577126e3ec3e3280f206a10",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 121219,
+        "cell": "dou--instrucao-normativa--medio",
+        "chars": 29447,
+        "entrySha256": "1e02632948279fb4ed756e7abe534036560cf71192fea737d4d251aefea29865",
+        "notes": [],
+        "outputHash": "ab9ec06513e1812b2321cc0c6a472faf5b78e12b55cc7194e6ca7c7d45e76b47",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "8e9b0948da7a6d220a073a4449f281be3576bcd4575b33bdc3a9332debc0dca6",
+        "sha256": "2196ec600f9a1cff11047da3c467261168a1b79cd577126e3ec3e3280f206a10",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M24",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 1800240,
+        "cell": "dou--instrucao-normativa--grande",
+        "chars": 1006011,
+        "entrySha256": "005f583a0768bc1cee5ecc7d59a5f3dd0e930a038207cfba048e49db767680b7",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 1006011 unidentified chars; limitations image_without_ocr, unidentified_content"
+        ],
+        "outputHash": "eee0b4fb3b2511d282b3949f9afa6c1a9dc817675bf55c4201dd42f1c8ac0a55",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 1006011
+        },
+        "readingComplete": false,
+        "semanticSha256": "94e4636844144b68204eea99474141a211180859b79e4fcd13de8186a2b77096",
+        "sha256": "f6fd18d1a8ea0926f1329cde48ccec6f9c251f7cee451980312d7fbd59f842c7",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 1800240,
+        "cell": "dou--instrucao-normativa--grande",
+        "chars": 1006011,
+        "entrySha256": "b5254d4d22446be1708921897661bbadc9be886012642c4a1bab075db97c3215",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 1006011 unidentified chars; limitations image_without_ocr, unidentified_content"
+        ],
+        "outputHash": "85d49de54be06c730c9eb587836b507c29c89493327a7bc49f3dc5b426a00a76",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 1006011
+        },
+        "readingComplete": false,
+        "semanticSha256": "94e4636844144b68204eea99474141a211180859b79e4fcd13de8186a2b77096",
+        "sha256": "f6fd18d1a8ea0926f1329cde48ccec6f9c251f7cee451980312d7fbd59f842c7",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M25",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 100726,
+        "cell": "dou--decreto--pequeno",
+        "chars": 7580,
+        "entrySha256": "420590017b24a13fff4714b2d71ca97f2aa4e0eaded7302850d8e3d5e24f27df",
+        "notes": [],
+        "outputHash": "6eb667b7e6a62dddf796a00e20139255f1800c15059f8b27671072f8538173be",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "4608490d671b24950534e8bf315c43230a3748adda823c52237440448f4fdc64",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "adf8812687baa1a5d2ae37b27b30386a3eb110b2bb8a4f5fed7788e105e47f44",
+        "sha256": "92cb1dff9ffc240ec1c715e063a9461d4b703da4da3654fc7fce96318f5b35d4",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 100726,
+        "cell": "dou--decreto--pequeno",
+        "chars": 7580,
+        "entrySha256": "bc01d38f91ba51409267223daa18ca418cf83052bce44a69dba31903a77e6031",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 129 unidentified chars; limitations unidentified_content"
+        ],
+        "outputHash": "601e83b9b01c76a5408e7bcac30e51507321b0d15a7c0c7c4aee8e6045525022",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [
+            "unidentified_content"
+          ],
+          "quoteHash": "4608490d671b24950534e8bf315c43230a3748adda823c52237440448f4fdc64",
+          "status": "partial",
+          "unidentified": 129
+        },
+        "readingComplete": false,
+        "semanticSha256": "33ab5028edf0d0b9191c4198de688431d3a5705399389df873d7e23611f25370",
+        "sha256": "92cb1dff9ffc240ec1c715e063a9461d4b703da4da3654fc7fce96318f5b35d4",
+        "size": "pequeno"
+      },
+      "changedFields": [
+        "coverage",
+        "eligibility",
+        "limitations",
+        "parts",
+        "status"
+      ],
+      "expected": "r4_target",
+      "id": "M26",
+      "source": "DOU",
+      "verdict": "intended"
+    },
+    {
+      "after": {
+        "bytes": 1599964,
+        "cell": "dou--decreto--grande",
+        "chars": 1162423,
+        "entrySha256": "f6950b6808bcc86f8291202d52b80791d8bb0200ca0e40ce0e2a2ef7d236335d",
+        "notes": [],
+        "outputHash": "99f75802819a2243df0576a19d5b5ad35d91e6345d98ab7355579dea884d9901",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "21f4bfe7215fa5512b8a07c23e02575e61e0755450312878e4d9a99e04c289a0",
+        "sha256": "a77a1e4e1d092ef86a3851389e6d2eae29af603b85d5e0099d099716bb5469f4",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 1599964,
+        "cell": "dou--decreto--grande",
+        "chars": 1162423,
+        "entrySha256": "547f620120894aa834c664cc13eb0f19779800cdb78839a404be7c08bf50ec03",
+        "notes": [],
+        "outputHash": "5d61c7767d6d52dd29cabb14fb93d02364d3250235ccea2e24bdb26f36fce55d",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "21f4bfe7215fa5512b8a07c23e02575e61e0755450312878e4d9a99e04c289a0",
+        "sha256": "a77a1e4e1d092ef86a3851389e6d2eae29af603b85d5e0099d099716bb5469f4",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M28",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 89970,
+        "cell": "dou--portaria--pequeno",
+        "chars": 4833,
+        "entrySha256": "ed54adc69bacef0353ab53af9a56f0bd4f6a3ede27ee5f17119d4dea2b1d4598",
+        "notes": [],
+        "outputHash": "11e9d6387025385e09208071e2fa6982a64147ec1c08be50ce24850578a0d18e",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "15ac5bc7a991798a32368570de6c75dfc6f20c29354887418c3e98c92c74ee85",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "6b27d6f701d73f80095d33b2fa7ad990c2284ebb7094ab4844314770d895d955",
+        "sha256": "d2ca1bf2b076f678fd8e1a50554525dada0e19022d2769a8b780c6a8b1527896",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 89970,
+        "cell": "dou--portaria--pequeno",
+        "chars": 4833,
+        "entrySha256": "798a5988bc9fd19fffc175a3aa64ec10db3a99e80081a943ebd55147e0d18477",
+        "notes": [],
+        "outputHash": "20e2dee32b3fb27da3f19ab735c3eadf3f93da7a9f3146898921e6ca9581682d",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "15ac5bc7a991798a32368570de6c75dfc6f20c29354887418c3e98c92c74ee85",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "6b27d6f701d73f80095d33b2fa7ad990c2284ebb7094ab4844314770d895d955",
+        "sha256": "d2ca1bf2b076f678fd8e1a50554525dada0e19022d2769a8b780c6a8b1527896",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M29",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 109003,
+        "cell": "dou--portaria--medio",
+        "chars": 20539,
+        "entrySha256": "e115440ca5196e3e7f0322372c7743c3467d5de090b5a2d6b60528b6feb73da0",
+        "notes": [],
+        "outputHash": "96512a427dabd6043992609e2e54fe057313dd38e41cb88842642b90c60d0099",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "d4f03f26788e41ee539bdff6cea9a51117505d74458e6f5d7701eed4e57407b4",
+        "sha256": "3629a9eb77320633d92d9d12b1d626faef2ac46627dcd3f49e75aef86a1d3a31",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 109003,
+        "cell": "dou--portaria--medio",
+        "chars": 20539,
+        "entrySha256": "3d845db6c61e24001e0f7f7deab74ea6f7f2402777531ac75768d133367c1ff2",
+        "notes": [],
+        "outputHash": "28f8af3ca873c94b4416b61bedc8909730047ca644554dd38a4a294e9e48fb46",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "d4f03f26788e41ee539bdff6cea9a51117505d74458e6f5d7701eed4e57407b4",
+        "sha256": "3629a9eb77320633d92d9d12b1d626faef2ac46627dcd3f49e75aef86a1d3a31",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M30",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 86811,
+        "cell": "dou--resolucao--pequeno",
+        "chars": 2255,
+        "entrySha256": "f4f5872397523b52d80ef88773ca427a38e8a0532fbc978a7bf0abc5924fb06c",
+        "notes": [],
+        "outputHash": "e9e6f00ddf7b7a2efedd818517329f9186de41d303924df0d5b8500204d0c4c5",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "d960bf2f30738ed4f99ca08023892d3e31904ec02c283b99ebd59acd12b9de1a",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "72473e4c95c01fc83633c038c31e793bf8468820a3c8b12523842908813df79a",
+        "sha256": "866bd1e26cfdbf15bd706f442b5f807cf6e3fb19109efc860f75b9ac957daa0d",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 86811,
+        "cell": "dou--resolucao--pequeno",
+        "chars": 2255,
+        "entrySha256": "47b5f83bd57b6e0c3ab40ca0355784796bce562ff2e3fc18c077d9e2fb04fc94",
+        "notes": [],
+        "outputHash": "f1e7eec76308392696246b1d538a31708e98208f8faefd454d49e7447e8498e9",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "d960bf2f30738ed4f99ca08023892d3e31904ec02c283b99ebd59acd12b9de1a",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "72473e4c95c01fc83633c038c31e793bf8468820a3c8b12523842908813df79a",
+        "sha256": "866bd1e26cfdbf15bd706f442b5f807cf6e3fb19109efc860f75b9ac957daa0d",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M32",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 86028,
+        "cell": "dou--resolucao--pequeno",
+        "chars": 1164,
+        "entrySha256": "8a4bedded30a39608bec092ca8e8dcfe0038937aa7b7a99be6b10840b398e8f6",
+        "notes": [],
+        "outputHash": "8a3276b97875655c427c9a9b5004f23d6aa45cf8eca8603a03583b06ab43d8e2",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "b0ec33f4e697c68ccb2b8f3ff8fcb209d3240c34a61e000b203885eab90959ab",
+        "sha256": "3d3c25f4310982087e0e95a74923a86701775e0280a300bac396503d2e1156b3",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 86028,
+        "cell": "dou--resolucao--pequeno",
+        "chars": 1164,
+        "entrySha256": "492624a989f90361d301007939a93ef03582e089c9fe6fcd0e3918e3307e2f3f",
+        "notes": [],
+        "outputHash": "b3e515d9447ed5be7bf980cde380b2352ce5b46c3337b466d3ea2c43603f3ae2",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "b0ec33f4e697c68ccb2b8f3ff8fcb209d3240c34a61e000b203885eab90959ab",
+        "sha256": "3d3c25f4310982087e0e95a74923a86701775e0280a300bac396503d2e1156b3",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M33",
+      "source": "DOU",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 610084,
+        "cell": "dou--resolucao--grande",
+        "chars": 338990,
+        "entrySha256": "64a6ce45d01c2b4269f4ce719c2945154855eda8fbae7191675eed7e1822bb1d",
+        "notes": [],
+        "outputHash": "83319eeb2aab49c78339196e416b34dcd2db02f61e697e101467314b4ce42d51",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "81346a68344f158d3e526d6be649720b5b1c8f356a8ca46d42d81697d2970fcb",
+        "sha256": "1b5b23ccbf7b97d94b020118a4106f06993454f9ea026562bbbb2bb7b1372642",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 610084,
+        "cell": "dou--resolucao--grande",
+        "chars": 349480,
+        "entrySha256": "3c09deb22a2cc1890665782fb70c23b642b54d8646e26bf150b8f32117bd68af",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 349020 unidentified chars; limitations image_without_ocr, unidentified_content, act_region_unproven"
+        ],
+        "outputHash": "9f523c4ebdcad614dee4cc745037a035b3dfb5e0c503ce002c0c1b664e2ba4cf",
+        "preparation": null,
+        "profile": "DOU",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 349480
+        },
+        "readingComplete": false,
+        "semanticSha256": "1ef97f571d10396f2e20adc2e2b540586eddb223011a699c6ec9d6248f4b0c12",
+        "sha256": "1b5b23ccbf7b97d94b020118a4106f06993454f9ea026562bbbb2bb7b1372642",
+        "size": "grande"
+      },
+      "changedFields": [
+        "canonicalText",
+        "coverage",
+        "eligibility",
+        "entities",
+        "identity",
+        "limitations",
+        "parts",
+        "sourceMap",
+        "status"
+      ],
+      "expected": "r4_target",
+      "id": "M34",
+      "source": "DOU",
+      "verdict": "intended"
+    },
+    {
+      "after": {
+        "bytes": 205981,
+        "cell": "confaz--ajuste-sinief--grande",
+        "chars": 119687,
+        "entrySha256": "96dd7831447ec98f3c9d09a0d2f2d327944211173c93aa6e1494081aa227aee3",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 6008 unidentified chars; limitations image_without_ocr, unidentified_content, act_region_unproven"
+        ],
+        "outputHash": "a372c2c1a5392c0372a0622fac12748c8a0fd819b6c30849e280aad0c28ca668",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 8447
+        },
+        "readingComplete": false,
+        "semanticSha256": "3d885e2005629bbfba73ac0a24e426e4faebd06f0aa1308e856d3bb2605cfae4",
+        "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 205981,
+        "cell": "confaz--ajuste-sinief--grande",
+        "chars": 119687,
+        "entrySha256": "1e1ac9ef9f08d7e81d21e13e04498102b48e53350278dc25b247a87315cb7755",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 6008 unidentified chars; limitations image_without_ocr, unidentified_content, act_region_unproven"
+        ],
+        "outputHash": "076b8b90d52966af7201c4069b32e5ca064e18137542c1cb3700535ccd23baa6",
+        "preparation": null,
+        "profile": "CONFAZ",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "image_without_ocr",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 8447
+        },
+        "readingComplete": false,
+        "semanticSha256": "3d885e2005629bbfba73ac0a24e426e4faebd06f0aa1308e856d3bb2605cfae4",
+        "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "M5",
+      "source": "CONFAZ",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 2285257,
+        "cell": "rfb--instrucao-normativa--grande",
+        "chars": 809136,
+        "entrySha256": "2e5cc03be447b0c388b563ad544a0c73e6bc94f6cf4bee372dfd4661deb61763",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 1819 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
+        ],
+        "outputHash": "792e7f870b7dd92718524bdb0e4579354c09293c08a78ac92bdeb6306e103a4e",
+        "preparation": "23146b8a6ecdf5cc35ff7fd09ac9fe08ba0babf5d69e64333b480423769eaaca",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [
+            "rfb_segment_type_conflict",
+            "rfb_segment_type_unidentified_by_source",
+            "rfb_tachado_evidence",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 1819
+        },
+        "readingComplete": false,
+        "semanticSha256": "2c13d807273670d87e8c1cab0a739a49c28806364fbfc81cf38f882a002dc1d1",
+        "sha256": "9005fddbc2df67e39127db7d34d2feb53ef8dfdc42bc59056862e97b9bb200b5",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 2285257,
+        "cell": "rfb--instrucao-normativa--grande",
+        "chars": 809136,
+        "entrySha256": "a4fc9c84a80f917fadd257e28e45578e5d355f9ad90115aad27f2e0505b520d3",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 1819 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
+        ],
+        "outputHash": "d526308446088acfb63d26051a4bdb526f2b0ba96420b557abf0ef6352f363ec",
+        "preparation": "23146b8a6ecdf5cc35ff7fd09ac9fe08ba0babf5d69e64333b480423769eaaca",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [
+            "rfb_segment_type_conflict",
+            "rfb_segment_type_unidentified_by_source",
+            "rfb_tachado_evidence",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 1819
+        },
+        "readingComplete": false,
+        "semanticSha256": "2c13d807273670d87e8c1cab0a739a49c28806364fbfc81cf38f882a002dc1d1",
+        "sha256": "9005fddbc2df67e39127db7d34d2feb53ef8dfdc42bc59056862e97b9bb200b5",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:104314",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 7914,
+        "cell": "rfb--instrucao-normativa--pequeno",
+        "chars": 2003,
+        "entrySha256": "fc8a0ea8712e26645203f7a8029dc6902a3c5b726fb9fb863f4db1d5292c001e",
+        "notes": [],
+        "outputHash": "e0fb1258c1caedbf18bcd4c4b70a834c2de553cb755720ae2709ed83ae13bbf7",
+        "preparation": "666f7a748813c8af26a6c0e9106a0115a89941dc2cce1727fe9d6696290b8504",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "1b686f815ae3c193f1b1b096450317c05a5206abdd6210df595070a84e6d35bc",
+        "sha256": "b4042dee56a2d69ce59bde5c22a77a219668514fe0713c747c9845cde6838eb4",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 7914,
+        "cell": "rfb--instrucao-normativa--pequeno",
+        "chars": 2003,
+        "entrySha256": "de7fe7f533c9cd92a608563e922b1d0f62470157f67cc9c81c6b79a18bee4bb8",
+        "notes": [],
+        "outputHash": "b8853678e202a2463a3c7e1d798e8d31134058ef7a99b91c087e3b6231a364d2",
+        "preparation": "666f7a748813c8af26a6c0e9106a0115a89941dc2cce1727fe9d6696290b8504",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "1b686f815ae3c193f1b1b096450317c05a5206abdd6210df595070a84e6d35bc",
+        "sha256": "b4042dee56a2d69ce59bde5c22a77a219668514fe0713c747c9845cde6838eb4",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:108391",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 234565,
+        "cell": "rfb--instrucao-normativa--grande",
+        "chars": 57179,
+        "entrySha256": "e2041649a48669684ea52d1502a448b6920e98621d6e3e7118e28e35fa877221",
+        "notes": [],
+        "outputHash": "db6a3130b73ed160fa137a244526d1faf4487240cf4d3475c3481ffaf4e72ff6",
+        "preparation": "cf977ccf18f7397d7c8f823a061bda2ece7e487d5c62fb809303892bc30840ac",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "b0cc1786dfbed5aad8d5be13b405c7789c8bead5d30925b2dab23bb8b5e5b171",
+        "sha256": "c07760b3ceb42030a928c0c97b9dfac44d8daca16a5dcaf611f8fe6201c8bcb2",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 234565,
+        "cell": "rfb--instrucao-normativa--grande",
+        "chars": 57179,
+        "entrySha256": "eb9396ddc5a1b1a82023b7ea5c02c87728de8ac87b15ecc768fba647cbefe762",
+        "notes": [],
+        "outputHash": "68ff318d32ce07d009e18a53d7c5ca27ddde0debb24b2aa9c3ffb01236a4eb29",
+        "preparation": "cf977ccf18f7397d7c8f823a061bda2ece7e487d5c62fb809303892bc30840ac",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "b0cc1786dfbed5aad8d5be13b405c7789c8bead5d30925b2dab23bb8b5e5b171",
+        "sha256": "c07760b3ceb42030a928c0c97b9dfac44d8daca16a5dcaf611f8fe6201c8bcb2",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:115131",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 787461,
+        "cell": "rfb--instrucao-normativa--grande",
+        "chars": 151963,
+        "entrySha256": "c3e680fb81c2599e34b097bd9243c9fcfd64b32dfcc437f55a630ffdfe749d9b",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 103 unidentified chars; 35 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content; own annex completeness: ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo I: present, not read; Anexo II: present, not read; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; Anexo IX: present, not read; Anexo X: present, not read; Anexo XI: present, not read; Anexo XII (ambiguous) absent from the representation; Anexo VI: present, not read; Anexo VII: present, not read; Anexo VIII: present, not read; Anexo XIII (ambiguous) absent from the representation; Anexo XIV (ambiguous) absent from the representation; Anexo XV: present, not read; Anexo XVI (ambiguous) absent from the representation; Anexo XVII (ambiguous) absent from the representation; Anexo XVIII (ambiguous) absent from the representation; Anexo XIX (ambiguous) absent from the representation"
+        ],
+        "outputHash": "487e4f0376f259716ff5c229fbf3b47414d95315a5bcb93e604bfcfca68f8bbe",
+        "preparation": "527306ca00e6b6e3da77e96cf0b9f3479499376ccf44a26a7218adb28d0979d3",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [
+            "rfb_segment_type_conflict",
+            "rfb_segment_type_unidentified_by_source",
+            "rfb_tachado_evidence",
+            "unidentified_content"
+          ],
+          "quoteHash": "7da4278dc862c8aa92542afcd3a910225c660d6f16e8ca0c949415fb36cef7d6",
+          "status": "partial",
+          "unidentified": 103
+        },
+        "readingComplete": false,
+        "semanticSha256": "127fd567e4d111d5c17c59878719d5e915b40721b524da0c200cf82ccea70c88",
+        "sha256": "4ca8d1d3179f32301ebaa34cc7f6eaa9936a0d20df7b44e1ead5d0b828664e78",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 787461,
+        "cell": "rfb--instrucao-normativa--grande",
+        "chars": 151963,
+        "entrySha256": "3cb43dd0d449d1b0dc9620760647f60632ee5902a4068e4bb1f54eeac930d32c",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 103 unidentified chars; 35 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content; own annex completeness: ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo I: present, not read; Anexo II: present, not read; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; Anexo IX: present, not read; Anexo X: present, not read; Anexo XI: present, not read; Anexo XII (ambiguous) absent from the representation; Anexo VI: present, not read; Anexo VII: present, not read; Anexo VIII: present, not read; Anexo XIII (ambiguous) absent from the representation; Anexo XIV (ambiguous) absent from the representation; Anexo XV: present, not read; Anexo XVI (ambiguous) absent from the representation; Anexo XVII (ambiguous) absent from the representation; Anexo XVIII (ambiguous) absent from the representation; Anexo XIX (ambiguous) absent from the representation"
+        ],
+        "outputHash": "4072a4aea94dec997ba1e32015384e88ddd3c9faf0a7b21153098a69210d432e",
+        "preparation": "527306ca00e6b6e3da77e96cf0b9f3479499376ccf44a26a7218adb28d0979d3",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [
+            "rfb_segment_type_conflict",
+            "rfb_segment_type_unidentified_by_source",
+            "rfb_tachado_evidence",
+            "unidentified_content"
+          ],
+          "quoteHash": "7da4278dc862c8aa92542afcd3a910225c660d6f16e8ca0c949415fb36cef7d6",
+          "status": "partial",
+          "unidentified": 103
+        },
+        "readingComplete": false,
+        "semanticSha256": "127fd567e4d111d5c17c59878719d5e915b40721b524da0c200cf82ccea70c88",
+        "sha256": "4ca8d1d3179f32301ebaa34cc7f6eaa9936a0d20df7b44e1ead5d0b828664e78",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:116968",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 11110,
+        "cell": "rfb--resolucao--pequeno",
+        "chars": 2167,
+        "entrySha256": "35fee486f08208dff3805e8a3073447cdd32670b6a4d2874f03d3bcb898a34d5",
+        "notes": [],
+        "outputHash": "9188f17ce4fcb30839a8dcf20229df64bd234331f3ed6ca41215b7a4c5c6f089",
+        "preparation": "ca7a127719047228d85dc98a622c34a0c906dfd2828b39fdefbdc78c5be07e2b",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "04f52a50db7b8b632ddd64c982de0b00af649af1c3d210d357b99fba57404617",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "a24f2e36b9251082598486a0e17a70a053cdcaea087bd0773a9a96a24026b161",
+        "sha256": "9565f3dbfee83ca61ce061c991e9891c1daeb50a9a86f80a8f97bc8d38129b2d",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 11110,
+        "cell": "rfb--resolucao--pequeno",
+        "chars": 2167,
+        "entrySha256": "1730069dd494a0d0eda28317e217098f9488625ce4291602fac1e91c55cf3980",
+        "notes": [],
+        "outputHash": "98a5030a96d1646166cf2775b7743475dca35029caf216be17dfcd95d3d3b13d",
+        "preparation": "ca7a127719047228d85dc98a622c34a0c906dfd2828b39fdefbdc78c5be07e2b",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "04f52a50db7b8b632ddd64c982de0b00af649af1c3d210d357b99fba57404617",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "a24f2e36b9251082598486a0e17a70a053cdcaea087bd0773a9a96a24026b161",
+        "sha256": "9565f3dbfee83ca61ce061c991e9891c1daeb50a9a86f80a8f97bc8d38129b2d",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:122645",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 3530584,
+        "cell": "rfb--instrucao-normativa--grande",
+        "chars": 1009001,
+        "entrySha256": "3826c477418dc7ba3515ed9ba98feef19e26d89ecfe4c28b1710c411531704ff",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 14 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_segment_type_conflict, rfb_quote_unclosed_resume_candidate, unidentified_content; own annex completeness: Anexo I: present, not read; Anexo II: present, not read; ambiguous annex mention without a label: association not provable; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VI: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VIII: present, not read; Anexo XXVI: present, not read; Anexo XXVII: present, not read; Anexo IX: present, not read; Anexo XXVIII: present, not read; Anexo XXIX: present, not read; ambiguous annex mention without a label: association not provable; Anexo X: present, not read; Anexo XII: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XIII: present, not read; Anexo XIV: present, not read; Anexo XV: present, not read; ambiguous annex mention without a label: association not provable; own annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XVI: present, not read; Anexo XVII: present, not read; Anexo XVIII: present, not read; Anexo XIX: present, not read; Anexo XX: present, not read; Anexo XXI: present, not read; Anexo XXIII: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXIV: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXV: present, not read; Anexo VII: present, not read; Anexo XI: present, not read; Anexo XXII: present, not read"
+        ],
+        "outputHash": "a0d0e76dc429caa4f36f8e3318e7c63f9381f38145688cfd67d6ebf420cc9aea",
+        "preparation": "c223c99d03dc08bdcb53ddefbfc5e7624b011aa1c63aa21e93e0656a42455791",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [
+            "rfb_quote_unclosed_resume_candidate",
+            "rfb_segment_type_conflict",
+            "rfb_segment_type_unidentified_by_source",
+            "unidentified_content"
+          ],
+          "quoteHash": "9249412fb1832236eda20ac425b83ba71a5948692447ab6f8b040f8cc11809a5",
+          "status": "partial",
+          "unidentified": 14
+        },
+        "readingComplete": false,
+        "semanticSha256": "231fa365548b6e2b617c017a2677c4bda160b7620912aa3d3e05e7e119f0fd05",
+        "sha256": "9672e74829990edc5246b03eca3e65999499edd9d334cc988293133dbf66490b",
+        "size": "grande"
+      },
+      "before": {
+        "bytes": 3530584,
+        "cell": "rfb--instrucao-normativa--grande",
+        "chars": 1009001,
+        "entrySha256": "179c902b5fe39c798ed1c473906609fbbc42090c3285166ca1a293a49d2068f2",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 14 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_segment_type_conflict, rfb_quote_unclosed_resume_candidate, unidentified_content; own annex completeness: Anexo I: present, not read; Anexo II: present, not read; ambiguous annex mention without a label: association not provable; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VI: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VIII: present, not read; Anexo XXVI: present, not read; Anexo XXVII: present, not read; Anexo IX: present, not read; Anexo XXVIII: present, not read; Anexo XXIX: present, not read; ambiguous annex mention without a label: association not provable; Anexo X: present, not read; Anexo XII: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XIII: present, not read; Anexo XIV: present, not read; Anexo XV: present, not read; ambiguous annex mention without a label: association not provable; own annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XVI: present, not read; Anexo XVII: present, not read; Anexo XVIII: present, not read; Anexo XIX: present, not read; Anexo XX: present, not read; Anexo XXI: present, not read; Anexo XXIII: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXIV: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXV: present, not read; Anexo VII: present, not read; Anexo XI: present, not read; Anexo XXII: present, not read"
+        ],
+        "outputHash": "934cfb199e6e3f333bb9d4fcd23e3aa2d4c4c53889ebdca24d6f684ceb756675",
+        "preparation": "c223c99d03dc08bdcb53ddefbfc5e7624b011aa1c63aa21e93e0656a42455791",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [
+            "rfb_quote_unclosed_resume_candidate",
+            "rfb_segment_type_conflict",
+            "rfb_segment_type_unidentified_by_source",
+            "unidentified_content"
+          ],
+          "quoteHash": "9249412fb1832236eda20ac425b83ba71a5948692447ab6f8b040f8cc11809a5",
+          "status": "partial",
+          "unidentified": 14
+        },
+        "readingComplete": false,
+        "semanticSha256": "231fa365548b6e2b617c017a2677c4bda160b7620912aa3d3e05e7e119f0fd05",
+        "sha256": "9672e74829990edc5246b03eca3e65999499edd9d334cc988293133dbf66490b",
+        "size": "grande"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:127905",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 31143,
+        "cell": "rfb--instrucao-normativa--pequeno",
+        "chars": 4540,
+        "entrySha256": "31d59ff4564ab97f4f2b6dd7971e6bb19b54ac0dbb91866065d47df36a4eecbc",
+        "notes": [],
+        "outputHash": "9fe7e4b38965b145659b575d6148b6150b61c98fcb25cca0d9bd14f8460b9975",
+        "preparation": "fd5532b65f3245f1853636e08e3ee4046594c048443d973e955dfa055ce0383b",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "fbf332d552fad78f1d15da0fff03c11e69d4dde3b1f1333af287d397af8d6775",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "7298db6b1a2ec57bcb4840cbd255e0c03af1ceefba00661626b7f0d633174e25",
+        "sha256": "6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 31143,
+        "cell": "rfb--instrucao-normativa--pequeno",
+        "chars": 4540,
+        "entrySha256": "91ed4f2234de12ed0f90a6345ad71da0c5424a084c278065720f0225bfef340d",
+        "notes": [],
+        "outputHash": "f1872725af52399b6391881c75fd01dd993491f935cbe7f4913b944452ae8c3c",
+        "preparation": "fd5532b65f3245f1853636e08e3ee4046594c048443d973e955dfa055ce0383b",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "fbf332d552fad78f1d15da0fff03c11e69d4dde3b1f1333af287d397af8d6775",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "7298db6b1a2ec57bcb4840cbd255e0c03af1ceefba00661626b7f0d633174e25",
+        "sha256": "6428ea94b1e87705cfb09106fbe5af396621a987ff10a7abd51554e6ffac8408",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:133898",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 144575,
+        "cell": "rfb--instrucao-normativa--medio",
+        "chars": 31389,
+        "entrySha256": "72e18cbd87b844dca6632cb1e92ff0193b33166b8f4d6520b38e64952e6054ad",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 3640 unidentified chars; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, unidentified_content"
+        ],
+        "outputHash": "114275acd2bfbcee3ddfdecf11fd06c0b0ce4567d2840817c7f7aa496d8a02f7",
+        "preparation": "96fa2cdc42cfea85a5bc65f06d5cece9304713f7b091218d1e31bc351624fa6f",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [
+            "rfb_segment_type_unidentified_by_source",
+            "rfb_tachado_evidence",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 3640
+        },
+        "readingComplete": false,
+        "semanticSha256": "664dfa9c60bd3b6c48df5ab8daa3d1293d8082a69b48c8bf094458ca8adaae3b",
+        "sha256": "d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 144575,
+        "cell": "rfb--instrucao-normativa--medio",
+        "chars": 31389,
+        "entrySha256": "881565e96779774bc7bb1b11abb0acc53478c21122cdb50e081afb12e92cb40e",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; 3640 unidentified chars; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, unidentified_content"
+        ],
+        "outputHash": "a933387deed3b41bd8aeac1e79aae1f02bcc9bfd6fe69e25c44e15d5311591b1",
+        "preparation": "96fa2cdc42cfea85a5bc65f06d5cece9304713f7b091218d1e31bc351624fa6f",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [
+            "rfb_segment_type_unidentified_by_source",
+            "rfb_tachado_evidence",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 3640
+        },
+        "readingComplete": false,
+        "semanticSha256": "664dfa9c60bd3b6c48df5ab8daa3d1293d8082a69b48c8bf094458ca8adaae3b",
+        "sha256": "d80a3ba09ae418f6dd587bd62d0bc57415de569ca3ab85a21a3cb746ade9d95e",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:141910",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 24241,
+        "cell": "rfb--portaria--pequeno",
+        "chars": 4699,
+        "entrySha256": "7fbfd0424d5abe1dedd36e1f81a03e585499d600a3fff5be8619de7bb905f4c2",
+        "notes": [],
+        "outputHash": "91668851d47084c57920aef9b60a09e812adef321b81f52d3eb8ddb9572a4dbf",
+        "preparation": "90d35cd103a9bc7107124b887beb6c5929d0c2c11c293978f4d8fd2ae7a55b96",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "f5195333e317572b81dab27bb97542ef43668dd531308137e655c9d47907db50",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "21bf8340dbc3f2e42682fc2870a9d379b6146f9296e8aa84b56688d11e130b53",
+        "sha256": "db6e77240662a40e2565066012568309da34961a830ef1fe8167361efbe36b4c",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 24241,
+        "cell": "rfb--portaria--pequeno",
+        "chars": 4699,
+        "entrySha256": "9be5f1a905e12a73de15fd14707a65122f05ff5499b8ee9a23db7f2320ac18f5",
+        "notes": [],
+        "outputHash": "f2732c4605037783b6ae58f84a4d955de22cf8c67f482e9767382ef2ea26c5dd",
+        "preparation": "90d35cd103a9bc7107124b887beb6c5929d0c2c11c293978f4d8fd2ae7a55b96",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "f5195333e317572b81dab27bb97542ef43668dd531308137e655c9d47907db50",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "21bf8340dbc3f2e42682fc2870a9d379b6146f9296e8aa84b56688d11e130b53",
+        "sha256": "db6e77240662a40e2565066012568309da34961a830ef1fe8167361efbe36b4c",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:142967",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 32477,
+        "cell": "rfb--ato-declaratorio-executivo--medio",
+        "chars": 10620,
+        "entrySha256": "5a0d56e98966013e818cdabeed04090950723c7fc1c70482df6ae4c3ea1d0b1b",
+        "notes": [
+          "partial reading — never accepted as complete: own annex completeness: Anexo Único (own) absent from the representation"
+        ],
+        "outputHash": "687c9c84b9ffe06f4c188a140cc6c517a72dd312c11a8698cd5b4bf2017e60e2",
+        "preparation": "bb6b7ac3e00593d95f73248188c6839ccdc672d9cdebba3ec29a8b96fd31e5c2",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": false,
+        "semanticSha256": "fa4d062c56be9cf546b5690023797408f1ef6b3ff138d1b3fcc2e48e89533c98",
+        "sha256": "0c8788185864c520c77e907778cf15c69e1872b36f82b2313ae3f50e29386f4c",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 32477,
+        "cell": "rfb--ato-declaratorio-executivo--medio",
+        "chars": 10620,
+        "entrySha256": "2276815090e99e5c937ab714463e891278a3d12d4aa407e5220b8dbf754ba55a",
+        "notes": [
+          "partial reading — never accepted as complete: own annex completeness: Anexo Único (own) absent from the representation"
+        ],
+        "outputHash": "e2b3a2630d57f94a637022f9a309bf79d90fc775d7053ea951c056ec2d803838",
+        "preparation": "bb6b7ac3e00593d95f73248188c6839ccdc672d9cdebba3ec29a8b96fd31e5c2",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": false,
+        "semanticSha256": "fa4d062c56be9cf546b5690023797408f1ef6b3ff138d1b3fcc2e48e89533c98",
+        "sha256": "0c8788185864c520c77e907778cf15c69e1872b36f82b2313ae3f50e29386f4c",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:148516",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 11638,
+        "cell": "rfb--ato-declaratorio-executivo--pequeno",
+        "chars": 1140,
+        "entrySha256": "b99d35e51fedfaf0165e7e79bdd3f26e7182de12483df078f79a23c7faa13bb3",
+        "notes": [],
+        "outputHash": "cd1a312ea5e3ffb4d2ae57608e2955ef748643f30ae40e882e007f5bc9b62692",
+        "preparation": "35c3ee36dd403472450fa2c70b86e99ce2e1b3bae3d91d635a824f9c6a61333e",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "9923a545cc91719058535b1e77b0bba0add54631b80c1c1d0ce9a6d0654035a9",
+        "sha256": "cc3c7a1f3e77eda86fb19c9939b12aec15e3f28f9a6927e1131413da2204898f",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 11638,
+        "cell": "rfb--ato-declaratorio-executivo--pequeno",
+        "chars": 1140,
+        "entrySha256": "a6c7b3e8581dd62b80d5c26c47fa138d911ffb0b3e35189e51ef70c3022062fb",
+        "notes": [],
+        "outputHash": "f88526e681e2afff39dbe7be13386a2af42ec2829e860bfc5a6e151fb066119b",
+        "preparation": "35c3ee36dd403472450fa2c70b86e99ce2e1b3bae3d91d635a824f9c6a61333e",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "9923a545cc91719058535b1e77b0bba0add54631b80c1c1d0ce9a6d0654035a9",
+        "sha256": "cc3c7a1f3e77eda86fb19c9939b12aec15e3f28f9a6927e1131413da2204898f",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:148629",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 8185,
+        "cell": null,
+        "chars": null,
+        "entrySha256": "3708e799ef50136511cbac6cf159f4b17b47bef1471ed8ef7b01cf0b17ffdae2",
+        "notes": [
+          "body in an attachment absent from the representation: size UNDETERMINED, never covers a size cell",
+          "partial reading — never accepted as complete: 2 attachment(s) without content"
+        ],
+        "outputHash": "b69e00f80a43ec4275967347bad262650d5d74065ceb9f61ae8428f66b608587",
+        "preparation": "06db6d8aa008e3f9aacdcc5d7a7660260a9b537d6edaf7dbe5ce7b39ac38b116",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": false,
+        "semanticSha256": "bc079243719f158deaf7a10f003b6b23b4df17ee59b18f6977f2ddf10cca4960",
+        "sha256": "d74c8f46b782cb63624ffa02f1f0ac4c575d73dc25a16e6dc7fb69ab4dbdc2c9",
+        "size": null
+      },
+      "before": {
+        "bytes": 8185,
+        "cell": null,
+        "chars": null,
+        "entrySha256": "ff7f6bb2d1da2621a16d30388f707d3536a332ac0de7d94c16153001cb19fe96",
+        "notes": [
+          "body in an attachment absent from the representation: size UNDETERMINED, never covers a size cell",
+          "partial reading — never accepted as complete: 2 attachment(s) without content"
+        ],
+        "outputHash": "2afb2d6c792cb1c7a24d080d99b6d25432336e23aa8195924775b17fcfe62d12",
+        "preparation": "06db6d8aa008e3f9aacdcc5d7a7660260a9b537d6edaf7dbe5ce7b39ac38b116",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": false,
+        "semanticSha256": "bc079243719f158deaf7a10f003b6b23b4df17ee59b18f6977f2ddf10cca4960",
+        "sha256": "d74c8f46b782cb63624ffa02f1f0ac4c575d73dc25a16e6dc7fb69ab4dbdc2c9",
+        "size": null
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:148681",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 73686,
+        "cell": "rfb--portaria--medio",
+        "chars": 20829,
+        "entrySha256": "7d80b45d543f3f598015316ea1ea5939c5f6e440fe1f93c0df7615c3064aa868",
+        "notes": [],
+        "outputHash": "04543c7e1a51469773b9f5c94217e72f75c3ef9598dd46c0c7c1dc193ad9f9eb",
+        "preparation": "196830e1b0ea8b83e45265ad3bcb743f5c54a6d9985f1498219f035752f9a595",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "7d80eec7e6596d594372e4af06bba35c1d202108f19b8ab73a9ce7f0595cb957",
+        "sha256": "a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 73686,
+        "cell": "rfb--portaria--medio",
+        "chars": 20829,
+        "entrySha256": "c2f211e660cc092380b41b3fa59ee42f541e7b8a61abe896a66ac9a737fd4f94",
+        "notes": [],
+        "outputHash": "56414b69367e07bf0f8a71906a09d4d85fdbcea66699cdedc8a6528496704358",
+        "preparation": "196830e1b0ea8b83e45265ad3bcb743f5c54a6d9985f1498219f035752f9a595",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "7d80eec7e6596d594372e4af06bba35c1d202108f19b8ab73a9ce7f0595cb957",
+        "sha256": "a98ade77b2ba777c82ce6388840cbae07d2e313f4c31e8e659388f56e4ab1cc8",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:148693",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 11168,
+        "cell": "rfb--ato-declaratorio-interpretativo--pequeno",
+        "chars": 3106,
+        "entrySha256": "4730343b9d8d9ba15b0d093f28708df7fd5ba39f0a71ec926e46bfe96ac7f975",
+        "notes": [],
+        "outputHash": "e80620d306d540f3263fe49d8902ce06e4e2f064d2142413c8ab22e1c359fe44",
+        "preparation": "5497716e92ccfe3067f84215b423b3d93a23c579f50a58f64293152534e10c01",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "1a66235b8189a1164cdf29a1079e9fb564673220766186672093178cb0c507e4",
+        "sha256": "1c15767f8b2daa40a8e8e6283a1b7c49d7bd98a44aa5d19734a67987ff19b996",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 11168,
+        "cell": "rfb--ato-declaratorio-interpretativo--pequeno",
+        "chars": 3106,
+        "entrySha256": "f140ab9c82f2f098c11b544f63ead8567afceba0feac128fdd92ecbc88e7aef7",
+        "notes": [],
+        "outputHash": "5d91b5ff89a94fcf35c9fffd1474795bf730fbb52253ab7bd5d0772d8793ec1e",
+        "preparation": "5497716e92ccfe3067f84215b423b3d93a23c579f50a58f64293152534e10c01",
+        "profile": "RFB",
+        "reading": {
+          "limitations": [],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "complete",
+          "unidentified": 0
+        },
+        "readingComplete": true,
+        "semanticSha256": "1a66235b8189a1164cdf29a1079e9fb564673220766186672093178cb0c507e4",
+        "sha256": "1c15767f8b2daa40a8e8e6283a1b7c49d7bd98a44aa5d19734a67987ff19b996",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "rfb:37103",
+      "source": "RFB",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 199138,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+        "chars": 33383,
+        "entrySha256": "2c3c853d2bc7c504d973b2f86604e9f9a9a7272bbbdba33dc75ea4b3b84d8519",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "91a73210b8e71f313a3ac0ec11c422eedad04b1da72cce9e0011d4a5af08405f",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "2db935e915a0bf4da83d88ddc344f3219c09b8e0303e6c49da4438228ca05be1",
+          "status": "partial",
+          "unidentified": 357
+        },
+        "readingComplete": false,
+        "semanticSha256": "7c095b70f7abe4a2d1835eb92cb8a82f82b4327b3bb7086e1ecccda010b75c08",
+        "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 199138,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+        "chars": 33383,
+        "entrySha256": "68da62df8435f558440d20436527234d5d283a2b9b21c41f074b72367e52a444",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "f803be98b6e0ebad117be4e78e71cff359edc335b2381ea1927023185d56dbde",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "2db935e915a0bf4da83d88ddc344f3219c09b8e0303e6c49da4438228ca05be1",
+          "status": "partial",
+          "unidentified": 357
+        },
+        "readingComplete": false,
+        "semanticSha256": "7c095b70f7abe4a2d1835eb92cb8a82f82b4327b3bb7086e1ecccda010b75c08",
+        "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "ricms-an1art041",
+      "source": "SEFAZ-SP-PORTAL",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 176447,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+        "chars": 20457,
+        "entrySha256": "9fcc9339c7b2e9a3b6fec972771f5e5908c44389da7a929488ef61a16a754609",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "f9969801907e733473599898471f01d7a22561b23e720adea9313ae949baf694",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "00b80172e8d56dd2be7d50e29c1ec95561f205b9e996b533cf15458b464c5f14",
+          "status": "partial",
+          "unidentified": 218
+        },
+        "readingComplete": false,
+        "semanticSha256": "0ffc2131d06e9c7960462549b9ac4fa18704854e8d25b0c7cc07d02ce1950ada",
+        "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 176447,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+        "chars": 20457,
+        "entrySha256": "fabc3ac03d750f775064136db2ccd13636f0f81875c084ac96528c0ab314f731",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "0fd73436f53b1702ac290694b5e50fd7b752850d02b010f56a48f1dbadd4a593",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "00b80172e8d56dd2be7d50e29c1ec95561f205b9e996b533cf15458b464c5f14",
+          "status": "partial",
+          "unidentified": 218
+        },
+        "readingComplete": false,
+        "semanticSha256": "0ffc2131d06e9c7960462549b9ac4fa18704854e8d25b0c7cc07d02ce1950ada",
+        "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "ricms-an2art003",
+      "source": "SEFAZ-SP-PORTAL",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 168294,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+        "chars": 12616,
+        "entrySha256": "c4ea9b76c466d3e7600c30ba0dca0fcb7b2c2352aacbd3ef00f85940ca0d441d",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "e29a9f1798b08faad07c5dd855ec74e80cafab4a6486fbbcebd783040a34d7d6",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "052551a8d4c04a6fdfa8f619d0057e26b616e09446c087334ea22880ad257e64",
+          "status": "partial",
+          "unidentified": 213
+        },
+        "readingComplete": false,
+        "semanticSha256": "024141ddfffed8c6513e79048ec4bbdfb9171a0ecc77f666de748553dac6114a",
+        "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 168294,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+        "chars": 12616,
+        "entrySha256": "579bfcbb300ef8c4e2402ef3ac71c1583a04a8388f6e25f2181998991c8d1cdf",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "745604ee04b86ee92e26af27cfdd2243b5bf9ac2bf4b62172fd96d4e99c79a0b",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "052551a8d4c04a6fdfa8f619d0057e26b616e09446c087334ea22880ad257e64",
+          "status": "partial",
+          "unidentified": 213
+        },
+        "readingComplete": false,
+        "semanticSha256": "024141ddfffed8c6513e79048ec4bbdfb9171a0ecc77f666de748553dac6114a",
+        "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "ricms-an2art039",
+      "source": "SEFAZ-SP-PORTAL",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 165355,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+        "chars": 11628,
+        "entrySha256": "c63c4d8ad390c31c7af63cf204bae60d321ed4cb4a5ce6e24c491348acc83a7b",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "659c4fd793a490dcfb3ae2f7aa0bf8edeaaea91522ae20e8eacc345ed6720000",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "43ff0f039a57d2299b8c8ca0f0de41bf3a229a923c17fdd7bb8a81edecd19283",
+          "status": "partial",
+          "unidentified": 425
+        },
+        "readingComplete": false,
+        "semanticSha256": "6d18a5563dc4060f5d2dda34f45eeaa83e0f273a7d435085c2d0eda604a9607e",
+        "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+        "size": "médio"
+      },
+      "before": {
+        "bytes": 165355,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+        "chars": 11628,
+        "entrySha256": "229ab2d64edab2e2861d0a4cdc9a5bda4257b5aea611f493fb88e0539cdebe81",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "97398a924cc2f886679a8e8003a2148097313d18bb3bbb481f2f61e14ee65b85",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "43ff0f039a57d2299b8c8ca0f0de41bf3a229a923c17fdd7bb8a81edecd19283",
+          "status": "partial",
+          "unidentified": 425
+        },
+        "readingComplete": false,
+        "semanticSha256": "6d18a5563dc4060f5d2dda34f45eeaa83e0f273a7d435085c2d0eda604a9607e",
+        "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+        "size": "médio"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "ricms-art007",
+      "source": "SEFAZ-SP-PORTAL",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 156994,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+        "chars": 3219,
+        "entrySha256": "7a098a9a23b6e5bd7bff4e5327d2f499728d3367284824ff025866d669ebcd3b",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "2328fc45b0dbb1329e4e05d0be5e52f6426c6ec4841ec1bba2f87756f40c69ee",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "e74525b017c88cdabffa3a2fb785e051ef6b4ac4d25d2913c9a41397271e1294",
+          "status": "partial",
+          "unidentified": 49
+        },
+        "readingComplete": false,
+        "semanticSha256": "caa3f448ce61588794350b93e7e6425b1deca73fa6a48b01b62d3677eda83d41",
+        "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 156994,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+        "chars": 3219,
+        "entrySha256": "22c97d68a9c7d1b2f0970061494e922c2085ddd62b73d8f3866c7d7ddfc6aa0f",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "57bb4da8ca83732e1f5a533dbc21a78b846a81ea779b4450ca74a79be5122f77",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "e74525b017c88cdabffa3a2fb785e051ef6b4ac4d25d2913c9a41397271e1294",
+          "status": "partial",
+          "unidentified": 49
+        },
+        "readingComplete": false,
+        "semanticSha256": "caa3f448ce61588794350b93e7e6425b1deca73fa6a48b01b62d3677eda83d41",
+        "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "ricms-art008",
+      "source": "SEFAZ-SP-PORTAL",
+      "verdict": "equivalent"
+    },
+    {
+      "after": {
+        "bytes": 154921,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+        "chars": 3340,
+        "entrySha256": "0749516003c23131ca345c5bacc07363b6089706654cd99e05417149c0a20f66",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "aa4c0cc2618cb18ec5413835b6e3c13349d8340b20e92d5ff8eaf2ad8779448e",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 54
+        },
+        "readingComplete": false,
+        "semanticSha256": "4a103f2975bc49c55cc8d7d98c2fb6e3968ff441959cc3bc1f8eba8ba0e29026",
+        "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+        "size": "pequeno"
+      },
+      "before": {
+        "bytes": 154921,
+        "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+        "chars": 3340,
+        "entrySha256": "ac6dc3eb7f3174abcb7c83710f79f50ae40996743365fe11b101f7a527edf5a7",
+        "notes": [
+          "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only, unidentified_content"
+        ],
+        "outputHash": "4eb16e8d649e1daf6a8f26ce092a2fac9f08f9eebfcdcb034b0f1e127087e49e",
+        "preparation": null,
+        "profile": "SEFAZ-SP-PORTAL",
+        "reading": {
+          "limitations": [
+            "excluded_executable_content",
+            "sefaz_sp_portal_local_preparation_only",
+            "unidentified_content"
+          ],
+          "quoteHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+          "status": "partial",
+          "unidentified": 54
+        },
+        "readingComplete": false,
+        "semanticSha256": "4a103f2975bc49c55cc8d7d98c2fb6e3968ff441959cc3bc1f8eba8ba0e29026",
+        "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+        "size": "pequeno"
+      },
+      "changedFields": [],
+      "expected": "identity_only",
+      "id": "ricms-art009",
+      "source": "SEFAZ-SP-PORTAL",
+      "verdict": "equivalent"
+    }
+  ]
+}
