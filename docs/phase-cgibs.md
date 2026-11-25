@@ -266,3 +266,15 @@ Configuração operacional final:
   Scheduler e coberta pelo teste de integração existente.
 
 Com esses gates, o conector CGIBS está apto para operação horária.
+
+### Recuperação de checkpoint e identidade estável de origem (controle #106)
+
+Para arquivos já vinculados, a identidade canônica persistida para a origem
+prevalece sobre o checkpoint e sobre uma identidade derivada do título atual.
+Uma origem nova mantém a derivação usual. Checkpoints de execuções
+`PARTIAL_SUCCESS` conservam o estado por arquivo. O status e as falhas da
+execução continuam visíveis com a mesma semântica.
+
+A mudança usa as tabelas existentes e segue a janela incremental normal.
+Extração retroativa de texto e reprocessamento manual de produção exigem
+decisão separada.
