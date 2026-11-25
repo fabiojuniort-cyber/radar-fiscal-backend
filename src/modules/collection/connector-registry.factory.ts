@@ -7,7 +7,7 @@ import { readDoeSpSourceState } from './doe-sp-source-state.repository.js';
 import { RfbNormasConnector } from './rfb-normas.connector.js';
 import { RfbNewsConnector } from './rfb-news.connector.js';
 import { readRfbNormasSourceState } from './rfb-normas-source-state.repository.js';
-import { readCgibsSourceState } from './cgibs-source-state.repository.js';
+import { readCgibsPersistedIdentityKeys, readCgibsSourceState } from './cgibs-source-state.repository.js';
 import { ConfazConnector } from './confaz.connector.js';
 import { DouConnector } from './dou.connector.js';
 import { readDouSourceState } from './dou-source-state.repository.js';
@@ -61,6 +61,8 @@ export function buildConnectorRegistry(
         ? {
             readState: (sourceId) =>
               readCgibsSourceState(options.db!, sourceId),
+            readPersistedIdentityKeys: (sourceId) =>
+              readCgibsPersistedIdentityKeys(options.db!, sourceId),
           }
         : {}),
     }),
