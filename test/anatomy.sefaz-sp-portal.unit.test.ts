@@ -95,7 +95,7 @@ test('L16 negative: quotation keeps precedence; unidentified revogado stays unkn
 const D = new URL('../ops/anatomy/official-identification/doesp-ricms/', import.meta.url);
 const official = (id: string) => {
   const meta = JSON.parse(readFileSync(new URL(`${id}.meta.json`, D), 'utf8')); const bytes = new Uint8Array(readFileSync(new URL(`${id}.html`, D)));
-  assert.equal(meta.promoted, false); assert.equal(meta.verified, false);
+  assert.equal(meta.promoted, false); assert.equal(meta.verified, true); assert.equal(meta.urlVerified, true); assert.match(meta.manualCorroboration?.sha256 ?? '', /^[a-f0-9]{64}$/u);
   assert.equal(createHash('sha256').update(bytes).digest('hex'), meta.sha256, 'raw snapshot untouched');
   const p = prepareSefazSpPortalPage({ resourceId: id, url: meta.url, bytes });
   const run = (html: string) => analyzeAnatomy({ publicationVersionId: id, referenceDate: '2026-11-05', ruleSet: { id: 'sp', version: '1' },
