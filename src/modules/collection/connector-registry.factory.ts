@@ -10,6 +10,7 @@ import { readRfbNormasSourceState } from './rfb-normas-source-state.repository.j
 import { readCgibsSourceState } from './cgibs-source-state.repository.js';
 import { ConfazConnector } from './confaz.connector.js';
 import { DouConnector } from './dou.connector.js';
+import type { DouReserveClient } from './dou-reserve.client.js';
 import { readDouSourceState } from './dou-source-state.repository.js';
 import {
   readConfazSourceState,
@@ -27,6 +28,7 @@ export interface BuildConnectorRegistryOptions {
   includeSimulated?: boolean;
   db?: Kysely<DB>;
   includeDou?: boolean;
+  douReserve?: DouReserveClient;
 }
 
 export function buildConnectorRegistry(
@@ -38,7 +40,8 @@ export function buildConnectorRegistry(
     registry.register(new DouConnector({
       credentials: () => process.env.INLABS_EMAIL && process.env.INLABS_PASSWORD
         ? { email: process.env.INLABS_EMAIL, password: process.env.INLABS_PASSWORD } : undefined,
-      ...(options.db ? { readState: (sourceId: string, runId: string) => readDouSourceState(options.db!, sourceId, runId) } : {}),
+      ...(options.douReserve ? { reserve: options.douReserve } : {}),
+      ...(options.db ? { readState: (sourceId: string, runId: string) => readDouSourceState(options.db!, sourceId, runId, Boolean(options.douReserve)) } : {}),
     }));
   }
 

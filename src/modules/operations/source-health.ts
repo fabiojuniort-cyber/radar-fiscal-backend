@@ -1,6 +1,80 @@
 import { sql, type Kysely } from 'kysely';
 
 import type { DB } from '../../infrastructure/database/database.types.js';
+import { readDouCoverage } from '../collection/dou-coverage.js';
+
+const douPilotExclusions = [{
+  date: '2026-10-09', section: 'DO1E', editions: ['192-A', '192-B', '192-C'],
+  status: 'PENDING_OUTSIDE_PILOT', reason: 'DOU_NESTED_DAILY_ZIP_UNSUPPORTED',
+}];
+
+export function summarizeDouCoverage(value: unknown) {
+  const ledger = readDouCoverage(value);
+  const rows = Object.values(ledger?.rows ?? {});
+  return {
+    state: ledger ? 'TRACKED' : value == null ? 'NOT_YET_TRACKED' : 'INVALID',
+    recordedThrough: ledger?.recordedThrough ?? null,
+    pending: rows.filter(row => row.status === 'PENDING'),
+    activeEscalations: rows.filter(row => row.status === 'ESCALATED'),
+    archivedEscalationCount: ledger?.archivedEscalationCount ?? 0,
+    archivedInLastObservation: Object.values(ledger?.archivedEscalations ?? {}),
+    archivedGapInLastObservation: ledger?.archivedGap ?? null,
+    pilotExclusions: douPilotExclusions,
+  };
+}
+
+/** Operator-only SELECTs. An open or failed attempt cannot replace consultation freshness. */
+export async function readDouCoverageHealth(db: Kysely<DB>) {
+  const result = await sql<{
+    source_code: string;
+    last_consulted_at: Date | null;
+    snapshot_at: Date | null;
+    snapshot_run_status: string | null;
+    snapshot_consultation: 'OK' | 'FAILED' | null;
+    ledger: unknown;
+  }>`
+    SELECT s.code AS source_code, trusted.finished_at AS last_consulted_at,
+           latest.finished_at AS snapshot_at, latest.run_status AS snapshot_run_status,
+           latest.consultation AS snapshot_consultation, latest.ledger
+    FROM sources s
+    LEFT JOIN LATERAL (
+      SELECT cr.finished_at, cr.status AS run_status, ca.metadata -> 'douCoverage' AS ledger,
+             CASE WHEN ca.status <> 'SUCCESS' THEN 'FAILED'
+                  WHEN ca.metadata ->> 'douConsultation' = 'OK' THEN 'OK'
+                  WHEN ca.metadata ->> 'douConsultation' = 'FAILED' THEN 'FAILED'
+             END AS consultation
+      FROM collection_runs cr
+      JOIN collection_attempts ca ON ca.collection_run_id = cr.id
+      WHERE cr.source_id = s.id AND cr.trigger_type <> 'BACKFILL'
+        AND cr.finished_at IS NOT NULL AND cr.status <> 'CANCELLED'
+        AND ca.metadata ? 'douCoverage'
+      ORDER BY cr.finished_at DESC, ca.attempt_no DESC
+      LIMIT 1
+    ) latest ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT cr.finished_at
+      FROM collection_runs cr
+      JOIN collection_attempts ca ON ca.collection_run_id = cr.id
+      WHERE cr.source_id = s.id AND cr.trigger_type <> 'BACKFILL'
+        AND cr.finished_at IS NOT NULL AND ca.status = 'SUCCESS'
+        AND ((cr.status IN ('SUCCESS', 'SUCCESS_NO_RESULTS') AND NOT (ca.metadata ? 'douCoverage'))
+          OR (cr.status IN ('SUCCESS', 'SUCCESS_NO_RESULTS', 'PARTIAL_SUCCESS')
+            AND ca.metadata ->> 'douConsultation' = 'OK'))
+      ORDER BY cr.finished_at DESC, ca.attempt_no DESC
+      LIMIT 1
+    ) trusted ON TRUE
+    WHERE s.connector_key = 'dou' AND s.is_active = TRUE
+    ORDER BY s.code
+  `.execute(db);
+  return result.rows.map(row => ({
+    sourceCode: row.source_code,
+    lastConsultedAt: toDate(row.last_consulted_at),
+    snapshotAt: toDate(row.snapshot_at),
+    snapshotRunStatus: row.snapshot_run_status,
+    snapshotConsultation: row.snapshot_consultation,
+    ...summarizeDouCoverage(row.ledger),
+  }));
+}
 
 /**
  * Source health watchdog.

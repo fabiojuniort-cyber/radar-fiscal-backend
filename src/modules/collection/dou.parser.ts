@@ -7,8 +7,8 @@ import type { ConnectorPublication, ConnectorPartialFailure } from './connector.
 import { ConnectorError } from './connector.error.js';
 import { parseCanonicalRfbFormalAct } from './rfb-normas.identity.js';
 
-export interface DouXmlEntry { name: string; bytes: Uint8Array }
-export interface DouArchiveContext { date: string; section: string; filename: string; officialUrl: string; rawSha256: string }
+export interface DouXmlEntry { name: string; bytes: Uint8Array; expectedSection?: string }
+export interface DouArchiveContext { date: string; section: string; filename: string; officialUrl: string; rawSha256: string; ingestionChannel?: 'DOU_OPEN_DATA_ZIP' }
 interface Part {
   attrs: Record<string, string>;
   fields: Record<string, string>;
@@ -54,7 +54,7 @@ function detachXmlStrings(values: Record<string, string>): void {
 }
 
 function parsePart(entry: DouXmlEntry): Part {
-  const match = /^(\d+)_(\d{8})_(\d+)(?:-(\d+))?\.xml$/.exec(entry.name);
+  const match = /^(\d+)_(\d{8})_(\d+)(?:-(\d+))?\.xml$/i.exec(entry.name);
   if (!match) throw error('DOU_UNRECOGNIZED_XML_FILENAME');
   let xml: string;
   try { xml = new TextDecoder('utf-8', { fatal: true }).decode(entry.bytes); } catch { throw error('DOU_INVALID_ENCODING'); }
@@ -90,6 +90,7 @@ function parsePart(entry: DouXmlEntry): Part {
   if (count !== 1 || rootCount !== 1 || bodyCount !== 1 || attrs.idMateria !== match[3]) throw error('DOU_INVALID_XML_STRUCTURE');
   const date = brazilDate(attrs.pubDate ?? '');
   if (date.replaceAll('-', '') !== match[2]) throw error('DOU_FILENAME_DATE_MISMATCH');
+  if (entry.expectedSection && attrs.pubName !== entry.expectedSection) throw error('DOU_ZIP_FOLDER_SECTION_MISMATCH');
   if (!/^\d+$/.test(attrs.id ?? '') || !attrs.editionNumber || !attrs.artCategory || !attrs.pubName) throw error('DOU_MISSING_METADATA');
   // Multipart grouping needs parsed fields, not the original XML buffers (or
   // embedded base64 images). Keep only the original byte hash/size for provenance.
@@ -287,7 +288,7 @@ export function extractEmbeddedConfazPublications(
         `${parent.externalId}:embedded:${current.parsed.family}:${current.parsed.actNumber}`,
       metadata: {
         sourceRole: 'PRIMARY',
-        ingestionChannel: 'INLABS',
+        ingestionChannel: parent.metadata?.ingestionChannel ?? 'INLABS',
         officialUrlGranularity: 'PAGE',
         dou: {
           publicationDate:
@@ -383,7 +384,7 @@ function publication(parts: Part[], context: DouArchiveContext): ConnectorPublic
     // of the same idMateria. The unmodified official ID is also retained below.
     externalId: `${date}:${a.pubName}:${a.editionNumber}:${a.idMateria}`,
     metadata: {
-      sourceRole: 'PRIMARY', ingestionChannel: 'INLABS', officialUrlGranularity: 'PAGE',
+      sourceRole: 'PRIMARY', ingestionChannel: context.ingestionChannel ?? 'INLABS', officialUrlGranularity: 'PAGE',
       dou: { publicationDate: date, section: a.pubName, edition: a.editionNumber,
         officialMatterId: a.idMateria, agencyPath: a.artCategory,
         unit: a.artCategory!.split('/').at(-1), sourceActType: a.artType,
@@ -414,7 +415,7 @@ interface DouGroups {
 function addDouEntry({ groups, invalid, partialFailures }: DouGroups, entry: DouXmlEntry): void {
   // Infer a group only from the validated filename pattern so a broken continuation
   // prevents a truncated publication from being persisted as a new complete version.
-  const filenameGroup = /^(\d+)_\d{8}_(\d+)(?:-\d+)?\.xml$/.exec(entry.name);
+  const filenameGroup = /^(\d+)_\d{8}_(\d+)(?:-\d+)?\.xml$/i.exec(entry.name);
   const key = filenameGroup ? `${filenameGroup[1]}:${filenameGroup[2]}` : entry.name;
   try {
     const p = parsePart(entry);
@@ -429,12 +430,12 @@ function addDouEntry({ groups, invalid, partialFailures }: DouGroups, entry: Dou
   }
 }
 
-function* assembledPublications({ groups, partialFailures }: DouGroups, context: DouArchiveContext): Generator<ConnectorPublication> {
+function* assembledPublications({ groups, partialFailures }: DouGroups, contextFor: (part: Part) => DouArchiveContext): Generator<ConnectorPublication> {
   for (const [key, parts] of groups) {
     groups.delete(key);
     let publications: ConnectorPublication[];
     try {
-      const parent = publication(parts, context);
+      const parent = publication(parts, contextFor(parts[0]!));
       publications = [parent, ...extractEmbeddedConfazPublications(parent)];
     } catch (e) {
       partialFailures.push({ code: e instanceof ConnectorError ? e.code : 'DOU_INVALID_MATTER', message: 'Matter could not be assembled', itemReference: parts[0]!.entry.name });
@@ -452,20 +453,78 @@ export function parseDouEntries(entries: DouXmlEntry[], context: DouArchiveConte
 } {
   const state: DouGroups = { groups: new Map(), invalid: new Set(), partialFailures: [] };
   for (const entry of entries) addDouEntry(state, entry);
-  return { publications: [...assembledPublications(state, context)], partialFailures: state.partialFailures };
+  return { publications: [...assembledPublications(state, () => context)], partialFailures: state.partialFailures };
+}
+
+interface DouZipSelection { date: string; sections: readonly string[] }
+type ZipLeaf = Omit<DouXmlEntry, 'bytes'> & { auxiliary?: boolean };
+
+function selectMonthlyZipEntry(path: string, selection: DouZipSelection): ZipLeaf | undefined {
+  // Monthly editions are published flat or in a fixed date/section hierarchy.
+  // Never extract to the archive's entry path. Only the basename enters the XML parser.
+  if (path.endsWith('/')) {
+    const directory = /^\d{8}\/(?:(DO[13]E?)\/)?$/.exec(path);
+    if (!directory || (directory[1] && !selection.sections.includes(directory[1]))) throw error('DOU_UNSAFE_ZIP_PATH');
+    return undefined;
+  }
+  let name = path;
+  let expectedSection: string | undefined;
+  let folderDate: string | undefined;
+  if (path.includes('/') || path.includes('\\')) {
+    const nested = /^(\d{8})\/(DO[13]E?)\/([^/\\]+)$/.exec(path);
+    if (!nested || !selection.sections.includes(nested[2]!)) throw error('DOU_UNSAFE_ZIP_PATH');
+    folderDate = nested[1]!;
+    expectedSection = nested[2]!;
+    name = nested[3]!;
+  }
+  if (!/\.xml$/i.test(name)) {
+    const embedded = /^(\d{4}-\d{2}-\d{2})-(DO[13]E?)\.zip$/i.exec(name);
+    if (embedded) {
+      const date = embedded[1]!.replaceAll('-', '');
+      const section = embedded[2]!.toUpperCase();
+      if (!selection.sections.includes(section) || (folderDate && (folderDate !== date || expectedSection !== section))) {
+        throw error('DOU_UNSAFE_ZIP_PATH');
+      }
+      if (date === selection.date) throw error('DOU_NESTED_DAILY_ZIP_UNSUPPORTED');
+      return undefined;
+    }
+    // Thumbs.db and normal images exist in official samples. A renamed
+    // article-shaped file is not an auxiliary member, regardless of suffix.
+    if (/^thumbs\.db$/i.test(name) ||
+        (/\.(?:jpe?g|png|gif)$/i.test(name) && !/^\d+_\d{8}_\d+(?:-\d+)?\./.test(name))) {
+      return !folderDate || folderDate === selection.date ? { name: path, auxiliary: true } : undefined;
+    }
+    throw error('DOU_UNRECOGNIZED_ZIP_MEMBER');
+  }
+  const fileDate = /^\d+_(\d{8})_\d+(?:-\d+)?\.xml$/i.exec(name)?.[1];
+  if (!fileDate) throw error('DOU_UNRECOGNIZED_XML_FILENAME');
+  if (folderDate && folderDate !== fileDate) throw error('DOU_ZIP_FOLDER_DATE_MISMATCH');
+  if (fileDate !== selection.date) return undefined;
+  return { name, ...(expectedSection ? { expectedSection } : {}) };
+}
+
+function validAuxiliary(name: string, bytes: Buffer): boolean {
+  if (/\.jpe?g$/i.test(name)) return bytes.subarray(0, 3).toString('hex') === 'ffd8ff';
+  if (/\.png$/i.test(name)) return bytes.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+  if (/\.gif$/i.test(name)) return /^GIF8[79]a$/.test(bytes.subarray(0, 6).toString('ascii'));
+  return bytes.subarray(0, 8).toString('hex') === 'd0cf11e0a1b11ae1';
 }
 
 /** Read one XML entry at a time without copying the compressed archive. */
 async function visitDouZip(
-  bytes: Uint8Array,
+  source: Uint8Array | string,
   signal: AbortSignal,
   onEntry: (entry: DouXmlEntry) => void,
+  selection?: DouZipSelection,
 ): Promise<{ xmlCount: number; mediaCount: number }> {
-  if (bytes.byteLength > 64 * 1024 * 1024) throw error('DOU_ARCHIVE_TOO_LARGE');
+  if (typeof source !== 'string' && source.byteLength > 64 * 1024 * 1024) throw error('DOU_ARCHIVE_TOO_LARGE');
   signal.throwIfAborted();
-  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.fromBuffer(buffer,
-    { lazyEntries: true, validateEntrySizes: true, strictFileNames: true }, (err, file) => err ? reject(error('DOU_INVALID_ZIP')) : resolve(file)));
+  const options = { lazyEntries: true, validateEntrySizes: true, strictFileNames: true };
+  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
+    const opened = (err: Error | null, file: yauzl.ZipFile) => err ? reject(error('DOU_INVALID_ZIP')) : resolve(file);
+    if (typeof source === 'string') yauzl.open(source, options, opened);
+    else yauzl.fromBuffer(Buffer.from(source.buffer, source.byteOffset, source.byteLength), options, opened);
+  });
   return new Promise((resolve, reject) => {
     const names = new Set<string>(); let total = 0; let xmlCount = 0; let mediaCount = 0; let done = false;
     let stream: NodeJS.ReadableStream & { destroy(): void } | undefined;
@@ -483,18 +542,29 @@ async function visitDouZip(
     signal.addEventListener('abort', abort, { once: true });
     zip.on('error', () => fail(error('DOU_INVALID_ZIP')));
     zip.on('end', () => { if (done) return; done = true; cleanup(); resolve({ xmlCount, mediaCount }); });
+    let entryCount = 0;
     zip.on('entry', (entry: yauzl.Entry) => {
       if (done) return;
       if (signal.aborted) { abort(); return; }
-      total += entry.uncompressedSize;
-      if (names.has(entry.fileName) || names.size >= 5000 || entry.uncompressedSize > 8 * 1024 * 1024 || total > 128 * 1024 * 1024 || entry.isEncrypted()) {
+      if (++entryCount > (selection ? 120_000 : 5000) || entry.isEncrypted()) {
         fail(error('DOU_UNSAFE_ZIP')); return;
       }
-      names.add(entry.fileName);
-      if (entry.fileName.endsWith('/')) { zip.readEntry(); return; }
-      // Flat names are the format observed in both real archives.
-      if (entry.fileName.includes('/') || entry.fileName.includes('\\')) { fail(error('DOU_UNSAFE_ZIP_PATH')); return; }
-      if (!entry.fileName.endsWith('.xml')) { mediaCount++; zip.readEntry(); return; }
+      let selected: ZipLeaf | undefined = { name: entry.fileName };
+      if (selection) {
+        try { selected = selectMonthlyZipEntry(entry.fileName, selection); }
+        catch (e) { fail(e); return; }
+        if (!selected) { zip.readEntry(); return; }
+      }
+      total += entry.uncompressedSize;
+      const logicalName = selection ? selected.name.toLowerCase() : selected.name;
+      if (names.has(logicalName) || names.size >= 5000 || entry.uncompressedSize > 8 * 1024 * 1024 || total > 128 * 1024 * 1024) {
+        fail(error('DOU_UNSAFE_ZIP')); return;
+      }
+      names.add(logicalName);
+      if (selected.name.endsWith('/')) { zip.readEntry(); return; }
+      if (!selected.auxiliary && (selected.name.includes('/') || selected.name.includes('\\'))) { fail(error('DOU_UNSAFE_ZIP_PATH')); return; }
+      if (!selected.auxiliary && !/\.xml$/i.test(selected.name)) { mediaCount++; zip.readEntry(); return; }
+      const entryMetadata = selected;
       zip.openReadStream(entry, (err, input) => {
         if (err || !input) { fail(error('DOU_INVALID_ZIP_ENTRY')); return; }
         if (done) { input.destroy(); return; }
@@ -512,8 +582,13 @@ async function visitDouZip(
           if (done) return;
           if (size !== entry.uncompressedSize || crc32(entryBytes!) !== entry.crc32) { fail(error('DOU_ZIP_CRC_MISMATCH')); return; }
           try {
-            onEntry({ name: entry.fileName, bytes: entryBytes! });
-            xmlCount++;
+            if (entryMetadata.auxiliary) {
+              if (!validAuxiliary(entryMetadata.name, entryBytes!)) throw error('DOU_UNRECOGNIZED_ZIP_MEMBER');
+              mediaCount++;
+            } else {
+              onEntry({ ...entryMetadata, bytes: entryBytes! });
+              xmlCount++;
+            }
           } catch (e) { fail(e); return; }
           entryBytes = undefined;
           stream = undefined;
@@ -547,13 +622,41 @@ export async function parseDouZip(
   const state: DouGroups = { groups: new Map(), invalid: new Set(), partialFailures: [] };
   try {
     const counts = await visitDouZip(bytes, signal, entry => addDouEntry(state, entry));
-    for (const publication of assembledPublications(state, context)) {
+    for (const publication of assembledPublications(state, () => context)) {
       signal.throwIfAborted();
       await onPublication(publication);
       signal.throwIfAborted();
     }
     signal.throwIfAborted();
     return { partialFailures: state.partialFailures, ...counts };
+  } finally {
+    state.groups.clear();
+    state.invalid.clear();
+  }
+}
+
+/** Select one date before inflating XMLs from a disk-backed monthly package. */
+export async function parseDouMonthlyZipDate(
+  path: string,
+  archive: Omit<DouArchiveContext, 'section'>,
+  allowedSections: readonly string[],
+  signal: AbortSignal,
+  onPublication: (publication: ConnectorPublication) => Promise<void>,
+): Promise<{ partialFailures: ConnectorPartialFailure[]; xmlCount: number }> {
+  const state: DouGroups = { groups: new Map(), invalid: new Set(), partialFailures: [] };
+  try {
+    const selection = { date: archive.date.replaceAll('-', ''), sections: allowedSections };
+    const { xmlCount } = await visitDouZip(path, signal, entry => addDouEntry(state, entry), selection);
+    for (const publication of assembledPublications(state, part => {
+      const section = part.attrs.pubName!;
+      if (!allowedSections.includes(section)) throw error('DOU_ARCHIVE_CONTEXT_MISMATCH');
+      return { ...archive, section };
+    })) {
+      signal.throwIfAborted();
+      await onPublication(publication);
+    }
+    signal.throwIfAborted();
+    return { partialFailures: state.partialFailures, xmlCount };
   } finally {
     state.groups.clear();
     state.invalid.clear();
