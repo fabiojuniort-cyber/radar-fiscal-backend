@@ -1,0 +1,295 @@
+name: OPS-01 - read-only inspections and isolated proofs
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ops-runner.yml
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Approved, fixed task (no arbitrary commands)"
+        required: true
+        type: choice
+        options:
+          - inspect_f3_static
+          - inspect_f2_sources
+          - simulate_f3_readonly
+          - prove_f2_isolated
+
+# Workflow has no privileges to push, deploy or modify GitHub resources.
+permissions:
+  contents: read
+
+concurrency:
+  group: ops01-${{ github.workflow }}-${{ github.ref }}-${{ inputs.task || 'pull-request' }}
+  cancel-in-progress: false
+
+jobs:
+  # PR CI gate: real offline F3 inspection, no DB, no ops environment/secrets.
+  inspect-f3-static:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.task == 'inspect_f3_static')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Inspect F3 rules offline (existing read-only test scripts)
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p ops-evidence
+          ./node_modules/.bin/tsx --test \
+            test/collection-filter.f3.unit.test.ts \
+            test/collection-filter.f3-simulation.unit.test.ts \
+            test/collection-filter.engine.unit.test.ts
+          printf 'OPS01_TASK=inspect_f3_static\nOPS01_RESULT=PASS\nOPS01_PRODUCTION_ACCESS=NONE\n' | tee ops-evidence/summary.txt
+          cat ops-evidence/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ops01-f3-offline-summary
+          path: ops-evidence/summary.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Sources fixed to a reviewed commit in the existing proof branch.
+  # No artifacts/paths/URLs supplied by the workflow caller are accepted.
+  inspect-f2-sources:
+    if: github.event_name == 'workflow_dispatch' && inputs.task == 'inspect_f2_sources'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: d4de99e93cd80a8ab02ae0857b1260a01a660b43
+          path: ops-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate immutable XLSX inputs and run the native T03 CLI without DB
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/ops01" ops-evidence
+          trap 'rm -rf "$RUNNER_TEMP/ops01"' EXIT
+          base64 -d ops-source/Radar_Fiscal_Carga_Segmento_Revisada_v5.1.xlsx.b64 > "$RUNNER_TEMP/ops01/segmento.xlsx"
+          base64 -d ops-source/Radar_Fiscal_Carga_Produto_Revisada_v5.xlsx.b64 > "$RUNNER_TEMP/ops01/produto.xlsx"
+          printf '%s  %s\n' \
+            695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67 "$RUNNER_TEMP/ops01/segmento.xlsx" \
+            261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a "$RUNNER_TEMP/ops01/produto.xlsx" | sha256sum --check --status
+          node ops/taxonomy/f2-xlsx-dry-run.mjs \
+            --segmento="$RUNNER_TEMP/ops01/segmento.xlsx" \
+            --produto="$RUNNER_TEMP/ops01/produto.xlsx" \
+            --out="$RUNNER_TEMP/ops01/plan.json" > "$RUNNER_TEMP/ops01/cli.log"
+          node --input-type=module - <<'NODE'
+          import {readFileSync, writeFileSync} from 'node:fs';
+          const p=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/ops01/plan.json','utf8'));
+          const s=p.summary;
+          if(p.mode!=='DRY_RUN_ONLY'||!p.noDatabaseWrites||s.errors!==0||
+             s.segmentRows!==1332||s.productRows!==4225||s.cnaeDistinct!==1332||
+             s.productCodesDistinct!==4225||s.warnings!==448||s.actuationCategories!==12)
+            throw Error('F2_CLI_SOURCE_GATE_FAILED');
+          const safe='OPS01_TASK=inspect_f2_sources\nOPS01_RESULT=PASS\n'+
+            'SEGMENTO_ROWS=1332\nPRODUTO_ROWS=4225\nWARNINGS=448\nPRODUCTION_ACCESS=NONE\n';
+          writeFileSync('ops-evidence/summary.txt',safe);
+          process.stdout.write(safe);
+          NODE
+          cat ops-evidence/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ops01-f2-source-summary
+          path: ops-evidence/summary.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Only on main + manual dispatch + protected environment "ops".
+  # F3 already runs BEGIN REPEATABLE READ READ ONLY, checks unfiltered role,
+  # and prints bounded public metadata only; filter to aggregate summary.
+  simulate-f3-readonly:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.task == 'simulate_f3_readonly'
+    runs-on: ubuntu-latest
+    environment: ops
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: F3 existing simulation under read-only startup
+        shell: bash
+        env:
+          F3_SIMULATION_DATABASE_URL: ${{ secrets.OPS_F3_READONLY_DATABASE_URL }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/ops01" ops-evidence
+          trap 'rm -rf "$RUNNER_TEMP/ops01"' EXIT
+          [[ -n "$F3_SIMULATION_DATABASE_URL" ]] || { echo 'OPS01_BLOCK=F3_SECRET_MISSING'; exit 1; }
+          # The original TS script enforces BEGIN ... READ ONLY and ROLLBACK.
+          if ! PGOPTIONS="-c default_transaction_read_only=on" \
+            node dist/infrastructure/database/f3-type-simulation.js > "$RUNNER_TEMP/ops01/f3.out" 2>/dev/null; then
+            echo 'OPS01_BLOCK=F3_SIMULATION_FAILED'; exit 1
+          fi
+          grep -q '^F3_SIMULATION_PASS; READ_ONLY; NO_WRITE; NO_DELETE$' "$RUNNER_TEMP/ops01/f3.out" || {
+            echo 'OPS01_BLOCK=F3_PASS_MISSING'; exit 1;
+          }
+          # Only aggregate summary (not publication titles, ids or data) is retained.
+          grep '^F3_SIMULATION_SUMMARY=' "$RUNNER_TEMP/ops01/f3.out" > ops-evidence/aggregate.txt
+          printf 'OPS01_TASK=simulate_f3_readonly\nOPS01_RESULT=PASS\nPRODUCTION_WRITE=FORBIDDEN\n' | tee ops-evidence/summary.txt
+          cat ops-evidence/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ops01-f3-aggregate-summary
+          path: ops-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Production is NEVER a restore/write target. Only pg_dump connects to prod.
+  # pg_restore, two staging jobs and readback run against the GitHub Actions
+  # Postgres 18 service in database radar_fiscal_test. No dump is uploaded.
+  prove-f2-isolated:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.task == 'prove_f2_isolated'
+    runs-on: ubuntu-latest
+    environment: ops
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ops01-ephemeral-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d radar_fiscal_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 8
+    env:
+      NODE_ENV: test
+      F2_IMPORT_SCOPE: ISOLATED_POSTGRES18_ONLY
+      DATABASE_ADMIN_URL: postgresql://postgres:ops01-ephemeral-ci-password@localhost:5432/radar_fiscal_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: d4de99e93cd80a8ab02ae0857b1260a01a660b43
+          path: ops-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate signed sources before connecting to production
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/ops01"
+          base64 -d ops-source/Radar_Fiscal_Carga_Segmento_Revisada_v5.1.xlsx.b64 > "$RUNNER_TEMP/ops01/segmento.xlsx"
+          base64 -d ops-source/Radar_Fiscal_Carga_Produto_Revisada_v5.xlsx.b64 > "$RUNNER_TEMP/ops01/produto.xlsx"
+          printf '%s  %s\n' \
+            695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67 "$RUNNER_TEMP/ops01/segmento.xlsx" \
+            261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a "$RUNNER_TEMP/ops01/produto.xlsx" | sha256sum --check --status
+          node ops/taxonomy/f2-xlsx-dry-run.mjs \
+            --segmento="$RUNNER_TEMP/ops01/segmento.xlsx" \
+            --produto="$RUNNER_TEMP/ops01/produto.xlsx" \
+            --out="$RUNNER_TEMP/ops01/plan.json" > "$RUNNER_TEMP/ops01/cli.log"
+          node --input-type=module - <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const s=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/ops01/plan.json','utf8')).summary;
+          if(s.errors!==0||s.warnings!==448||s.segmentRows!==1332||
+             s.productRows!==4225||s.cnaeDistinct!==1332||s.productCodesDistinct!==4225)
+            throw Error('F2_SOURCE_GATE_FAILED');
+          NODE
+          echo 'OPS01_INPUT_HASH_AND_NATIVE_CLI=PASS'
+      - name: Read-only pg_dump (prod) and restore only in Actions PostgreSQL 18
+        shell: bash
+        env:
+          OPS_PROD_READONLY_URL: ${{ secrets.OPS_PROD_READONLY_URL }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          [[ -n "$OPS_PROD_READONLY_URL" ]] || { echo 'OPS01_BLOCK=DUMP_SECRET_MISSING'; exit 1; }
+          # Official postgres:18 image supplies both pg_dump and pg_restore 18.
+          # This is the ONLY step receiving production credentials.
+          docker run --rm --network host --env OPS_PROD_READONLY_URL \
+            --env PGOPTIONS="-c default_transaction_read_only=on -c statement_timeout=600000" \
+            -v "$RUNNER_TEMP/ops01:/work" postgres:18-bookworm \
+            bash -c 'pg_dump --dbname="$OPS_PROD_READONLY_URL" --format=custom --no-owner --no-acl --file=/work/readonly.dump' \
+            >/dev/null 2>&1 || { echo 'OPS01_BLOCK=READONLY_DUMP_FAILED'; exit 1; }
+          echo 'OPS01_PRODUCTION_READONLY_DUMP=PASS'
+          # The credential is NOT supplied to the restore container.
+          docker run --rm --network host -v "$RUNNER_TEMP/ops01:/work" postgres:18-bookworm \
+            pg_restore --dbname="$DATABASE_ADMIN_URL" --no-owner --no-acl \
+            --exit-on-error --single-transaction /work/readonly.dump \
+            >/dev/null 2>&1 || { echo 'OPS01_BLOCK=ISOLATED_RESTORE_FAILED'; exit 1; }
+          echo 'OPS01_ISOLATED_PG18_RESTORE=PASS'
+      - name: Two existing staging jobs with full source readback, isolated DB only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p ops-evidence
+          node ops/taxonomy/f2-t03-stage-writer.mjs --isolated-apply \
+            --segmento="$RUNNER_TEMP/ops01/segmento.xlsx" \
+            --produto="$RUNNER_TEMP/ops01/produto.xlsx" \
+            --report="$RUNNER_TEMP/ops01/first.json" > "$RUNNER_TEMP/ops01/first.log"
+          node ops/taxonomy/f2-t03-stage-writer.mjs --isolated-apply \
+            --segmento="$RUNNER_TEMP/ops01/segmento.xlsx" \
+            --produto="$RUNNER_TEMP/ops01/produto.xlsx" \
+            --report="$RUNNER_TEMP/ops01/second.json" > "$RUNNER_TEMP/ops01/second.log"
+          node --input-type=module - <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const dir=process.env.RUNNER_TEMP+'/ops01/';
+          const one=JSON.parse(readFileSync(dir+'first.json','utf8'));
+          const two=JSON.parse(readFileSync(dir+'second.json','utf8'));
+          if(one.mode!=='F2_PG18_ISOLATED_STAGING_ONLY'||!one.firstRun||
+             one.insertedBatches!==1||one.insertedSegments!==1332||
+             one.insertedProducts!==4225||one.errors!==0||one.warnings!==448||
+             two.firstRun!==false||two.insertedBatches!==0||
+             two.insertedSegments!==0||two.insertedProducts!==0||
+             two.liveTaxonomyChanges!==0||two.batchId!==one.batchId)
+            throw Error('F2_ISOLATED_DOUBLE_JOB_READBACK_FAILED');
+          const safe='OPS01_TASK=prove_f2_isolated\nOPS01_RESULT=PASS\n'+
+            'INPUT_SHA256=PASS\nDUMP_PRODUCTION=READ_ONLY\nRESTORE=GITHUB_ACTIONS_PG18_ONLY\n'+
+            'FIRST_SEGMENTO=1332\nFIRST_PRODUTO=4225\nSECOND_INSERTED=0\n'+
+            'READBACK=PASS\nPRODUCTION_WRITE=FORBIDDEN\n';
+          writeFileSync('ops-evidence/summary.txt',safe);
+          process.stdout.write(safe);
+          NODE
+          cat ops-evidence/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Destroy dump and all source data from this ephemeral runner
+        if: always()
+        shell: bash
+        run: rm -rf -- "$RUNNER_TEMP/ops01"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ops01-f2-isolated-summary
+          path: ops-evidence/summary.txt
+          if-no-files-found: ignore
+          retention-days: 7
