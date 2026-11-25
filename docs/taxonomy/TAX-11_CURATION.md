@@ -146,6 +146,9 @@ site os filtrava e nunca salvou códigos dessas dimensões).
   `conforme`. Isso mantém os falsos negativos conservadores de uma vedação de crédito que se aplica ao setor
   (“Fica vedado o crédito nas saídas de caminhões”) e de uma referência que qualifica uma aplicação afirmativa
   (“Concede isenção a caminhões conforme o Convênio ICMS 133/02”).
+- **Pontuação interna:** vírgulas e dois-pontos não separam a evidência da vedação ou da referência editorial
+  na mesma sentença. A regra inclui `proibido` e `não poderá ser aplicado`, assim como as suas flexões e as
+  formas de concessão e utilização do benefício.
 - **Legado:** runs anteriores, sem o marcador no snapshot, mantêm a tag. Nada é reclassificado nem reprocessado: a
   regra vale só para classificações novas.
 

@@ -178,20 +178,27 @@ export function extractCclasstribCodes(raw: string): Map<string, string> {
 // the automotive application, is not an exclusion ("não se aplica a caminhões", "exceto ônibus") and is not an
 // incidental reference to another act or wording ("de que trata", "nos termos do Convênio ICMS 133/02 …").
 const AUTOMOTIVE_APPLICATION = /\b(?:setor automotivo|industria automobilistica|autopecas|automoveis de passageiros|veiculos automotores|veiculos rodoviarios|transporte rodoviario|caminhoes|onibus)\b/;
-const AUTOMOTIVE_EXCLUSION = /\b(?:nao (?:se aplic\w*|alcanca\w*|abrang\w*|compreend\w*|inclu\w*|se estend\w*|benefici\w*)|exceto|excetuad[oa]s?|salvo|ressalvad[oa]s?|exclui\w*|vedad[oa]s?|com excecao|a excecao|inaplicavel|inaplicaveis)\b/;
+const AUTOMOTIVE_EXCLUSION = /\b(?:nao (?:se aplic\w*|alcanca\w*|abrang\w*|compreend\w*|inclu\w*|se estend\w*|benefici\w*|podera(?:o)? ser (?:aplicad|concedid|utilizad)[oa]s?)|exceto|excetuad[oa]s?|salvo|ressalvad[oa]s?|exclui\w*|vedad[oa]s?|proibid[oa]s?|com excecao|a excecao|inaplicavel|inaplicaveis)\b/;
 const COORDINATED_EXCLUSION = /\be nao (?:a|ao|as|aos|para)\b/;
 const AUTOMOTIVE_INCIDENTAL = /\b(?:de que trata|a que se refere|nos termos|na forma|conforme|previst[oa]s?|referid[oa]s?|mencionad[oa]s?|citad[oa]s?|redacao anterior|revogad[oa]s?)\b|\b(?:lei|decreto|convenio|protocolo|ajuste|portaria|instrucao normativa|resolucao)\b(?: [a-z]+){0,3} (?:n )?\d/;
-const CLAUSE_SEPARATOR = /[.;:()\[\],]|\s[–—-]\s/u;
+const SENTENCE_SEPARATOR = /[;!?]|\.(?=\s|$)/u;
+const TRAILING_APPLICATION_EXCEPTION = /,\s*n[aã]o\s+se\s+aplicando\b/iu;
 const AUTOMOTIVE_SEGMENT_LABEL = 'Automotivo e equipamentos de transporte';
 
 /** True only when the title or the first non-blank line affirmatively applies the act to automotive/transport goods. */
 export function hasAutomotiveApplication(title: string, contentText: string | null | undefined): boolean {
   const opening = [title, contentText?.split(/\r?\n/u).find((line) => line.trim().length > 0) ?? ''];
-  return opening.some((text) => text.split(CLAUSE_SEPARATOR).some((clause) => {
+  return opening.some((text) => text.split(SENTENCE_SEPARATOR).some((sentence) => {
+    // Commas and colons do not terminate a prohibition or reference. Preserve only an explicit
+    // trailing application exception after the affirmative scope has already been stated.
+    if (AUTOMOTIVE_INCIDENTAL.test(normalizeWithIndex(sentence).text)) return false;
+    const exception = TRAILING_APPLICATION_EXCEPTION.exec(sentence);
+    if (exception && AUTOMOTIVE_APPLICATION.test(normalizeWithIndex(sentence.slice(exception.index)).text)) return false;
+    const assertion = sentence.slice(0, exception?.index ?? sentence.length);
     // In "a caminhões e não a reboques", only the first list applies.
-    const affirmative = normalizeWithIndex(clause).text.split(COORDINATED_EXCLUSION, 1)[0]!;
+    const affirmative = normalizeWithIndex(assertion).text.split(COORDINATED_EXCLUSION, 1)[0]!;
     return AUTOMOTIVE_APPLICATION.test(affirmative)
-      && !AUTOMOTIVE_EXCLUSION.test(affirmative) && !AUTOMOTIVE_INCIDENTAL.test(affirmative);
+      && !AUTOMOTIVE_EXCLUSION.test(affirmative);
   }));
 }
 

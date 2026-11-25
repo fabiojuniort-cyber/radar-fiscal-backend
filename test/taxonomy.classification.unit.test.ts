@@ -195,6 +195,14 @@ test('automotive application needs an affirmative clause in the title or first n
     ['Convênio ICMS', 'Concede isenção a caminhões conforme o Convênio ICMS 133/02.', false, 'conservative limit: trailing reference'],
     ['Convênio ICMS', 'Concede isenção a máquinas conforme o Convênio ICMS 133/02 sobre caminhões.', false, 'reference alone does not establish scope'],
     ['Convênio ICMS', 'Isenção conforme Convênio ICMS 133/02 para caminhões', false, 'conservative limit: application only after conforme'],
+    ['Convênio ICMS', 'Fica vedada, nas saídas de caminhões, a aplicação do benefício.', false, 'comma does not detach an item from its prohibition'],
+    ['Convênio ICMS', 'É proibida a aplicação do benefício aos caminhões.', false, 'explicit prohibition of the application'],
+    ['Convênio ICMS', 'O benefício não poderá ser aplicado a caminhões.', false, 'future passive exclusion'],
+    ['Convênio ICMS', 'Nos termos da Lei nº 10.485, os veículos automotores novos.', false, 'comma does not detach a reference'],
+    ['Convênio ICMS', 'Redação anterior: operações com veículos automotores.', false, 'colon does not detach historical wording'],
+    ['Convênio ICMS', 'É proibida a venda com isenção de veículos automotores.', false, 'prohibition governs the exemption'],
+    ['Convênio ICMS', 'As isenções não poderão ser concedidas para caminhões.', false, 'plural future passive exclusion'],
+    ['Convênio ICMS', 'O benefício não poderá ser utilizado para caminhões.', false, 'future passive exclusion of use'],
   ];
   for (const [title, text, expected, why] of cases) assert.equal(hasAutomotiveApplication(title, text), expected, why);
   for (const exclusion of ['não se aplica a', 'não alcança', 'não abrange', 'não compreende', 'não inclui', 'não se estende a', 'não beneficia', 'exceto', 'salvo', 'ressalvados', 'excluídos', 'com exceção de']) {
