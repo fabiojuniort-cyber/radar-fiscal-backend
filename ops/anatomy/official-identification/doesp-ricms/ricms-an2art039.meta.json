@@ -12,10 +12,18 @@
   "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
   "bytes": 168294,
   "consultedAt": "2026-11-05T01:50:01.645Z",
-  "urlStatus": "candidate",
-  "urlVerified": false,
+  "urlStatus": "verified",
+  "urlVerified": true,
   "representation": "html",
-  "verified": false,
+  "verified": true,
   "reason": "coleta de amostra DOE-SP (Sefaz-SP), artigo com redações posteriores",
-  "promoted": false
+  "promoted": false,
+  "manualCorroboration": {
+    "commit": "7c5271a5efb0b953bf10cd9b47effe86ebc83bd8",
+    "url": "https://legislacao.fazenda.sp.gov.br:443/Paginas/an2art039.aspx",
+    "receivedBy": "2026-11-25T02:22:26Z",
+    "bytes": 166725,
+    "sha256": "1d7c332b699bb87c3947863afabc79c6be72297ef1eee74055050b6c02ef32a7",
+    "regionSha256": "22c2ff625c51fda36e8769f4ad635b9878300900211281bc5366f0749a012f00"
+  }
 }

@@ -16,8 +16,9 @@ import { portalActChars } from '../ops/anatomy/official-act-size.js';
 const r2AcceptedSampleIds = ['rfb:108391', 'rfb:115131', 'rfb:122645', 'rfb:133898', 'rfb:142967', 'rfb:148629', 'rfb:148693', 'rfb:37103'];
 const r2Engine = '817617b56ffbe347e42131a11fc855a26c304ebb01a669d10fd42339a8514ffe';
 const completePortalSamples = new Set(['M14', 'M16', 'M18', 'M19', 'M20', 'M23', 'M24', 'M26', 'M28', 'M29', 'M30', 'M32', 'M33', 'M34', 'http:M4']);
-const acceptedSampleIds = [...r2AcceptedSampleIds, ...completePortalSamples, 'rfb:141910', 'M10', 'M12', 'http:M1'].sort();
+const acceptedSampleIds = [...r2AcceptedSampleIds, ...completePortalSamples, ...["ricms-art008","ricms-art009","ricms-an2art039","ricms-an2art003"], 'rfb:141910', 'M10', 'M12', 'http:M1'].sort();
 const acceptedCellIds = [
+  'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio',
   'confaz--convenio-icms--grande', 'dou--decreto--pequeno', 'dou--resolucao--grande',
   'confaz--ajuste-sinief--grande', 'confaz--ajuste-sinief--pequeno', 'confaz--convenio-icms--pequeno', 'confaz--protocolo-icms--pequeno',
   'dou--decreto--grande', 'dou--instrucao-normativa--medio', 'dou--instrucao-normativa--pequeno', 'dou--portaria--medio',
@@ -327,7 +328,7 @@ test('E9 acceptance B4: the committed file is the append-only union with #305/#3
   const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string; entrySha256: string; revalidates?: string }[] };
   // composition gate (tribusca-control#116, after c.6965245285): append-only — the 2026-11-11 Portaria record at 0e009431 is
   // PRESERVED and a revalidation record pins the composed engine; only the record on the current engine makes it accepted
-  assert.equal(file.acceptances.length, 122, '95 prior records and 27 appended for R6');
+  assert.equal(file.acceptances.length, 126, '122 prior records and 4 appended for R6b');
   assert.deepEqual(file.acceptances.slice(18, 26).map((r) => r.sampleId).sort(), r2AcceptedSampleIds);
   assert.ok(file.acceptances.slice(18, 26).every((r) => r.engineBuildHash === r2Engine));
   assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);
@@ -549,13 +550,13 @@ test('E9-M1 non-RFB acceptance: right digest/engine/cell on a complete reading i
   assert.deepEqual([unvalidated.readingComplete, unvalidated.stages.accepted, unvalidated.notes], [null, false, []], 'only validated samples are assessed');
   const approvedNonRfb = acceptedSampleIds.filter(id => !id.startsWith('rfb:'));
   const nonRfb = real.filter((s) => s.source !== 'RFB' && s.stages.validated);
-  assert.deepEqual(nonRfb.filter((s) => s.readingComplete).map((s) => s.id).sort(), approvedNonRfb);
+  assert.deepEqual(nonRfb.filter((s) => s.readingComplete).map((s) => s.id).sort(), [...approvedNonRfb, 'ricms-an1art041', 'ricms-art007'].sort());
   assert.ok(nonRfb.every((s) => s.stages.accepted === approvedNonRfb.includes(s.id) && (s.readingComplete || /^partial reading/u.test(s.notes[0]!))));
   assert.equal(samplesBaseline(real).samples.length, nonRfb.length, 'partial notes do not drop samples from the baseline');
   const mx = buildMatrix(real);
   for (const id of ['confaz--convenio-icms--grande', 'confaz--ajuste-sinief--grande', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio']) {
-    const accepted = id.startsWith('confaz--');
-    const c = mx.cells.find((x) => x.id === id)!; assert.deepEqual([c.status, c.complete, c.accepted, c.partialSamples.length > 0], ['covered', accepted, accepted, true], id);
+    const hasPartial = id.startsWith('confaz--');
+    const c = mx.cells.find((x) => x.id === id)!; assert.deepEqual([c.status, c.complete, c.accepted, c.partialSamples.length > 0], ['covered', true, true, hasPartial], id);
   }
 });
 

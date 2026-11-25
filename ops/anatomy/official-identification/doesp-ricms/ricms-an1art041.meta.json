@@ -12,11 +12,19 @@
   "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
   "bytes": 199138,
   "consultedAt": "2026-11-05T18:22:00.738Z",
-  "urlStatus": "candidate",
-  "urlVerified": false,
+  "urlStatus": "verified",
+  "urlVerified": true,
   "representation": "html",
-  "verified": false,
+  "verified": true,
   "reason": "COLETA-02 item 5 (L18): 25 p.revogado dentro de blockquote",
   "origin": "automated fetch via consultOfficial (COLETA-02)",
-  "promoted": false
+  "promoted": false,
+  "manualCorroboration": {
+    "commit": "7c5271a5efb0b953bf10cd9b47effe86ebc83bd8",
+    "url": "https://legislacao.fazenda.sp.gov.br:443/Paginas/an1art041.aspx",
+    "receivedBy": "2026-11-25T02:22:26Z",
+    "bytes": 197569,
+    "sha256": "dcc0efa4ba94d8e61a2ac2609c988a81cf80a4130ac51000d27cf8282356409e",
+    "regionSha256": "7b2a90bfaa2038e56a13c0635fe43a673976c05c93fe0a2e85135f75fbd21d7b"
+  }
 }

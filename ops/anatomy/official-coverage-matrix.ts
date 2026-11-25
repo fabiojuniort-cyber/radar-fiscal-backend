@@ -1,3 +1,4 @@
+import { DomUtils, parseDocument } from 'htmlparser2';
 /**
  * E9 / P3 — official coverage matrix "fonte × tipo de ato × variação de layout × porte" (direction approved by Fábio,
  * #116 c.6514510003; E9 criterion STATUS-MATRIX-02 §9; R2 of #303 c.6701945748).
@@ -382,6 +383,32 @@ export function assessNonRfbSample(sample: Sample, rd: Pick<Read, 'status' | 'un
   if (sample.stages.accepted) sample.evidence.push('docs/anatomy/e9-acceptances.json');
 }
 
+type SefazSampleMeta = { id: string; url: string; finalUrl: string; sha256: string; bytes: number; urlVerified?: boolean; verified?: boolean;
+  manualCorroboration?: { commit: string; url: string; receivedBy: string; bytes: number; sha256: string; regionSha256: string } };
+const SEFAZ_MANUAL_DIR = join(ROOT, 'manual-inbox', 'sefaz-sp');
+const SEFAZ_MANUAL_COMMIT = '7c5271a5efb0b953bf10cd9b47effe86ebc83bd8';
+const SEFAZ_LOCAL_PROVENANCE = 'sefaz_sp_portal_local_preparation_only';
+
+function corroborateSefazSample(meta: SefazSampleMeta, regionSha256: string): boolean {
+  const evidence = meta.manualCorroboration;
+  if (!meta.urlVerified && !meta.verified && !evidence) return false;
+  const fail = () => { throw new SampleIntegrityError(meta.id + ': invalid SEFAZ-SP manual corroboration'); };
+  if (!meta.urlVerified || !meta.verified || !evidence || evidence.commit !== SEFAZ_MANUAL_COMMIT
+    || evidence.regionSha256 !== regionSha256 || !/^ricms-(?:an\d+)?art\d+$/u.test(meta.id)) return fail();
+  const url = new URL(meta.url).href;
+  if (new URL(meta.finalUrl).href !== url || new URL(evidence.url).href !== url) return fail();
+  const file = meta.id + '.html';
+  const rows = readFileSync(join(SEFAZ_MANUAL_DIR, 'MANIFEST.csv'), 'utf8').split(/\r?\n/u).filter(l => l.startsWith(file + ','));
+  if (rows.length !== 1 || !rows[0]!.startsWith(file + ',' + evidence.bytes + ',' + evidence.sha256 + ',' + evidence.url + ',"<= ' + evidence.receivedBy + ' (')
+    || !Number.isFinite(Date.parse(evidence.receivedBy)) || Date.parse(evidence.receivedBy) > Date.parse('2026-11-25T02:22:26Z')) return fail();
+  const bytes = verifiedBytes(join(SEFAZ_MANUAL_DIR, file), evidence, meta.id + ' manual');
+  const html = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  const canonical = DomUtils.findAll(el => el.name === 'link' && el.attribs.rel?.toLowerCase().split(/\s+/u).includes('canonical'), parseDocument(html).children);
+  if (canonical.length !== 1 || !canonical[0]!.attribs.href || new URL(canonical[0]!.attribs.href).href !== url
+    || prepareSefazSpPortalPage({ resourceId: meta.id, url, bytes }).region.sha256 !== regionSha256) return fail();
+  return true;
+}
+
 export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), acceptances: Acceptance[] = loadAcceptances(new Set(GRID.map((c) => c.id)))): Sample[] {
   const out: Sample[] = [];
   const locked = (id: string, s: string, profile: string, rd: Read) => {
@@ -426,7 +453,7 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
   // Sefaz-SP consolidated legislation portal: read only through its proven preparation (typed source).
   const sp = join(ROOT, 'doesp-ricms');
   for (const f of readdirSync(sp).filter((x) => x.endsWith('.meta.json')).sort()) {
-    const m = JSON.parse(readFileSync(join(sp, f), 'utf8')) as { id: string; url: string; sha256: string; bytes: number };
+    const m = JSON.parse(readFileSync(join(sp, f), 'utf8')) as SefazSampleMeta;
     const bytes = verifiedBytes(join(sp, `${m.id}.html`), m, m.id);
     const prep = prepareSefazSpPortalPage({ resourceId: m.id, url: m.url, bytes });
     const rd = readWith('SEFAZ-SP-PORTAL', m.id, prep.html, { sefazSpPortal: prep });
@@ -434,7 +461,17 @@ export function collectSamples(baseline: BaselineEntry[] = loadBaseline(), accep
     const spSample: Sample = { id: m.id, source: 'SEFAZ-SP-PORTAL', type: 'Decreto consolidado (RICMS/2000), artigo', layout: LAYOUT.SP_PORTAL_HTML, chars: rd.chars, size: sizeOf(rd.chars), sha256: m.sha256, bytes: m.bytes,
       stages: { captured: true, identified: true, read: true, validated: ok, accepted: false }, profile: 'SEFAZ-SP-PORTAL', diagnostic: null, outputHash: rd.outputHash,
       evidence: ok ? ['docs/anatomy/official-samples-baseline.json', 'test/anatomy.official-coverage.unit.test.ts'] : [], notes: [...rd.invariants] };
-    assessNonRfb(spSample, rd); out.push(spSample);
+    // This evidence closes only the offline provenance gap. Keep the motor output and its
+    // limitation intact, and continue to reject any substantive or unexplained reading gap.
+    const corroborated = corroborateSefazSample(m, prep.region.sha256);
+    const provenanceOnly = rd.status === 'partial' && rd.unidentifiedChars === 0
+      && rd.limitationCodes.includes(SEFAZ_LOCAL_PROVENANCE)
+      && rd.limitationCodes.every(code => code === SEFAZ_LOCAL_PROVENANCE || NON_SUBSTANTIVE_LIMITATIONS.includes(code));
+    if (corroborated) spSample.evidence.push('ops/anatomy/official-identification/manual-inbox/sefaz-sp/MANIFEST.csv');
+    assessNonRfb(spSample, corroborated && provenanceOnly
+      ? { ...rd, status: 'complete', limitationCodes: rd.limitationCodes.filter(code => code !== SEFAZ_LOCAL_PROVENANCE) }
+      : rd);
+    out.push(spSample);
   }
   const ownProfile = (sample: Sample, profile: 'PLANALTO' | 'NORMAS-LEG', html: string, chars: number | null, proof: object): Sample => {
     const rd = readWith(profile, sample.id, html, proof);

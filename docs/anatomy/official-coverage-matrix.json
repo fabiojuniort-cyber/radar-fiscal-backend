@@ -422,12 +422,11 @@
       "outputHash": "f170820ba1d5aa361ad8fcd2ce3104d047364d6905866cc739d64379a95cb598",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
-        "test/anatomy.official-coverage.unit.test.ts"
+        "test/anatomy.official-coverage.unit.test.ts",
+        "ops/anatomy/official-identification/manual-inbox/sefaz-sp/MANIFEST.csv"
       ],
-      "notes": [
-        "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only"
-      ],
-      "readingComplete": false
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "ricms-an2art003",
@@ -443,19 +442,19 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": false
+        "accepted": true
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
       "outputHash": "f7b72d1fbe89100bd00fd7fdd955f5c5e5f3aa7d1d65460cfc8d766a40c01e71",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
-        "test/anatomy.official-coverage.unit.test.ts"
+        "test/anatomy.official-coverage.unit.test.ts",
+        "ops/anatomy/official-identification/manual-inbox/sefaz-sp/MANIFEST.csv",
+        "docs/anatomy/e9-acceptances.json"
       ],
-      "notes": [
-        "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only"
-      ],
-      "readingComplete": false
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "ricms-an2art039",
@@ -471,19 +470,19 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": false
+        "accepted": true
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
       "outputHash": "7244b84728fd9c0c7645a81bae18649117783e4fa180eb81dc3890ce6368c99c",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
-        "test/anatomy.official-coverage.unit.test.ts"
+        "test/anatomy.official-coverage.unit.test.ts",
+        "ops/anatomy/official-identification/manual-inbox/sefaz-sp/MANIFEST.csv",
+        "docs/anatomy/e9-acceptances.json"
       ],
-      "notes": [
-        "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only"
-      ],
-      "readingComplete": false
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "ricms-art007",
@@ -506,12 +505,11 @@
       "outputHash": "e47a1fb71a85b72863051aa2c5b613bca9c983e94fee4e019ca8023787253e41",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
-        "test/anatomy.official-coverage.unit.test.ts"
+        "test/anatomy.official-coverage.unit.test.ts",
+        "ops/anatomy/official-identification/manual-inbox/sefaz-sp/MANIFEST.csv"
       ],
-      "notes": [
-        "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only"
-      ],
-      "readingComplete": false
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "ricms-art008",
@@ -527,19 +525,19 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": false
+        "accepted": true
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
       "outputHash": "64769c898aca30a23dd2b9ad01b7dddd46d76307da795a85bd55a09555d6fdfc",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
-        "test/anatomy.official-coverage.unit.test.ts"
+        "test/anatomy.official-coverage.unit.test.ts",
+        "ops/anatomy/official-identification/manual-inbox/sefaz-sp/MANIFEST.csv",
+        "docs/anatomy/e9-acceptances.json"
       ],
-      "notes": [
-        "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only"
-      ],
-      "readingComplete": false
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "ricms-art009",
@@ -555,19 +553,19 @@
         "identified": true,
         "read": true,
         "validated": true,
-        "accepted": false
+        "accepted": true
       },
       "profile": "SEFAZ-SP-PORTAL",
       "diagnostic": null,
       "outputHash": "0ee6aecdc2afd704c5207b513431f6647ce1967372c1f3eea9b315fd07c3ff2c",
       "evidence": [
         "docs/anatomy/official-samples-baseline.json",
-        "test/anatomy.official-coverage.unit.test.ts"
+        "test/anatomy.official-coverage.unit.test.ts",
+        "ops/anatomy/official-identification/manual-inbox/sefaz-sp/MANIFEST.csv",
+        "docs/anatomy/e9-acceptances.json"
       ],
-      "notes": [
-        "partial reading — never accepted as complete: status partial; limitations sefaz_sp_portal_local_preparation_only"
-      ],
-      "readingComplete": false
+      "notes": [],
+      "readingComplete": true
     },
     {
       "id": "lei-10637-2002-atualizada",
@@ -2442,12 +2440,9 @@
         "ricms-art008",
         "ricms-art009"
       ],
-      "complete": false,
-      "partialSamples": [
-        "ricms-art008",
-        "ricms-art009"
-      ],
-      "accepted": false,
+      "complete": true,
+      "partialSamples": [],
+      "accepted": true,
       "unvalidatedSamples": []
     },
     {
@@ -2467,14 +2462,9 @@
         "ricms-an2art039",
         "ricms-art007"
       ],
-      "complete": false,
-      "partialSamples": [
-        "ricms-an1art041",
-        "ricms-an2art003",
-        "ricms-an2art039",
-        "ricms-art007"
-      ],
-      "accepted": false,
+      "complete": true,
+      "partialSamples": [],
+      "accepted": true,
       "unvalidatedSamples": []
     },
     {

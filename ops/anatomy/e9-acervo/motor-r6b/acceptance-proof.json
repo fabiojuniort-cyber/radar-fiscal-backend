@@ -1,0 +1,58 @@
+{
+  "originalLedgerSha256": "5839f5be0f67bbd05f5ca0bdf09f31695ede305fb430c77feead3fcc38d83fdf",
+  "preserved": 122,
+  "records": [
+    {
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R6b)",
+      "decidedOn": "2026-11-25",
+      "engineBuildHash": "a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "entrySha256": "0f646da28c04a6e1443895c32c4c55717c3c251455714553df75ca4938ae2e07",
+      "limits": [
+        "Leitura offline de artigo no portal consolidado SEFAZ-SP, com região idêntica à captura manual. legalStatus permanece unknown."
+      ],
+      "ref": "Mandato COORD R6b | capturas verificadas no commit 7c5271a5efb0b953bf10cd9b47effe86ebc83bd8 | ops/anatomy/e9-acervo/motor-r6b/equivalence.json",
+      "sampleId": "ricms-art008",
+      "scope": "offline"
+    },
+    {
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R6b)",
+      "decidedOn": "2026-11-25",
+      "engineBuildHash": "a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "entrySha256": "391605e53e7bc704dffcd241a4aa954bb893a0d24a6deaa8a57ea0542c5209c7",
+      "limits": [
+        "Leitura offline de artigo no portal consolidado SEFAZ-SP, com região idêntica à captura manual. legalStatus permanece unknown."
+      ],
+      "ref": "Mandato COORD R6b | capturas verificadas no commit 7c5271a5efb0b953bf10cd9b47effe86ebc83bd8 | ops/anatomy/e9-acervo/motor-r6b/equivalence.json",
+      "sampleId": "ricms-art009",
+      "scope": "offline"
+    },
+    {
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R6b)",
+      "decidedOn": "2026-11-25",
+      "engineBuildHash": "a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "entrySha256": "868f06873b652f9f986537c44f2d55cb2eb43776dc4c260ddff26b317f1c985e",
+      "limits": [
+        "Leitura offline de artigo no portal consolidado SEFAZ-SP, com região idêntica à captura manual. legalStatus permanece unknown."
+      ],
+      "ref": "Mandato COORD R6b | capturas verificadas no commit 7c5271a5efb0b953bf10cd9b47effe86ebc83bd8 | ops/anatomy/e9-acervo/motor-r6b/equivalence.json",
+      "sampleId": "ricms-an2art039",
+      "scope": "offline"
+    },
+    {
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "decidedBy": "COORD (Frente 1, E9-MOTOR R6b)",
+      "decidedOn": "2026-11-25",
+      "engineBuildHash": "a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "entrySha256": "5cc25c0076a9c2c108093e4ac9f17f0cd3eabe9da827ccc8c1b14eb6f9426125",
+      "limits": [
+        "Leitura offline de artigo no portal consolidado SEFAZ-SP, com região idêntica à captura manual. legalStatus permanece unknown."
+      ],
+      "ref": "Mandato COORD R6b | capturas verificadas no commit 7c5271a5efb0b953bf10cd9b47effe86ebc83bd8 | ops/anatomy/e9-acervo/motor-r6b/equivalence.json",
+      "sampleId": "ricms-an2art003",
+      "scope": "offline"
+    }
+  ]
+}
