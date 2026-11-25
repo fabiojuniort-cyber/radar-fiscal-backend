@@ -1,5 +1,5 @@
 {
-  "engineBuildHash": "87337b64ac0833d84c9ea1f9e54c87c146abce804cb6f2026714e5afd231d44d",
+  "engineBuildHash": "a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
   "acts": [
     {
       "idAto": 37103,
@@ -35,7 +35,7 @@
       "struckSegments": 2,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "17b3249cfa8c91088ee45abf9ae4f74b3e27338b135dcda782a95d0594e1ba37",
+      "outputHash": "63b6f9e6170e5f341900e8f9e6f95625b049a4d872e7aa6fd56f7019217eeb9e",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -85,7 +85,7 @@
       "struckSegments": 4002,
       "attachmentsWithoutContent": 30,
       "missingSegments": 0,
-      "outputHash": "48f82339f9e3a9bf70c13f7626870389fbc33ed1e07fb66cfa6186f5c08f6b9a",
+      "outputHash": "c2fc06f1fd14d638ba18675dbbf6fd4d7fbf1ff7fbdb6b83aee51a1636493f5c",
       "inlineAttachments": {
         "total": 30,
         "states": {
@@ -127,7 +127,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "328f0cc28f0155c0eed08d6a9d088ee928474f5560519cacf87480afe54a1b32",
+      "outputHash": "3583b7dcbd50d076c6c190a932e7b7681cc814ebc2314a927c4e47f7efc1cdf6",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -170,7 +170,7 @@
       "struckSegments": 343,
       "attachmentsWithoutContent": 0,
       "missingSegments": 1,
-      "outputHash": "846fe295a0ca07fd8f75a4a090170e0a36c46fd35a00f36a8cf31889eceb3576",
+      "outputHash": "3f3196a67c627915c79981e4272c713539c5649b51bff7577ff327ed94687099",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -221,7 +221,7 @@
       "struckSegments": 136,
       "attachmentsWithoutContent": 35,
       "missingSegments": 0,
-      "outputHash": "14802de6f20b5705e3268243e4219be0e3145509bbc7022d42a7c0fd7dcd49c9",
+      "outputHash": "f2e3cf3fa63b4ff1df98a9ea10d97d6a1411273de22e2f525482e2bdcf34372c",
       "inlineAttachments": {
         "total": 35,
         "states": {
@@ -263,7 +263,7 @@
       "struckSegments": 1,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "bc61f5096428dcb2736aaf89165008f7a14de303dfcdae68090393006ef2d49c",
+      "outputHash": "f3d92939cb0cc1c97092bd789eda03c0361c7d2b288766309ceb57c9f7bc3aa2",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -312,7 +312,7 @@
       "struckSegments": 608,
       "attachmentsWithoutContent": 31,
       "missingSegments": 0,
-      "outputHash": "b1b58cea5a4f3e8810e49c78172c6b97e1f307066239a4680b9c38799a757dd3",
+      "outputHash": "1dd23c90ff92a4c408fefccce4284678c12931b197cda170772f46bc3dcbcecb",
       "inlineAttachments": {
         "total": 31,
         "states": {
@@ -365,7 +365,7 @@
       "struckSegments": 19,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "05bc8a5b6d79484f6689d5f90c45b0ba4abda18db5ea04057fd2d60df5ef27bc",
+      "outputHash": "99e03c78601d84174ea767796463b371bc5114622395c2ad4564a8a666120dfa",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -387,9 +387,9 @@
       "preparationReconciliation": "identical",
       "preparationVersion": "rfb-api-original/0.2.0-provisional",
       "preparedHtmlSha256": "96fa2cdc42cfea85a5bc65f06d5cece9304713f7b091218d1e31bc351624fa6f",
-      "status": "partial",
+      "status": "complete",
       "canonicalChars": 31389,
-      "unidentifiedChars": 3640,
+      "unidentifiedChars": 0,
       "partTypes": {
         "document": 1,
         "summary": 1,
@@ -398,23 +398,18 @@
         "article": 22,
         "caput": 22,
         "paragraph": 66,
-        "inciso": 60,
+        "inciso": 88,
         "alinea": 27,
-        "unidentified": 28,
         "item": 2,
         "signature": 1
       },
-      "limitations": {
-        "rfb_segment_type_unidentified_by_source": 28,
-        "rfb_tachado_evidence": 4,
-        "unidentified_content": 1
-      },
+      "limitations": {},
       "historicalByTachado": 10,
       "historicalContextParts": 12,
       "struckSegments": 10,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "306ceb82e552c72123cd40e59ea77684a0952c061ce307cdc50cf7cffce07d09",
+      "outputHash": "9db9dc958fd582b0e858be12d15f9db64675bed71a1bf96913c88e6c4e23e3d4",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -454,7 +449,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "f736d9a64e80d5f7ada5c8c302eebd1dd3d644e8e2112ef1ec7f08bf4ca15250",
+      "outputHash": "b5a51693b1cb723c66ea047d6b54b6841fe1bda2b4ac07883582c4a72347d7f2",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -495,7 +490,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "01c4ea83879fde58df72d6afdadc9e133e0e1f99694b6ddabf3722160e173310",
+      "outputHash": "ca4399f75e64e380960a2eeb6768e8518f876db4a065c4bd9824b1dca8a33943",
       "inlineAttachments": {
         "total": 0,
         "states": {},
@@ -534,7 +529,7 @@
       "struckSegments": 0,
       "attachmentsWithoutContent": 1,
       "missingSegments": 0,
-      "outputHash": "6ed57015a43c13c14290e8956d7baf56c743caac3faa1b5edac518a29c9a7ae9",
+      "outputHash": "e2ddf2a743a777c2793353f95e15a3708154755e6b4fac628e52dbecca744f5d",
       "inlineAttachments": {
         "total": 1,
         "states": {
@@ -583,7 +578,7 @@
       "struckSegments": 2,
       "attachmentsWithoutContent": 2,
       "missingSegments": 0,
-      "outputHash": "26160fd016c217f7ca46d352023d42f1c549659750073da58797bbfb3613598f",
+      "outputHash": "453f91ed2cbb921a149be3bb4f65193b79daab7873ce2e755a218c6005c1e40c",
       "inlineAttachments": {
         "total": 2,
         "states": {
@@ -629,7 +624,7 @@
       "struckSegments": 2,
       "attachmentsWithoutContent": 0,
       "missingSegments": 0,
-      "outputHash": "e9d18f29bfcc8b928e7efa2719c14d0e392b1da710e48bfbbb469acd682207e6",
+      "outputHash": "7bf27f8d5e2fc88628db3d54e909de11d9f60bdd4d9045807f6ef8dcc4a05822",
       "inlineAttachments": {
         "total": 0,
         "states": {},
