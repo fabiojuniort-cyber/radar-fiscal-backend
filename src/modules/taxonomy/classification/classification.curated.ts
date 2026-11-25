@@ -178,8 +178,7 @@ export function extractCclasstribCodes(raw: string): Map<string, string> {
 // the automotive application, is not an exclusion ("não se aplica a caminhões", "exceto ônibus") and is not an
 // incidental reference to another act or wording ("de que trata", "nos termos do Convênio ICMS 133/02 …").
 const AUTOMOTIVE_APPLICATION = /\b(?:setor automotivo|industria automobilistica|autopecas|automoveis de passageiros|veiculos automotores|veiculos rodoviarios|transporte rodoviario|caminhoes|onibus)\b/;
-const AUTOMOTIVE_EXCLUSION = /\b(?:nao (?:se aplic\w*|alcanca\w*|abrang\w*|compreend\w*|inclu\w*|se estend\w*|benefici\w*)|exceto|excetuad[oa]s?|salvo|ressalvad[oa]s?|exclui\w*|com excecao|a excecao|inaplicavel|inaplicaveis)\b/;
-const BENEFIT_SCOPE_PROHIBITION = /\bvedad[oa]s? (?:(?:o|a|os|as) )?(?:aplicacao|fruicao|beneficios?|concessao|utilizacao|isencao|isencoes|reducao|reducoes)\b/;
+const AUTOMOTIVE_EXCLUSION = /\b(?:nao (?:se aplic\w*|alcanca\w*|abrang\w*|compreend\w*|inclu\w*|se estend\w*|benefici\w*)|exceto|excetuad[oa]s?|salvo|ressalvad[oa]s?|exclui\w*|vedad[oa]s?|com excecao|a excecao|inaplicavel|inaplicaveis)\b/;
 const COORDINATED_EXCLUSION = /\be nao (?:a|ao|as|aos|para)\b/;
 const AUTOMOTIVE_INCIDENTAL = /\b(?:de que trata|a que se refere|nos termos|na forma|conforme|previst[oa]s?|referid[oa]s?|mencionad[oa]s?|citad[oa]s?|redacao anterior|revogad[oa]s?)\b|\b(?:lei|decreto|convenio|protocolo|ajuste|portaria|instrucao normativa|resolucao)\b(?: [a-z]+){0,3} (?:n )?\d/;
 const CLAUSE_SEPARATOR = /[.;:()\[\],]|\s[–—-]\s/u;
@@ -190,13 +189,9 @@ export function hasAutomotiveApplication(title: string, contentText: string | nu
   const opening = [title, contentText?.split(/\r?\n/u).find((line) => line.trim().length > 0) ?? ''];
   return opening.some((text) => text.split(CLAUSE_SEPARATOR).some((clause) => {
     // In "a caminhões e não a reboques", only the first list applies.
-    // A trailing reference introduced by "conforme" does not cancel an application already stated.
-    const affirmative = normalizeWithIndex(clause).text.split(COORDINATED_EXCLUSION, 1)[0]!
-      .split(/\bconforme\b/, 1)[0]!;
+    const affirmative = normalizeWithIndex(clause).text.split(COORDINATED_EXCLUSION, 1)[0]!;
     return AUTOMOTIVE_APPLICATION.test(affirmative)
-      && !AUTOMOTIVE_EXCLUSION.test(affirmative)
-      && !BENEFIT_SCOPE_PROHIBITION.test(affirmative)
-      && !AUTOMOTIVE_INCIDENTAL.test(affirmative);
+      && !AUTOMOTIVE_EXCLUSION.test(affirmative) && !AUTOMOTIVE_INCIDENTAL.test(affirmative);
   }));
 }
 
