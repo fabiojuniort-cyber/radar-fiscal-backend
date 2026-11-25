@@ -1,0 +1,178 @@
+name: OPS-01 - read-only inspections and isolated proofs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - .github/workflows/ops-runner.yml
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Approved, fixed task (no arbitrary commands)"
+        required: true
+        type: choice
+        options:
+          - inspect_f3_static
+          - inspect_f2_sources
+          - prove_f2_isolated
+
+# Workflow has no privileges to push, deploy or modify GitHub resources.
+permissions:
+  contents: read
+
+concurrency:
+  group: ops01-${{ github.workflow }}-${{ github.ref }}-${{ inputs.task || 'pull-request' }}
+  cancel-in-progress: false
+
+jobs:
+  # PR CI gate: real offline F3 inspection, no DB, no ops environment/secrets.
+  inspect-f3-static:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.task == 'inspect_f3_static')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Inspect F3 rules offline (existing read-only test scripts)
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p ops-evidence
+          ./node_modules/.bin/tsx --test \
+            test/collection-filter.f3.unit.test.ts \
+            test/collection-filter.f3-simulation.unit.test.ts \
+            test/collection-filter.engine.unit.test.ts
+          printf 'OPS01_TASK=inspect_f3_static\nOPS01_RESULT=PASS\nOPS01_PRODUCTION_ACCESS=NONE\n' | tee ops-evidence/summary.txt
+          cat ops-evidence/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ops01-f3-offline-summary
+          path: ops-evidence/summary.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Sources fixed to a reviewed commit in the existing proof branch.
+  # No artifacts/paths/URLs supplied by the workflow caller are accepted.
+  inspect-f2-sources:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.task == 'inspect_f2_sources')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: d4de99e93cd80a8ab02ae0857b1260a01a660b43
+          path: ops-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate immutable XLSX inputs and run the native T03 CLI without DB
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/ops01" ops-evidence
+          trap 'rm -f "$RUNNER_TEMP/ops01/segmento.xlsx" "$RUNNER_TEMP/ops01/produto.xlsx" "$RUNNER_TEMP/ops01/plan.json" "$RUNNER_TEMP/ops01/cli.log"' EXIT
+          base64 -d ops-source/Radar_Fiscal_Carga_Segmento_Revisada_v5.1.xlsx.b64 > "$RUNNER_TEMP/ops01/segmento.xlsx"
+          base64 -d ops-source/Radar_Fiscal_Carga_Produto_Revisada_v5.xlsx.b64 > "$RUNNER_TEMP/ops01/produto.xlsx"
+          printf '%s  %s\n' \
+            695b0df85339ec60a2b1bc8b88b842ac09a55e71d90c3f7eb2443f1709c6af67 "$RUNNER_TEMP/ops01/segmento.xlsx" \
+            261da490a5a030e698d43030c6a552cf39cc3f025f0249f71ffff1001b57051a "$RUNNER_TEMP/ops01/produto.xlsx" | sha256sum --check --status
+          node ops/taxonomy/f2-xlsx-dry-run.mjs \
+            --segmento="$RUNNER_TEMP/ops01/segmento.xlsx" \
+            --produto="$RUNNER_TEMP/ops01/produto.xlsx" \
+            --out="$RUNNER_TEMP/ops01/plan.json" > "$RUNNER_TEMP/ops01/cli.log"
+          node --input-type=module - <<'NODE'
+          import {readFileSync, writeFileSync} from 'node:fs';
+          const p=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/ops01/plan.json','utf8'));
+          const s=p.summary;
+          if(p.mode!=='DRY_RUN_ONLY'||!p.noDatabaseWrites||s.errors!==0||
+             s.segmentRows!==1332||s.productRows!==4225||s.cnaeDistinct!==1332||
+             s.productCodesDistinct!==4225||s.warnings!==448||s.actuationCategories!==12)
+            throw Error('F2_CLI_SOURCE_GATE_FAILED');
+          const safe='OPS01_TASK=inspect_f2_sources\nOPS01_RESULT=PASS\n'+
+            'SEGMENTO_ROWS=1332\nPRODUTO_ROWS=4225\nWARNINGS=448\nPRODUCTION_ACCESS=NONE\n';
+          writeFileSync('ops-evidence/summary.txt',safe);
+          process.stdout.write(safe);
+          NODE
+          cat ops-evidence/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ops01-f2-source-summary
+          path: ops-evidence/summary.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  prove-f2-isolated:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.task == 'prove_f2_isolated')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U postgres -d radar_fiscal_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Prove read-only inspection of a synthetic PostgreSQL 18 fixture
+        shell: bash
+        env:
+          PGPORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$PGPORT" =~ ^[0-9]+$ ]]
+          test_client=(env -i PATH="$PATH" psql -X --no-password -h 127.0.0.1 -p "$PGPORT" -U postgres -d radar_fiscal_test -v ON_ERROR_STOP=1)
+          "${test_client[@]}" <<'SQL'
+          CREATE TABLE ops01_fixture (id integer PRIMARY KEY);
+          INSERT INTO ops01_fixture VALUES (1), (2);
+          SQL
+          env_vars=(env -i PATH="$PATH" PGOPTIONS="-c default_transaction_read_only=on")
+          "${env_vars[@]}" psql -X --no-password -h 127.0.0.1 -p "$PGPORT" -U postgres -d radar_fiscal_test -v ON_ERROR_STOP=1 <<'SQL'
+          DO $proof$
+          BEGIN
+            IF current_database() <> 'radar_fiscal_test'
+              OR current_setting('server_version_num')::integer / 10000 <> 18
+              OR current_setting('transaction_read_only') <> 'on'
+              OR (SELECT count(*) FROM ops01_fixture) <> 2
+            THEN
+              RAISE EXCEPTION 'OPS01_ISOLATED_READ_ONLY_GATE_FAILED';
+            END IF;
+            BEGIN
+              INSERT INTO ops01_fixture VALUES (3);
+              RAISE EXCEPTION 'OPS01_ISOLATED_WRITE_WAS_ACCEPTED';
+            EXCEPTION WHEN read_only_sql_transaction THEN
+              NULL;
+            END;
+          END
+          $proof$;
+          SQL
+          mkdir -p ops-evidence
+          printf '%s\n' OPS01_TASK=prove_f2_isolated OPS01_RESULT=PASS PG_MAJOR=18 SYNTHETIC_ROWS=2 WRITE_DENIED=YES PRODUCTION_ACCESS=NONE \
+            | tee ops-evidence/summary.txt
+          cat ops-evidence/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ops01-pg18-isolated-summary
+          path: ops-evidence/summary.txt
+          retention-days: 7
