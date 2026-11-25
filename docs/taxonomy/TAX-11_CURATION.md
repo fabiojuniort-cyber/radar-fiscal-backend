@@ -142,6 +142,10 @@ site os filtrava e nunca salvou códigos dessas dimensões).
   133/02", "nos termos", "redação anterior").
 - **Limite:** só o título e a primeira linha útil são lidos; uma aplicação automotiva descrita apenas mais adiante no
   texto não promove o segmento (conservador). A lista de termos é fechada.
+- **Vedações e referências:** a vedação da aplicação ou fruição do benefício exclui a aplicação automotiva. A vedação
+  de crédito ou de sua apropriação pode ser uma regra aplicável ao setor. A leitura conservadora ignora o trecho após
+  `conforme`: “Isenção conforme Convênio ICMS 133/02 para caminhões” não promove o segmento, mesmo quando a isenção
+  realmente alcança os caminhões.
 - **Legado:** runs anteriores, sem o marcador no snapshot, mantêm a tag. Nada é reclassificado nem reprocessado: a
   regra vale só para classificações novas.
 
