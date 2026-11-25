@@ -185,6 +185,16 @@ test('automotive application needs an affirmative clause in the title or first n
     ['Convênio ICMS', 'Os valores das saídas de caminhões não integram a base de cálculo.', true, 'exclusion from tax base applies to trucks'],
     ['Convênio ICMS', 'Concede isenção a caminhões e não a reboques.', true, 'first object remains in scope'],
     ['Convênio ICMS', 'Concede isenção a máquinas agrícolas e não a caminhões.', false, 'second object is outside scope'],
+    ['Convênio ICMS', 'Dispõe sobre operações com veículos automotores.', true, 'automotive terminology in use in official acts'],
+    ['Convênio ICMS', 'É vedado o crédito nas operações com autopeças.', false, 'conservative limit: credit prohibition'],
+    ['Convênio ICMS', 'Fica vedado o crédito nas saídas de caminhões.', false, 'conservative limit: credit prohibition on truck sales'],
+    ['Convênio ICMS', 'Fica vedada a apropriação de crédito nas saídas de caminhões.', false, 'conservative limit: credit appropriation prohibition'],
+    ['Convênio ICMS', 'Fica vedada a aplicação aos caminhões.', false, 'application is prohibited'],
+    ['Convênio ICMS', 'É vedada a fruição do benefício nas saídas de ônibus.', false, 'enjoyment of the benefit is prohibited'],
+    ['Convênio ICMS', 'Vedado o benefício para veículos automotores.', false, 'benefit is prohibited'],
+    ['Convênio ICMS', 'Concede isenção a caminhões conforme o Convênio ICMS 133/02.', false, 'conservative limit: trailing reference'],
+    ['Convênio ICMS', 'Concede isenção a máquinas conforme o Convênio ICMS 133/02 sobre caminhões.', false, 'reference alone does not establish scope'],
+    ['Convênio ICMS', 'Isenção conforme Convênio ICMS 133/02 para caminhões', false, 'conservative limit: application only after conforme'],
   ];
   for (const [title, text, expected, why] of cases) assert.equal(hasAutomotiveApplication(title, text), expected, why);
   for (const exclusion of ['não se aplica a', 'não alcança', 'não abrange', 'não compreende', 'não inclui', 'não se estende a', 'não beneficia', 'exceto', 'salvo', 'ressalvados', 'excluídos', 'com exceção de']) {

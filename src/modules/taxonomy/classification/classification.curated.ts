@@ -177,7 +177,7 @@ export function extractCclasstribCodes(raw: string): Map<string, string> {
 // incidental or part of a historical redaction. The evidence must be AFFIRMATIVE: a clause of that opening that names
 // the automotive application, is not an exclusion ("não se aplica a caminhões", "exceto ônibus") and is not an
 // incidental reference to another act or wording ("de que trata", "nos termos do Convênio ICMS 133/02 …").
-const AUTOMOTIVE_APPLICATION = /\b(?:setor automotivo|industria automobilistica|autopecas|automoveis de passageiros|veiculos rodoviarios|transporte rodoviario|caminhoes|onibus)\b/;
+const AUTOMOTIVE_APPLICATION = /\b(?:setor automotivo|industria automobilistica|autopecas|automoveis de passageiros|veiculos automotores|veiculos rodoviarios|transporte rodoviario|caminhoes|onibus)\b/;
 const AUTOMOTIVE_EXCLUSION = /\b(?:nao (?:se aplic\w*|alcanca\w*|abrang\w*|compreend\w*|inclu\w*|se estend\w*|benefici\w*)|exceto|excetuad[oa]s?|salvo|ressalvad[oa]s?|exclui\w*|vedad[oa]s?|com excecao|a excecao|inaplicavel|inaplicaveis)\b/;
 const COORDINATED_EXCLUSION = /\be nao (?:a|ao|as|aos|para)\b/;
 const AUTOMOTIVE_INCIDENTAL = /\b(?:de que trata|a que se refere|nos termos|na forma|conforme|previst[oa]s?|referid[oa]s?|mencionad[oa]s?|citad[oa]s?|redacao anterior|revogad[oa]s?)\b|\b(?:lei|decreto|convenio|protocolo|ajuste|portaria|instrucao normativa|resolucao)\b(?: [a-z]+){0,3} (?:n )?\d/;
