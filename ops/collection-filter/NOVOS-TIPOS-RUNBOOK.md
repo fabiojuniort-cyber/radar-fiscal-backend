@@ -1,62 +1,124 @@
-# Runbook — aplicação em lote de novos tipos do filtro de coleta
+# Guia 1 — Gravar as regras dos 616 Novos tipos (Windows, PowerShell)
 
-Planilha: `ops/collection-filter/novos-tipos-2026-11.csv` (616 linhas: 19 `KEEP_ALWAYS`, 50 `KEEP_IF_TAX_TERM`, 547 `EXCLUDE_UNLESS_STRONG`, após o ajuste de 2026-11-27 — ver `novos-tipos-2026-11-ajustes.md`).
-Ferramenta: `ops/collection-filter/apply-new-types.ts`. Usa somente as rotas administrativas já existentes do filtro de coleta
-(`new-types`, `direct-rule/preview|save`). **Não toca taxonomia**, não cria migrations e **não usa "Reaplicar filtro ao acervo"**.
+**O que esta rotina faz:** grava, no Filtro de Coleta, a regra de cada um dos 616 tipos da planilha `novos-tipos-2026-11.csv`:
+- 19 com o modo **Manter sempre**;
+- 50 com o modo **Manter só se tiver termo tributário**;
+- 547 com o modo **Excluir, salvo termo forte**.
 
-## Regras de segurança
+As mudanças em relação à planilha recebida estão em `novos-tipos-2026-11-ajustes.md`.
 
-- **Nunca cole token, senha ou cookie no chat**, em issue ou em PR. A ferramenta nunca imprime nem grava token/senha; o token fica só na memória do processo.
-- Credenciais: variáveis de ambiente `ADMIN_EMAIL` e `ADMIN_PASSWORD`, ou deixe vazias e a ferramenta pergunta (a senha é digitada sem eco).
-  Dica: `read -s ADMIN_PASSWORD; export ADMIN_PASSWORD` evita deixar a senha no histórico do shell. Use uma conta de administrador de plataforma.
-- `--base-url` precisa ser `https://...` (http só para localhost, usado em testes).
-- Não use "Reaplicar filtro ao acervo" em nenhum momento deste procedimento.
-- A fase 1 grava regras em produção (não apaga publicações). Rode `plan` e `phase1 --dry-run` primeiro e só avance com autorização.
+**O que ela NÃO faz:** **não apaga nenhuma publicação.** Ela só usa a função de *salvar regra* (`/save`), que vale para as **coletas futuras**. Para limpar o acervo já guardado, use o **Guia 2** (`NOVOS-TIPOS-LIMPEZA-PELA-TELA.md`), que é uma decisão à parte e feita pela tela.
 
-## Preparação (na sua máquina)
+> ⚠️ **Nunca cole senha, token ou cookie no chat, em issue ou em PR.** A senha é digitada sem aparecer na tela e não fica gravada em arquivo.
 
-```bash
-git fetch origin && git checkout claude/f3-new-types-batch
-npm ci
-export BASE=https://<url-do-backend-em-producao>
-export CSV=ops/collection-filter/novos-tipos-2026-11.csv
-export OUT=./saida-novos-tipos          # relatórios e arquivos de estado (não versionar)
-export ADMIN_EMAIL=<seu e-mail>         # a senha será pedida de forma oculta
+## 1. Instalação (uma vez só)
+
+1. Instale o **Git for Windows**: <https://git-scm.com/download/win>. Aceite as opções padrão.
+2. Instale o **Node.js 24**: <https://nodejs.org/>. Escolha a versão **24.x** e aceite as opções padrão.
+3. Abra o **PowerShell**: menu Iniciar → digite "PowerShell" → Enter.
+4. Confira as versões:
+   ```powershell
+   git --version
+   node --version
+   ```
+   O `node --version` deve mostrar `v24.` alguma coisa.
+5. Baixe o projeto e instale as dependências:
+   ```powershell
+   cd $HOME
+   git clone https://github.com/fabiojuniort-cyber/radar-fiscal-backend.git
+   cd radar-fiscal-backend
+   git checkout claude/f3-new-types-batch
+   npm ci
+   ```
+   O `npm ci` leva alguns minutos.
+
+## 2. Preparar a janela
+
+Repita isto **toda vez** que abrir um PowerShell novo para rodar a rotina:
+
+```powershell
+cd $HOME\radar-fiscal-backend
+$BASE = "https://radar-fiscal-backend-production.up.railway.app"
+$CSV  = "ops/collection-filter/novos-tipos-2026-11.csv"
+$OUT  = "$HOME\saida-novos-tipos"
+$env:ADMIN_EMAIL = "seu-email-de-administrador@exemplo.com"
+$senha = Read-Host "Senha do administrador" -AsSecureString
+$env:ADMIN_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($senha))
 ```
 
-## 1. plan (somente leitura)
+- **URL do backend:** é o endereço público do backend do TriFaros (acima). Se ele mudar, pegue o novo no painel do Railway: serviço **radar-fiscal-backend** → **Settings** → **Networking** → domínio público.
+- A senha é digitada **sem aparecer na tela** e fica só nesta janela do PowerShell.
 
-```bash
-npx tsx ops/collection-filter/apply-new-types.ts plan --base-url "$BASE" --csv "$CSV" --out "$OUT"
+## 3. Conferir antes, sem gravar nada (`--dry-run`)
+
+```powershell
+npx tsx ops/collection-filter/apply-new-types.ts plan   --base-url $BASE --csv $CSV --out $OUT
+npx tsx ops/collection-filter/apply-new-types.ts phase1 --base-url $BASE --csv $CSV --out $OUT --dry-run
 ```
 
-Aguarda o inventário ficar `READY` (cache assíncrono; "aquecendo" nunca é tratado como "sem tipos") e casa cada linha por
-(fonte, seção, nome normalizado com a mesma normalização do servidor). Gera `plan.json`, `divergences.csv` e `divergences.md`:
+**`plan`** compara a planilha com a lista atual de Novos tipos e grava o resultado em `$OUT\divergences.md`. Abra esse arquivo:
+```powershell
+notepad "$OUT\divergences.md"
+```
+- **CSV_WITHOUT_LIVE_ITEM:** o tipo da planilha não está mais na lista de Novos tipos. Por exemplo, já foi classificado ou o nome mudou.
+- **LIVE_NOT_IN_CSV:** um tipo novo apareceu depois da planilha.
+- **COUNT_DIFFERENCE:** é só informativa, porque o acervo muda todo dia.
 
-- linhas da planilha sem item vivo; itens vivos abertos que não estão na planilha;
-- diferenças de contagem de ocorrências (informativo: o acervo muda entre a planilha e hoje);
-- chaves duplicadas; linhas/modos inválidos.
+Se o `plan` terminar com erro por causa de divergências e você estiver de acordo com elas, acrescente `--allow-divergences` aos comandos seguintes. As linhas divergentes são ignoradas.
 
-Sai com código diferente de zero se houver linha sem item vivo, inválida ou duplicada em conflito. **Revise `divergences.md`.**
-Só use `--allow-divergences` depois de entender cada divergência (as linhas divergentes são simplesmente ignoradas na fase 1).
+**`phase1 --dry-run`** só consulta, **não grava nada**. Exemplo de saída (os nomes e números aqui são ilustrativos):
+```
+inventário READY: 616 tipos abertos
+[dry-run] doe-sp/Aviso KEEP_IF_TAX_TERM preview count=0 (informativo; nada é apagado) 812ms
+[dry-run] dou/Extratos de Contratos EXCLUDE_UNLESS_STRONG preview count=44 (informativo; nada é apagado) 1530ms
+...
+phase1 resumo: salvos=0 ja_salvos=0 sem_item_vivo=0 erro=nao dry_run=true
+nenhuma publicação foi apagada (rotina só usa /save)
+```
+O `count` mostra quantas publicações **já guardadas** aquele modo descartaria numa **limpeza futura**. **Esta rotina não apaga essas publicações.**
 
-## 2. fase 1 — salvar as regras de todas as linhas (não destrutiva)
+## 4. Gravar as regras (comando real)
 
-```bash
-npx tsx ops/collection-filter/apply-new-types.ts phase1 --base-url "$BASE" --csv "$CSV" --out "$OUT" --dry-run
-npx tsx ops/collection-filter/apply-new-types.ts phase1 --base-url "$BASE" --csv "$CSV" --out "$OUT"
+```powershell
+npx tsx ops/collection-filter/apply-new-types.ts phase1 --base-url $BASE --csv $CSV --out $OUT
 ```
 
-Todas as linhas, nos três modos. Para cada tipo, em sequência: preview novo e depois save (cada save sobe a revisão da política, por isso
-o preview é sempre refeito). **Nunca apaga publicações.** O `count` do preview é só informativo
-(`KEEP_IF_TAX_TERM` pode mostrar contagem > 0 por descartar o que não tem termo tributário, mas a fase 1 não apaga nada).
-`--dry-run` faz só os previews. Para no primeiro erro HTTP. Estado em `$OUT/phase1.state.json`; relatório em `$OUT/phase1-report.csv`.
+Exemplo de saída (os nomes e números aqui são ilustrativos):
+```
+inventário READY: 616 tipos abertos
+[saved] doe-sp/Aviso KEEP_IF_TAX_TERM rev=1201 preview=0 840ms
+[saved] dou/Extratos de Contratos EXCLUDE_UNLESS_STRONG rev=1202 preview=44 1611ms
+...
+phase1 resumo: salvos=616 ja_salvos=0 sem_item_vivo=0 erro=nao dry_run=false
+nenhuma publicação foi apagada (rotina só usa /save)
+```
 
-## Retomada
+- São 616 tipos, um de cada vez. Pode levar de **minutos a cerca de uma hora**.
+- Se cair a conexão ou você fechar a janela, **rode o mesmo comando de novo, com o mesmo `$OUT`**. Os tipos já salvos são pulados (`[skip] ... já salvo`).
+- Não apague a pasta `$OUT` enquanto não terminar.
+- Se aparecer erro (`erro=sim`), a rotina para no primeiro tipo com problema. Copie as últimas linhas, **sem a senha**, para a COORD.
+- O relatório por tipo fica em `$OUT\phase1-report.csv`, que abre no Excel.
 
-Basta repetir o mesmo comando com o mesmo `--out`: a fase 1 pula o que já foi salvo. Não apague os arquivos de estado no meio do processo. Um 401 no meio da execução faz um novo login automático (uma vez por chamada).
-Tipos cuja regra já foi salva deixam de aparecer na fila aberta do servidor; por isso o `plan` os mostra como "sem item vivo" depois de aplicados.
+## 5. Conferir na tela que as regras entraram
 
-## Se algo der errado
+1. Entre no site do TriFaros com a sua conta de administrador e abra **Administração → Filtro de Coleta** (`/admin/filtro-coleta`).
+2. No topo, **"Política publicada: vX · revisão N"**: a revisão deve ter aumentado cerca de 616 em relação a antes.
+3. A aba **"Novos tipos (N)"** deve mostrar bem menos itens. Os tipos gravados saem da fila.
+4. Na aba **Tipos**, filtre a coluna **Nome do ato** por alguns tipos da planilha (por exemplo "Extratos de Contratos", "Comunicado", "Renovação de Inscrição Estadual") e confira a coluna **Modo**:
+   - "Excluir, salvo termo forte";
+   - "Manter só se tiver termo tributário";
+   - "Manter sempre".
+5. A aba **Desconsiderados** passa a registrar, nas próximas coletas, o que for descartado por essas regras.
 
-Pare, não repita comandos às cegas e registre na Issue o trecho do log (sem credenciais) e o conteúdo de `phase1.state.json`.
+## 6. Ao terminar
+
+Feche o PowerShell. A senha some junto. Se quiser limpar antes:
+```powershell
+Remove-Item Env:ADMIN_PASSWORD
+```
+
+## Observações técnicas
+
+- A rotina só chama `GET /new-types`, `POST /direct-rule/preview` e `POST /direct-rule/save`, um tipo por vez, sempre com uma prévia nova antes de salvar.
+- O `/save` grava apenas a regra e nunca expurga o acervo: `saveDirectFilterRule` devolve `deletedCount: 0`, e a rota não chama `collection_filter_direct_purge_batch`.
+- A rotina não toca a taxonomia e não usa "Reaplicar filtro ao acervo".
