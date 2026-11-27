@@ -1,5 +1,5 @@
 {
-  "engineHash": "a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+  "engineHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
   "normalization": "UTF-8 source with LF line endings",
   "sourceHashes": {
     "docs/anatomy/nfc-shadow-manifest.json": "af1d1edfb25573d6a262dde06cf03dfb3b2864e46ff3aaf5cd9765538f4e8d0c",
@@ -16,11 +16,11 @@
     "src/modules/anatomy/nfc-shadow-table.ts": "a9074dad75bcd1f328769451c00715d2483f2e4a06c863b67cfcd382ac37d153",
     "src/modules/anatomy/nfc-shadow.ts": "92424d7c1f17c35197a3a1254f91ffe0d64918b32df87ce4b98b49091dfc9e49",
     "src/modules/anatomy/normas-leg-preparation.ts": "6516b69fa09afe649fa7c1bd0e0a78c7e3f1fbf125decdc690204d495a7c9fc7",
-    "src/modules/anatomy/official-portal-preparation.ts": "fe491459c65703afac172ce7f7cd945adcb12cd6ed41109da381a3432609796c",
+    "src/modules/anatomy/official-portal-preparation.ts": "02623274f2cf3edd23f5eedc6709e9aaef6f401ddd3b60943de2d1d3134b5334",
     "src/modules/anatomy/pdf-reader.ts": "c6464899099cc4c310a335302a2982d1a22d434720f93afd7a4d112e2c545b2f",
     "src/modules/anatomy/profile-rules.ts": "fb687f713031b8491d63699edaa48594ce26ecd45f064789591d43b22c2ab98e",
     "src/modules/anatomy/profile.ts": "cb10898fba6b6195eb912564f2dbfd2a01572603535a81f816ff4a1b455b8398",
-    "src/modules/anatomy/readers.ts": "c9cb7cb9d722a6e6f6bb6a99e709722bcbabc89afdd0e26abf3b90be614f4bd7",
+    "src/modules/anatomy/readers.ts": "f3551b5fcf1de45728a9b80ecd4614a0815da10cc5b0007ea1f49e9e4c465ce9",
     "src/modules/anatomy/rfb-inline-attachments.ts": "f59f2a281134a0ecfa07f865a58009837027d83adf4499b0d95f743f364a896b",
     "src/modules/anatomy/rfb-quote-resume.ts": "750d5c90f97e237e4a751d217e1afca051debf31dbdad70bc23d03dd0d396be5",
     "src/modules/anatomy/sefaz-sp-preparation.ts": "e5c24a28d4ac1e630eaca1cb31fd8d9e26e6270b42e69f37b3e7e099358b3d35"

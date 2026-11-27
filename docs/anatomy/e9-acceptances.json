@@ -2078,6 +2078,534 @@
       "limits": [
         "Leitura offline de artigo no portal consolidado SEFAZ-SP, com região idêntica à captura manual. legalStatus permanece unknown."
       ]
+    },
+    {
+      "sampleId": "rfb:108391",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "122033506dc16998eb8e1a2c6dee636f4bbe8a932ec40255ab41d6544a17a112",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:108391 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Instrução Normativa, porte pequeno, na amostra rfb:108391. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "rfb:115131",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "scope": "offline",
+      "entrySha256": "730c2128ea56ea1f99295fbd98a26420cd3d98c2d722dee22d4524b66078b61f",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:115131 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Instrução Normativa, porte grande, na amostra rfb:115131. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "rfb:133898",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "db45123813f88f38b7e1504f56f07de436263da2adf27b17f8a1282b3f70b309",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:133898 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Instrução Normativa, porte pequeno, na amostra rfb:133898. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "rfb:142967",
+      "cellId": "rfb--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "5db5ae572d65e0e34b876d3456caeb1d371e06bfe6a5f6960faa788f71aa8b3d",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:142967 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Portaria, porte pequeno, na amostra rfb:142967. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "rfb:148693",
+      "cellId": "rfb--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "b600bbd8d95cf369db492a3b575ee1352ab4e3fc054d2b991f7c05026a882223",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:148693 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Portaria, porte médio, na amostra rfb:148693. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "rfb:37103",
+      "cellId": "rfb--ato-declaratorio-interpretativo--pequeno",
+      "scope": "offline",
+      "entrySha256": "5c5b213425b11c5ec49dff3a3f1ad89ef0b8b60a669973bc09decebb35001297",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:37103 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Ato Declaratório Interpretativo, porte pequeno, na amostra rfb:37103. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "rfb:148629",
+      "cellId": "rfb--ato-declaratorio-executivo--pequeno",
+      "scope": "offline",
+      "entrySha256": "93c22685095b569e95d3ee35308a2ff0293182a7adb5b236ec4837e51fb3a5fc",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:148629 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Ato Declaratório Executivo, porte pequeno, na amostra rfb:148629. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "rfb:122645",
+      "cellId": "rfb--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "50d8c3cc2ea4118097e09793e37ea62d618d6906faadaf471cab681168e23e04",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:122645 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Resolução, porte pequeno, na amostra rfb:122645. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M14",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "69eb560bc32143c7708260aaf3679e57121cc37dc88b8bf405da05299752aed4",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M14 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do CONFAZ (Plone). Limite: Convênio ICMS, porte pequeno, na amostra M14.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M16",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "886002ccd02b405533ccfcb1dbd1a8ad2c137312cb762718ccdf2cad11ba0c1f",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M16 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do CONFAZ (Plone). Limite: Convênio ICMS, porte pequeno, na amostra M16.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M18",
+      "cellId": "confaz--ajuste-sinief--pequeno",
+      "scope": "offline",
+      "entrySha256": "162bcd2f4c818419693cfb08a59dfdf587f31881355a98115829dd640d8f6dd5",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M18 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do CONFAZ (Plone). Limite: Ajuste SINIEF, porte pequeno, na amostra M18.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M19",
+      "cellId": "confaz--ajuste-sinief--grande",
+      "scope": "offline",
+      "entrySha256": "f994f176dbb4f9c251e4abc73d6ce93ca5ac82d809bdcfcd6b3bd83b33f5c5d9",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M19 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do CONFAZ (Plone). Limite: Ajuste SINIEF, porte grande, na amostra M19.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M20",
+      "cellId": "confaz--protocolo-icms--pequeno",
+      "scope": "offline",
+      "entrySha256": "2fe0c8228283abfc73db6d400e353f7682d8252450424831b1f6a8fe4022e3aa",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M20 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do CONFAZ (Plone). Limite: Protocolo ICMS, porte pequeno, na amostra M20.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M23",
+      "cellId": "dou--instrucao-normativa--pequeno",
+      "scope": "offline",
+      "entrySha256": "3672298af5a816c7d4c5d0f170e61a04df8ac72f3d2244d1a68c64c0464a5b41",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M23 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Instrução Normativa, porte pequeno, na amostra M23.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M24",
+      "cellId": "dou--instrucao-normativa--medio",
+      "scope": "offline",
+      "entrySha256": "5f5840d50de6790e9411d45b1593a9638212ca8ea94c3ba549b8fa4929180355",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M24 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Instrução Normativa, porte médio, na amostra M24.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M28",
+      "cellId": "dou--decreto--grande",
+      "scope": "offline",
+      "entrySha256": "3be8be7b02e6ba68850fd481b8dc21ccd78679e98c8064dfecc2a49651ff70e0",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M28 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Decreto, porte grande, na amostra M28.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M29",
+      "cellId": "dou--portaria--pequeno",
+      "scope": "offline",
+      "entrySha256": "efe58ab63ee30d47af490079bed0824b177203ff3dbf6f6a0b55f0fdea00e73f",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M29 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Portaria, porte pequeno, na amostra M29.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M30",
+      "cellId": "dou--portaria--medio",
+      "scope": "offline",
+      "entrySha256": "8146b9ea65672fc328231cfde36ca0b3d28755d7060421b095e83c5ce0c7a171",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M30 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Portaria, porte médio, na amostra M30.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M32",
+      "cellId": "dou--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "91f5f992b486c193eb85d60faa62cfb379f9b6d03b81177d84c1a3f62dc6e646",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M32 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Resolução, porte pequeno, na amostra M32.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M33",
+      "cellId": "dou--resolucao--pequeno",
+      "scope": "offline",
+      "entrySha256": "b816b8da46e99ff3356fe225aa4606b82214f075a9297779dcd13a1a640de726",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M33 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Resolução, porte pequeno, na amostra M33.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M26",
+      "cellId": "dou--decreto--pequeno",
+      "scope": "offline",
+      "entrySha256": "211eda8ca51e03209d79021cbfe801d976be2c09fa25e4067c58f781bba7bc55",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M26 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Decreto, porte pequeno, na amostra M26. Inclui os anexos preservados nesta representação.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "http:M4",
+      "cellId": "confaz--convenio-icms--grande",
+      "scope": "offline",
+      "entrySha256": "58dde17e83a89ba070d45b38c2e825e98a450e549850e169a6080d3135a24b26",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de http:M4 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do CONFAZ (Plone). Limite: Convênio ICMS, porte grande, na amostra http:M4. Inclui os apêndices e instruções preservados nesta representação.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M34",
+      "cellId": "dou--resolucao--grande",
+      "scope": "offline",
+      "entrySha256": "2f101b93a91d9e122523da48267646e2c633617085b2b5cbf137d4146f1bcb0e",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M34 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML da página do ato no in.gov.br. Limite: Resolução, porte grande, na amostra M34. Inclui os anexos preservados nesta representação.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M10",
+      "cellId": "planalto--lei--pequeno",
+      "scope": "offline",
+      "entrySha256": "de9429513aaf4759fe640256018df90e019e86be12586f8647ba9c9cdd20525f",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M10 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML compilado do Planalto (ccivil_03). Limite: Lei, porte pequeno, na amostra M10. Decodificação aprovada para esta amostra.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "M12",
+      "cellId": "planalto--lei--medio",
+      "scope": "offline",
+      "entrySha256": "8a28cc55f26a52d1090c8cd74a97147c061d50da5b49ca5b22435aded8615e1d",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de M12 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML compilado do Planalto (ccivil_03). Limite: Lei, porte médio, na amostra M12. Decodificação aprovada para esta amostra.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "http:M1",
+      "cellId": "planalto--lei--grande",
+      "scope": "offline",
+      "entrySha256": "7fe91f513b006f497570733ea82dc928294183c3eedfb24df5916bf9ad1283d8",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de http:M1 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML compilado do Planalto (ccivil_03). Limite: Lei, porte grande, na amostra http:M1. Decodificação aprovada para esta amostra.",
+        "A célula grande é sustentada por http:M1. http:M2 segue parcial por itens numerados, tabela TIPI aninhada e resíduos editoriais.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "rfb:141910",
+      "cellId": "rfb--instrucao-normativa--medio",
+      "scope": "offline",
+      "entrySha256": "cc3ec39a52962a8a1f7416826338faf3520507c47abe1f57984ad9d0cbbd5507",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de rfb:141910 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: JSON multivigente (API normasinternet2). Limite: Instrução Normativa, porte médio, na amostra rfb:141910. Preparação RFB provisória.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "ricms-art008",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "scope": "offline",
+      "entrySha256": "743d88299d79fb52e7f448f4d5440a8812dd33396c822679a0a082d5b07c8175",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de ricms-art008 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML SharePoint, região \"Conteúdo da Página\". Limite: Decreto consolidado (RICMS/2000), artigo, porte pequeno, na amostra ricms-art008. A região é corroborada pela captura manual.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "ricms-art009",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "scope": "offline",
+      "entrySha256": "fa621a1eb5ca069d4deaddf4a8202ab429d455fbc6637047b45c198ef1579ec3",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de ricms-art009 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML SharePoint, região \"Conteúdo da Página\". Limite: Decreto consolidado (RICMS/2000), artigo, porte pequeno, na amostra ricms-art009. A região é corroborada pela captura manual.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "ricms-an2art039",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "scope": "offline",
+      "entrySha256": "c2665ce4c8b6b70e7164338ba8be645efee3523d35ddacc569cf3a29368059b9",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de ricms-an2art039 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML SharePoint, região \"Conteúdo da Página\". Limite: Decreto consolidado (RICMS/2000), artigo, porte médio, na amostra ricms-an2art039. A região é corroborada pela captura manual.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
+    },
+    {
+      "sampleId": "ricms-an2art003",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "scope": "offline",
+      "entrySha256": "298e29ac7b9ba0e2773ad0711b04259f5104af81223d89804fe01551357c8f30",
+      "engineBuildHash": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+      "decidedBy": "COORD (mandato EXEC F1 R7, condicionado à REV independente)",
+      "decidedOn": "2026-11-25",
+      "ref": "tribusca-control#116; mandato COORD → EXEC F1 R7 nesta sessão; revalidação de ricms-an2art003 @ a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
+      "limits": [
+        "Escopo offline: leitura local da representação oficial preservada.",
+        "Layout: HTML SharePoint, região \"Conteúdo da Página\". Limite: Decreto consolidado (RICMS/2000), artigo, porte médio, na amostra ricms-an2art003. A região é corroborada pela captura manual.",
+        "Aceite técnico de leitura. legalStatus permanece unknown. A autorização para operação tributária depende de decisão própria.",
+        "Motor 3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23. Nova identidade exige equivalência e revalidação append-only.",
+        "Merge e produção dependem de revisão independente e autorização da COORD."
+      ]
     }
   ]
 }

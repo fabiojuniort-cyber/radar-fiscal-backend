@@ -1,0 +1,254 @@
+{
+  "originalLedgerSha256": "06b8096b602768df59ae9e27ea5206f6269c7cd44042c94ff1510d9096808c35",
+  "preserved": 126,
+  "records": [
+    {
+      "afterEntrySha256": "122033506dc16998eb8e1a2c6dee636f4bbe8a932ec40255ab41d6544a17a112",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "ddfe55729245509cba45f20b8b7b9f42ef221a22e739695d71d46ec94847e9a7",
+      "beforeStatus": "complete",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "sampleId": "rfb:108391"
+    },
+    {
+      "afterEntrySha256": "730c2128ea56ea1f99295fbd98a26420cd3d98c2d722dee22d4524b66078b61f",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "f5ee03760bcd538234a7761cb5bd661d18b7dfea06bbd8318ecd1410cc9e60da",
+      "beforeStatus": "complete",
+      "cellId": "rfb--instrucao-normativa--grande",
+      "sampleId": "rfb:115131"
+    },
+    {
+      "afterEntrySha256": "db45123813f88f38b7e1504f56f07de436263da2adf27b17f8a1282b3f70b309",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "b3f2943820ac1af69928afb71467301cc51f98477b500690bd47667e7f2251cf",
+      "beforeStatus": "complete",
+      "cellId": "rfb--instrucao-normativa--pequeno",
+      "sampleId": "rfb:133898"
+    },
+    {
+      "afterEntrySha256": "5db5ae572d65e0e34b876d3456caeb1d371e06bfe6a5f6960faa788f71aa8b3d",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "1894360c6db514ccb6b34c180507c220bd4b675b0ff4c9e4890465c8858c79f7",
+      "beforeStatus": "complete",
+      "cellId": "rfb--portaria--pequeno",
+      "sampleId": "rfb:142967"
+    },
+    {
+      "afterEntrySha256": "b600bbd8d95cf369db492a3b575ee1352ab4e3fc054d2b991f7c05026a882223",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "ab08d1c02fe45e417dd105edc59f8c4d210ba57e5f260388f7c81c5701ccbce0",
+      "beforeStatus": "complete",
+      "cellId": "rfb--portaria--medio",
+      "sampleId": "rfb:148693"
+    },
+    {
+      "afterEntrySha256": "5c5b213425b11c5ec49dff3a3f1ad89ef0b8b60a669973bc09decebb35001297",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "fe8da60c269f9c34d88d1bc56017ad0344370926dcd51391f3facc0a90f42ff5",
+      "beforeStatus": "complete",
+      "cellId": "rfb--ato-declaratorio-interpretativo--pequeno",
+      "sampleId": "rfb:37103"
+    },
+    {
+      "afterEntrySha256": "93c22685095b569e95d3ee35308a2ff0293182a7adb5b236ec4837e51fb3a5fc",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "8295acc87a12c23667487b277742c6386dfc0d7a6eaa37a0cb7b0b8946425a46",
+      "beforeStatus": "complete",
+      "cellId": "rfb--ato-declaratorio-executivo--pequeno",
+      "sampleId": "rfb:148629"
+    },
+    {
+      "afterEntrySha256": "50d8c3cc2ea4118097e09793e37ea62d618d6906faadaf471cab681168e23e04",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "f77e2a56cefc45d03a6654cb90d0b015e2223d950fc6527b77a7286fc7ed5512",
+      "beforeStatus": "complete",
+      "cellId": "rfb--resolucao--pequeno",
+      "sampleId": "rfb:122645"
+    },
+    {
+      "afterEntrySha256": "69eb560bc32143c7708260aaf3679e57121cc37dc88b8bf405da05299752aed4",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "a678f1534ee9504c88601336150f90388aed4cc1464a15d7e06dd0698812239c",
+      "beforeStatus": "complete",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "sampleId": "M14"
+    },
+    {
+      "afterEntrySha256": "886002ccd02b405533ccfcb1dbd1a8ad2c137312cb762718ccdf2cad11ba0c1f",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "0d4e2bd0cf27a1d59221fb907d05305549a91a57458d816e4b3ec40a248e2465",
+      "beforeStatus": "complete",
+      "cellId": "confaz--convenio-icms--pequeno",
+      "sampleId": "M16"
+    },
+    {
+      "afterEntrySha256": "162bcd2f4c818419693cfb08a59dfdf587f31881355a98115829dd640d8f6dd5",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "f44a644757195b4830b51350c0c0640a4e0afadd3a9850a75c13bb21d4e69f23",
+      "beforeStatus": "complete",
+      "cellId": "confaz--ajuste-sinief--pequeno",
+      "sampleId": "M18"
+    },
+    {
+      "afterEntrySha256": "f994f176dbb4f9c251e4abc73d6ce93ca5ac82d809bdcfcd6b3bd83b33f5c5d9",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "34c51e6db267cbe108148cc87a91a29d77d53a1650c6eeceb20057fc83cad886",
+      "beforeStatus": "complete",
+      "cellId": "confaz--ajuste-sinief--grande",
+      "sampleId": "M19"
+    },
+    {
+      "afterEntrySha256": "2fe0c8228283abfc73db6d400e353f7682d8252450424831b1f6a8fe4022e3aa",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "441c6045ef0a71ed6172464c7ae4aade162dd25b47d03a28c8a7945573962969",
+      "beforeStatus": "complete",
+      "cellId": "confaz--protocolo-icms--pequeno",
+      "sampleId": "M20"
+    },
+    {
+      "afterEntrySha256": "3672298af5a816c7d4c5d0f170e61a04df8ac72f3d2244d1a68c64c0464a5b41",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "0a754dcda16e974c5ae62ad428dcc90b9939f0480b959c34a1f5bf65f5f4beb9",
+      "beforeStatus": "complete",
+      "cellId": "dou--instrucao-normativa--pequeno",
+      "sampleId": "M23"
+    },
+    {
+      "afterEntrySha256": "5f5840d50de6790e9411d45b1593a9638212ca8ea94c3ba549b8fa4929180355",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "a8a6da4886b9359431aa8e73699d54fbc9fdd2989d9248ffecb9a7854690e962",
+      "beforeStatus": "complete",
+      "cellId": "dou--instrucao-normativa--medio",
+      "sampleId": "M24"
+    },
+    {
+      "afterEntrySha256": "3be8be7b02e6ba68850fd481b8dc21ccd78679e98c8064dfecc2a49651ff70e0",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "c228adeb42c1d71add4bd75a10623a8780439c60ff69f9c0ded4e42109b5d2cf",
+      "beforeStatus": "complete",
+      "cellId": "dou--decreto--grande",
+      "sampleId": "M28"
+    },
+    {
+      "afterEntrySha256": "efe58ab63ee30d47af490079bed0824b177203ff3dbf6f6a0b55f0fdea00e73f",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "2954a29b1297084c65f8dd8373e9a4db3c1596a0bbe63353a9ccb784d332a38e",
+      "beforeStatus": "complete",
+      "cellId": "dou--portaria--pequeno",
+      "sampleId": "M29"
+    },
+    {
+      "afterEntrySha256": "8146b9ea65672fc328231cfde36ca0b3d28755d7060421b095e83c5ce0c7a171",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "a09b2fd15e172ad6871ea30a7846a461c45f98e5ab22329f327d10a80294434a",
+      "beforeStatus": "complete",
+      "cellId": "dou--portaria--medio",
+      "sampleId": "M30"
+    },
+    {
+      "afterEntrySha256": "91f5f992b486c193eb85d60faa62cfb379f9b6d03b81177d84c1a3f62dc6e646",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "b8506ac80e32336e8548463547e9816c574aa8c173adc5c307feafcbf652a9f8",
+      "beforeStatus": "complete",
+      "cellId": "dou--resolucao--pequeno",
+      "sampleId": "M32"
+    },
+    {
+      "afterEntrySha256": "b816b8da46e99ff3356fe225aa4606b82214f075a9297779dcd13a1a640de726",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "7b47743c741af073d72449d3b226e8c5bc862e105477734f96ba23649386a592",
+      "beforeStatus": "complete",
+      "cellId": "dou--resolucao--pequeno",
+      "sampleId": "M33"
+    },
+    {
+      "afterEntrySha256": "211eda8ca51e03209d79021cbfe801d976be2c09fa25e4067c58f781bba7bc55",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "97b6f4ba895b17134caabc2429aaff520d59adeeab407da9f1097fc1c8acbd2a",
+      "beforeStatus": "complete",
+      "cellId": "dou--decreto--pequeno",
+      "sampleId": "M26"
+    },
+    {
+      "afterEntrySha256": "58dde17e83a89ba070d45b38c2e825e98a450e549850e169a6080d3135a24b26",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "1bdaad28d4e21337d1b74a3cab3285d40f5647b24eea316f2459e359d716c6dc",
+      "beforeStatus": "complete",
+      "cellId": "confaz--convenio-icms--grande",
+      "sampleId": "http:M4"
+    },
+    {
+      "afterEntrySha256": "2f101b93a91d9e122523da48267646e2c633617085b2b5cbf137d4146f1bcb0e",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "eff994640b7fbbaffceb68822c1b1e380031ee2104b29127c4137c980c564ad7",
+      "beforeStatus": "complete",
+      "cellId": "dou--resolucao--grande",
+      "sampleId": "M34"
+    },
+    {
+      "afterEntrySha256": "de9429513aaf4759fe640256018df90e019e86be12586f8647ba9c9cdd20525f",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "2bebae2cb1f58f96ed7e6a03a240e866cc0da8994b007f305e0128095d5618c2",
+      "beforeStatus": "complete",
+      "cellId": "planalto--lei--pequeno",
+      "sampleId": "M10"
+    },
+    {
+      "afterEntrySha256": "8a28cc55f26a52d1090c8cd74a97147c061d50da5b49ca5b22435aded8615e1d",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "793b46ca60e91fdb00e1948934dc3b806934ecc782024530e2720eb43f1d605a",
+      "beforeStatus": "complete",
+      "cellId": "planalto--lei--medio",
+      "sampleId": "M12"
+    },
+    {
+      "afterEntrySha256": "7fe91f513b006f497570733ea82dc928294183c3eedfb24df5916bf9ad1283d8",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "3534008074038db972e18c8774994837d87dbfefad7d20f2de47f2ccb94fa946",
+      "beforeStatus": "complete",
+      "cellId": "planalto--lei--grande",
+      "sampleId": "http:M1"
+    },
+    {
+      "afterEntrySha256": "cc3ec39a52962a8a1f7416826338faf3520507c47abe1f57984ad9d0cbbd5507",
+      "afterStatus": "complete",
+      "beforeEntrySha256": "3684eeee6d20f1605a44c986a94104a12c8ba8addb47e6a4d32200fe8304aa37",
+      "beforeStatus": "complete",
+      "cellId": "rfb--instrucao-normativa--medio",
+      "sampleId": "rfb:141910"
+    },
+    {
+      "afterEntrySha256": "743d88299d79fb52e7f448f4d5440a8812dd33396c822679a0a082d5b07c8175",
+      "afterStatus": "partial",
+      "beforeEntrySha256": "0f646da28c04a6e1443895c32c4c55717c3c251455714553df75ca4938ae2e07",
+      "beforeStatus": "partial",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "sampleId": "ricms-art008"
+    },
+    {
+      "afterEntrySha256": "fa621a1eb5ca069d4deaddf4a8202ab429d455fbc6637047b45c198ef1579ec3",
+      "afterStatus": "partial",
+      "beforeEntrySha256": "391605e53e7bc704dffcd241a4aa954bb893a0d24a6deaa8a57ea0542c5209c7",
+      "beforeStatus": "partial",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "sampleId": "ricms-art009"
+    },
+    {
+      "afterEntrySha256": "c2665ce4c8b6b70e7164338ba8be645efee3523d35ddacc569cf3a29368059b9",
+      "afterStatus": "partial",
+      "beforeEntrySha256": "868f06873b652f9f986537c44f2d55cb2eb43776dc4c260ddff26b317f1c985e",
+      "beforeStatus": "partial",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "sampleId": "ricms-an2art039"
+    },
+    {
+      "afterEntrySha256": "298e29ac7b9ba0e2773ad0711b04259f5104af81223d89804fe01551357c8f30",
+      "afterStatus": "partial",
+      "beforeEntrySha256": "5cc25c0076a9c2c108093e4ac9f17f0cd3eabe9da827ccc8c1b14eb6f9426125",
+      "beforeStatus": "partial",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "sampleId": "ricms-an2art003"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { prepareOfficialAct } from '../src/modules/anatomy/official-portal-preparation.js';
 import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
@@ -89,6 +90,68 @@ test('CONFAZ Plone identifies an ementa, a spaced title and a sole annex', () =>
   assert.ok(r.parts.some((p) => p.type === 'summary' && p.context === 'prohibited'));
   assert.ok(r.parts.some((p) => p.ruleId.endsWith('confaz_plone_act_kind')));
   assert.ok(r.parts.some((p) => p.type === 'annex'));
+});
+
+test('R7 CONFAZ legacy titles must settle the same number and year at the start of the act', () => {
+  const article = '<p>Cláusula primeira Teor preservado.</p>';
+  const wrap = (content: string) => '<main id="content-core"><div id="parent-fieldname-text">' + content + '</div></main>';
+  const cases = [
+    ['AJUSTE SINIEF 7/05', 'AJUSTE SINIEF 07/05, DE 30 DE SETEMBRO DE 2005'],
+    ['PROTOCOLO ICMS 21/11', 'PROTOCOLO ICMS 21, DE 1º DE ABRIL DE 2011'],
+  ];
+  for (const [expected, literal] of cases) {
+    const title = '<p class="TituloAcordo">' + literal + '</p>';
+    const result = typedPortal('CONFAZ', '<nav>Menu externo</nav>' + wrap(title + article), expected!);
+    assert.match(result.canonicalText, /Teor preservado/u);
+    assert.doesNotMatch(result.canonicalText, /Menu externo/u);
+    for (const altered of [title + title + article, article + title, title.replace('TituloAcordo', 'TextoAcordo') + article,
+      title.replace(/20\d\d/u, '2026') + article]) {
+      assert.equal(prepareOfficialAct('CONFAZ', 'synthetic', wrap(altered), expected!), null);
+    }
+  }
+});
+
+test('R7 CONFAZ preserves archived act text and excludes the terminal signature rectification', () => {
+  const cases = [
+    ['manual/M21', 'PROTOCOLO ICMS 21/11', 'PROTOCOLO ICMS 21, DE 1º DE ABRIL DE 2011'],
+    ['manual/M5', 'AJUSTE SINIEF 7/05', 'AJUSTE SINIEF 07/05, DE 30 DE SETEMBRO DE 2005'],
+    ['e9-http/M5', 'AJUSTE SINIEF 7/05', 'AJUSTE SINIEF 07/05, DE 30 DE SETEMBRO DE 2005'],
+  ];
+  for (const [file, expected, literal] of cases) {
+    const html = readFileSync(new URL('../ops/anatomy/official-identification/' + file + '.html', import.meta.url), 'utf8');
+    const result = typedPortal('CONFAZ', html, expected!);
+    assert.equal(result.status, 'complete', file);
+    assert.equal(result.canonicalText, typedPortal('CONFAZ', html, literal!).canonicalText, file);
+    assert.ok(result.coverage.segments.every(segment => segment.classification !== 'unidentified'), file);
+    if (file === 'manual/M21') {
+      const correction = result.parts.filter(part => part.ruleId.includes('confaz_plone_signature_rectification'));
+      assert.deepEqual(correction.map(part => [part.type, part.context]), [
+        ['editorial_note', 'prohibited'], ['editorial_note', 'prohibited'], ['quoted_text', 'prohibited'],
+        ['quoted_text', 'prohibited'], ['signature', 'prohibited'],
+      ]);
+      const altered = html.replace('Na lista de assinatura', 'No dispositivo normativo');
+      assert.notEqual(altered, html);
+      assert.equal(typedPortal('CONFAZ', altered, expected!).status, 'partial');
+    } else {
+      assert.ok(result.parts.some(part => part.ruleId.endsWith('confaz_plone_earlier_wording_title') && part.context === 'prohibited'));
+      assert.ok(result.parts.some(part => part.ruleId.endsWith('confaz_plone_annex_subheading') && part.context === 'unknown'));
+      if (file === 'manual/M5') {
+        const altered = html.replaceAll('AJ007_05_anterior', 'AJ008_05_anterior');
+        assert.notEqual(altered, html);
+        assert.equal(typedPortal('CONFAZ', altered, expected!).status, 'partial');
+      }
+    }
+  }
+});
+
+test('R7 CONFAZ recognizes the beverage annex subheading and keeps the extraction failure conservative', () => {
+  const html = readFileSync(new URL('../ops/anatomy/official-identification/e9-http/M3.html', import.meta.url), 'utf8');
+  const result = typedPortal('CONFAZ', html, 'CONVÊNIO ICMS 142/18');
+  assert.equal(result.status, 'partial');
+  assert.deepEqual(result.limitations.map(limitation => limitation.code), ['entity_extraction_failed']);
+  assert.equal(result.entities.length, 0);
+  assert.ok(result.coverage.segments.every(segment => segment.classification !== 'unidentified'));
+  assert.ok(result.parts.some(part => part.ruleId.endsWith('confaz_plone_annex_subheading') && part.context === 'unknown'));
 });
 
 test('Planalto uses a proved body and supports a separated or compact ordinal', () => {
@@ -223,6 +286,26 @@ test('R5 Planalto preserves ordinal-only strike and restores anchored article in
     assert.ok(read(article + historical + replacement(anchor)).parts.filter(part => part.type === 'inciso')
       .every(part => part.context === 'prohibited'));
   }
+});
+
+test('R7 Planalto prohibits standalone repeal placeholders with editorial suffixes only', () => {
+  const title = 'LEI Nº 100, DE 1 DE JANEIRO DE 2026';
+  const html = '<html><body><p>Casa Civil</p><p>' + title + '</p><p>Art. 1º Disposições gerais:</p>'
+    + '<p>I - ( revogado ); (Redação dada pela Lei nº 14.430, de 2022)</p>'
+    + '<p>II – (Revogado pela Lei Complementar nº 214, de 2025) Produção de efeitos</p>'
+    + '<p>III - A regra do art. 8º (Revogado pela Lei nº 14.430) servirá como referência.</p>'
+    + '<p>IV - (Revogado pela Lei nº 14.430) O prazo é de vinte dias.</p>'
+    + '<p>§ 13-A. (Revogado pela Lei Complementar nº 214, de 2025) Produção de efeitos</p>'
+    + '<p>§ 15. (Revogado). (Redação dada pela Lei nº 14.292, de 2022)</p>'
+    + '<p>§ 16. Aplica-se a regra ainda que a lei citada tenha sido revogada.</p></body></html>';
+  const r = typedPortal('PLANALTO', html, title);
+  const devices = r.parts.filter(part => part.type === 'inciso' || part.type === 'paragraph');
+  assert.deepEqual(devices.map(part => part.context), [
+    'prohibited', 'prohibited', 'operative_candidate', 'operative_candidate',
+    'prohibited', 'prohibited', 'operative_candidate',
+  ]);
+  assert.equal(devices.filter(part => part.contextReasons.includes('planalto_repealed_placeholder')).length, 4);
+  assert.ok(devices.every(part => part.legalStatus === 'unknown'));
 });
 
 test('R6 RFB corroborates bare ordinals without promoting historical versions or crossing devices', () => {
