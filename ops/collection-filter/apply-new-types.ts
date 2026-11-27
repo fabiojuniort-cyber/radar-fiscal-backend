@@ -2,13 +2,12 @@
  * Aplicação em lote dos "novos tipos" do filtro de coleta (F3) pelas rotas
  * administrativas existentes. Veja NOVOS-TIPOS-RUNBOOK.md.
  *
- * Uso: npx tsx ops/collection-filter/apply-new-types.ts <plan|phase1|phase2-preview|phase2-confirm> ...
+ * Uso: npx tsx ops/collection-filter/apply-new-types.ts <plan|phase1> ...
  *
  * Garantias:
- *  - plan / phase2-preview são somente leitura (nenhuma escrita no servidor);
- *  - phase1 NUNCA chama /confirm: só preview + save (não destrutivo);
- *  - phase2-confirm só age sobre o arquivo aprovado (hash conferido) e nunca
- *    apaga mais do que a contagem aprovada para cada tipo;
+ *  - plan é somente leitura (nenhuma escrita no servidor);
+ *  - phase1 salva as regras de TODAS as linhas da planilha (os três modos),
+ *    somente por preview -> save, em sequência; esta rotina não apaga nada;
  *  - nenhum token/senha é impresso ou gravado; o token fica só em memória;
  *  - não toca taxonomia nem usa "reaplicar filtro ao acervo".
  */
@@ -28,7 +27,6 @@ export const ALLOWED_MODES: readonly string[] = [...KEEP_MODES, EXCLUDE_MODE];
 export const ALLOWED_SOURCES: readonly string[] = ['dou', 'doe-sp'];
 export const EXPECTED_HEADER = ['fonte', 'secao', 'tipo', 'ocorrencias', 'modo', 'grupo'];
 const API = '/api/v1/admin/collection-filter';
-const MAX_CONFIRM_STEPS = 1000;
 
 export interface CsvRow {
   line: number;
@@ -57,9 +55,6 @@ export interface Divergence { kind: string; source: string; section: string; tip
 export interface PreviewResult {
   actName: string; count: number; blockedCompany: number; blockedOtherSource: number;
   samples: Array<{ title?: string }>; token: string; policyRevision: number; confirmationToken: string;
-}
-export interface ConfirmResult {
-  changed: boolean; apagadas?: number; restantes?: number; deletedCount?: number; revision?: number;
 }
 
 export interface ApiClient {
@@ -349,6 +344,9 @@ export async function runPlan(ctx: Ctx) {
 
 // ------------------------------------------------------------------ phase1
 
+/** Rótulo da coluna informativa do relatório da fase 1. */
+export const PREVIEW_COLUMN = 'publicacoes_ja_guardadas_que_este_modo_descartaria_numa_limpeza_futura_NAO_sao_apagadas_por_esta_rotina';
+
 interface Phase1Record {
   key: string; source: string; section: string; canonicalType: string; mode: string;
   previewCount: number; blockedCompany: number; blockedOtherSource: number;
@@ -362,11 +360,12 @@ export async function runPhase1(ctx: Ctx, opts: { dryRun: boolean }) {
   const state: Phase1State = (await readJsonIfExists<Phase1State>(statePath)) ?? { version: 1, saved: {} };
   const { items } = await fetchReadyInventory(ctx);
   const { matched, unmatched } = matchRows(sheet.effective, items);
-  const keepMatched = matched.filter((m) => (KEEP_MODES as readonly string[]).includes(m.row.mode));
-  const keepUnmatched = unmatched.filter((r) => (KEEP_MODES as readonly string[]).includes(r.mode) && !state.saved[r.key]);
+  const pendingUnmatched = unmatched.filter((r) => !state.saved[r.key]);
   const dry: Array<Record<string, unknown>> = [];
   let saved = 0, skipped = 0, failed: string | null = null;
-  for (const m of keepMatched) {
+  // Estritamente sequencial: cada save incrementa a revisão da política, então
+  // um preview novo precede cada save.
+  for (const m of matched) {
     if (state.saved[m.row.key]) { skipped++; ctx.log(`[skip] ${m.row.source}/${m.canonicalType} já salvo`); continue; }
     const t0 = Date.now();
     try {
@@ -374,7 +373,7 @@ export async function runPhase1(ctx: Ctx, opts: { dryRun: boolean }) {
       if (opts.dryRun) {
         dry.push({ source: m.row.source, section: m.row.section, canonicalType: m.canonicalType, mode: m.row.mode,
           previewCount: p.count, blockedCompany: p.blockedCompany, blockedOtherSource: p.blockedOtherSource });
-        ctx.log(`[dry-run] ${m.row.source}/${m.canonicalType} ${m.row.mode} preview count=${p.count} (informativo) ${Date.now() - t0}ms`);
+        ctx.log(`[dry-run] ${m.row.source}/${m.canonicalType} ${m.row.mode} preview count=${p.count} (informativo; nada é apagado) ${Date.now() - t0}ms`);
         continue;
       }
       const res = (await ctx.client.post(`${API}/direct-rule/save`, { ...ruleBody(m), ...previewProof(p) })) as { revision?: number };
@@ -394,151 +393,15 @@ export async function runPhase1(ctx: Ctx, opts: { dryRun: boolean }) {
   else {
     const records = Object.values(state.saved);
     await writeAtomic(path.join(ctx.outDir, 'phase1-report.csv'), toCsv(
-      ['fonte', 'secao', 'tipo', 'modo', 'preview_count_informativo', 'blockedCompany', 'blockedOtherSource', 'revisao', 'resultado'],
+      ['fonte', 'secao', 'tipo', 'modo', PREVIEW_COLUMN, 'blockedCompany', 'blockedOtherSource', 'revisao', 'resultado'],
       records.map((r) => [r.source, r.section, r.canonicalType, r.mode, r.previewCount, r.blockedCompany, r.blockedOtherSource, r.revision, r.result])));
   }
-  ctx.log(`phase1 resumo: salvos=${saved} ja_salvos=${skipped} sem_item_vivo=${keepUnmatched.length} erro=${failed ? 'sim' : 'nao'} dry_run=${opts.dryRun} (nenhuma chamada a /confirm)`);
+  ctx.log(`phase1 resumo: salvos=${saved} ja_salvos=${skipped} sem_item_vivo=${pendingUnmatched.length} erro=${failed ? 'sim' : 'nao'} dry_run=${opts.dryRun}`);
+  ctx.log('nenhuma publicação foi apagada (rotina só usa /save)');
   let exitCode = 0;
   if (failed) exitCode = 1;
-  else if (keepUnmatched.length && !ctx.allowDivergences) { exitCode = 2; ctx.log('phase1: há linhas KEEP sem item vivo; rode plan e revise (ou --allow-divergences)'); }
-  return { saved, skipped, unmatched: keepUnmatched.length, failed, dry, exitCode };
-}
-
-// ----------------------------------------------------------- phase2-preview
-
-export interface Phase2Item {
-  key: string; sourceCode: string; section: string; canonicalType: string; mode: string;
-  csvOccurrences: number; liveOccurrences: number; count: number; blockedCompany: number;
-  blockedOtherSource: number; sampleTitles: string[]; policyRevision: number;
-}
-export interface Phase2Approval {
-  version: 1; generatedAt: string; csvSha256: string; items: Phase2Item[];
-  totals: { types: number; typesWithDeletions: number; totalToDelete: number; totalBlockedCompany: number; totalBlockedOtherSource: number };
-  unmatchedCsv: Array<{ line: number; source: string; section: string; tipo: string }>;
-}
-export const approvalCode = (bytes: string | Uint8Array) => sha256Hex(bytes).slice(0, 12);
-
-export async function runPhase2Preview(ctx: Ctx) {
-  const sheet = await loadSheet(ctx);
-  const { items } = await fetchReadyInventory(ctx);
-  const { matched, unmatched } = matchRows(sheet.effective, items);
-  const excl = matched.filter((m) => m.row.mode === EXCLUDE_MODE);
-  const exclUnmatched = unmatched.filter((r) => r.mode === EXCLUDE_MODE);
-  const out: Phase2Item[] = [];
-  for (const m of excl) {
-    const t0 = Date.now();
-    const p = await preview(ctx, m); // erro HTTP interrompe (propaga)
-    out.push({ key: m.row.key, sourceCode: m.row.source, section: m.row.section, canonicalType: m.canonicalType, mode: m.row.mode,
-      csvOccurrences: m.row.occurrences, liveOccurrences: Number(m.item.occurrence_count), count: p.count,
-      blockedCompany: p.blockedCompany, blockedOtherSource: p.blockedOtherSource,
-      sampleTitles: (p.samples ?? []).slice(0, 3).map((s) => String(s.title ?? '')), policyRevision: p.policyRevision });
-    ctx.log(`[preview] ${m.row.source}/${m.canonicalType} apagaria=${p.count} protegidas(emp=${p.blockedCompany},outra_fonte=${p.blockedOtherSource}) ${Date.now() - t0}ms`);
-  }
-  const approval: Phase2Approval = {
-    version: 1, generatedAt: ctx.now().toISOString(), csvSha256: sheet.csvSha256, items: out,
-    totals: {
-      types: out.length, typesWithDeletions: out.filter((i) => i.count > 0).length,
-      totalToDelete: out.reduce((a, i) => a + i.count, 0),
-      totalBlockedCompany: out.reduce((a, i) => a + i.blockedCompany, 0),
-      totalBlockedOtherSource: out.reduce((a, i) => a + i.blockedOtherSource, 0),
-    },
-    unmatchedCsv: exclUnmatched.map((r) => ({ line: r.line, source: r.source, section: r.section, tipo: r.tipo })),
-  };
-  const body = JSON.stringify(approval, null, 2) + '\n';
-  const code = approvalCode(body);
-  await writeAtomic(path.join(ctx.outDir, 'phase2-preview.json'), body);
-  await writeAtomic(path.join(ctx.outDir, 'phase2-preview.csv'), toCsv(
-    ['fonte', 'secao', 'tipo', 'modo', 'apagaria', 'blockedCompany', 'blockedOtherSource', 'exemplos'],
-    out.map((i) => [i.sourceCode, i.section, i.canonicalType, i.mode, i.count, i.blockedCompany, i.blockedOtherSource, i.sampleTitles.join(' | ')])));
-  const t = approval.totals;
-  const md = [
-    '# Pré-visualização da fase 2 (somente leitura)', '',
-    `Código de aprovação: \`${code}\` (sha256 de phase2-preview.json, primeiros 12 hex)`, '',
-    `- Tipos: ${t.types}; com exclusões: ${t.typesWithDeletions}`,
-    `- Total a apagar: ${t.totalToDelete}`,
-    `- Protegidas mantidas: empresa=${t.totalBlockedCompany}, outra fonte=${t.totalBlockedOtherSource}`,
-    `- Linhas EXCLUDE sem item vivo: ${approval.unmatchedCsv.length}`, '',
-    '| Fonte | Seção | Tipo | Apagaria | blockedCompany | blockedOtherSource | Exemplos |', '|---|---|---|---:|---:|---:|---|',
-    ...out.map((i) => `| ${i.sourceCode} | ${i.section} | ${i.canonicalType.replaceAll('|', '\\|')} | ${i.count} | ${i.blockedCompany} | ${i.blockedOtherSource} | ${i.sampleTitles.join(' / ').replaceAll('|', '\\|')} |`), '',
-  ].join('\n');
-  await writeAtomic(path.join(ctx.outDir, 'phase2-preview.md'), md);
-  ctx.log(`phase2-preview: tipos=${t.types} apagaria=${t.totalToDelete} protegidas empresa=${t.totalBlockedCompany} outra_fonte=${t.totalBlockedOtherSource} sem_item_vivo=${approval.unmatchedCsv.length}`);
-  ctx.log(`CÓDIGO DE APROVAÇÃO: ${code}`);
-  ctx.log('PARE: aprovação do Fábio necessária');
-  return { approval, code, exitCode: exclUnmatched.length && !ctx.allowDivergences ? 2 : 0 };
-}
-
-// ----------------------------------------------------------- phase2-confirm
-
-interface Phase2TypeState {
-  status: 'IN_PROGRESS' | 'DONE' | 'SKIPPED_EXCEEDS_APPROVED' | 'STOPPED';
-  steps: number; deletedTotal: number; approvedCount: number; detail?: string;
-}
-interface Phase2State { version: 1; approvalCode: string; types: Record<string, Phase2TypeState> }
-
-export async function runPhase2Confirm(ctx: Ctx, opts: { approvedPath: string; approvalCode: string }) {
-  const bytes = await readFile(opts.approvedPath);
-  const actual = approvalCode(bytes);
-  if (opts.approvalCode.trim().toLowerCase() !== actual) {
-    throw new Error('codigo_de_aprovacao_invalido: nao confere com o arquivo; nada foi alterado');
-  }
-  const approval = JSON.parse(bytes.toString('utf8')) as Phase2Approval;
-  if (approval.version !== 1 || !Array.isArray(approval.items)) throw new Error('arquivo_de_aprovacao_invalido');
-  for (const i of approval.items) {
-    if (i.mode !== EXCLUDE_MODE || !ALLOWED_SOURCES.includes(i.sourceCode) || !Number.isInteger(i.count) || i.count < 0 || !i.canonicalType) {
-      throw new Error('arquivo_de_aprovacao_invalido: item fora do escopo EXCLUDE_UNLESS_STRONG');
-    }
-  }
-  if (ctx.csvPath && existsSync(ctx.csvPath)) {
-    const csvSha = sha256Hex(await readFile(ctx.csvPath));
-    if (csvSha !== approval.csvSha256) throw new Error('csv_diferente_do_usado_no_preview; nada foi alterado');
-  }
-  const statePath = path.join(ctx.outDir, 'phase2.state.json');
-  const state: Phase2State = (await readJsonIfExists<Phase2State>(statePath)) ?? { version: 1, approvalCode: actual, types: {} };
-  if (state.approvalCode !== actual) throw new Error('phase2.state.json pertence a outra aprovacao; use outro --out');
-  const persist = () => writeAtomic(statePath, JSON.stringify(state, null, 2) + '\n');
-
-  let done = 0, alreadyDone = 0, problems = 0, deleted = 0;
-  for (const item of approval.items) {
-    const prior = state.types[item.key];
-    if (prior?.status === 'DONE') { alreadyDone++; deleted += prior.deletedTotal; ctx.log(`[skip] ${item.sourceCode}/${item.canonicalType} já concluído`); continue; }
-    const t0 = Date.now();
-    const rule = { row: { source: item.sourceCode, section: item.section, mode: item.mode }, canonicalType: item.canonicalType };
-    // Reexecução retoma de onde parou: passos e total apagado são preservados,
-    // então o teto aprovado vale para o acumulado de todas as execuções.
-    const st: Phase2TypeState = prior ?? { status: 'IN_PROGRESS', steps: 0, deletedTotal: 0, approvedCount: item.count };
-    st.status = 'IN_PROGRESS'; delete st.detail;
-    state.types[item.key] = st;
-    const stop = async (status: Phase2TypeState['status'], detail: string) => {
-      st.status = status; st.detail = detail; problems++; await persist();
-      ctx.log(`[${status}] ${item.sourceCode}/${item.canonicalType}: ${detail}`);
-    };
-    for (;;) {
-      const fresh = await preview(ctx, rule); // erro HTTP propaga e interrompe tudo
-      const allowed = item.count - st.deletedTotal;
-      if (fresh.count > allowed) {
-        await stop(st.steps === 0 ? 'SKIPPED_EXCEEDS_APPROVED' : 'STOPPED', `contagem atual ${fresh.count} > aprovada restante ${allowed}; nada além do aprovado será apagado`);
-        break;
-      }
-      if (fresh.count === 0) {
-        // Nada a apagar: persiste a regra por save (não destrutivo) se ainda não persistida.
-        if (st.steps === 0) await ctx.client.post(`${API}/direct-rule/save`, { ...ruleBody(rule), ...previewProof(fresh) });
-        st.status = 'DONE'; await persist(); done++; deleted += st.deletedTotal;
-        ctx.log(`[DONE] ${item.sourceCode}/${item.canonicalType} apagadas=${st.deletedTotal} ${Date.now() - t0}ms`);
-        break;
-      }
-      const res = (await ctx.client.post(`${API}/direct-rule/confirm`, { ...ruleBody(rule), ...previewProof(fresh), ...(st.steps > 0 ? { resume: true } : {}) })) as ConfirmResult;
-      if (res.changed) { await stop('STOPPED', 'contagem/token mudou durante a confirmação; nada apagado neste passo'); break; }
-      const step = Number(res.deletedCount ?? res.apagadas ?? 0);
-      st.steps++; st.deletedTotal += step; await persist();
-      ctx.log(`  passo ${st.steps}: apagadas=${step} restantes=${res.restantes}`);
-      if (res.restantes === 0) { st.status = 'DONE'; await persist(); done++; deleted += st.deletedTotal; ctx.log(`[DONE] ${item.sourceCode}/${item.canonicalType} apagadas=${st.deletedTotal} ${Date.now() - t0}ms`); break; }
-      if (step === 0) { await stop('STOPPED', 'progresso zero; parado sem nova tentativa automática'); break; }
-      if (st.steps >= MAX_CONFIRM_STEPS) { await stop('STOPPED', 'limite de passos'); break; }
-    }
-  }
-  ctx.log(`phase2-confirm resumo: concluidos=${done} ja_concluidos=${alreadyDone} com_problema=${problems} total_apagadas=${deleted}`);
-  return { done, alreadyDone, problems, deleted, exitCode: problems ? 1 : 0 };
+  else if (pendingUnmatched.length && !ctx.allowDivergences) { exitCode = 2; ctx.log('phase1: há linhas sem item vivo; rode plan e revise (ou --allow-divergences)'); }
+  return { saved, skipped, unmatched: pendingUnmatched.length, failed, dry, exitCode };
 }
 
 // --------------------------------------------------------------------- CLI
@@ -591,8 +454,6 @@ export async function readCredentials(): Promise<Credentials> {
 const USAGE = `Uso: npx tsx ops/collection-filter/apply-new-types.ts <comando> --base-url <url> --csv <arquivo> --out <dir>
   plan [--allow-divergences]
   phase1 [--dry-run] [--allow-divergences]
-  phase2-preview [--allow-divergences]
-  phase2-confirm --approved <phase2-preview.json> --approval-code <12 hex>
 Credenciais: ADMIN_EMAIL / ADMIN_PASSWORD (ou prompt; senha oculta).`;
 
 export async function main(argv: string[]): Promise<number> {
@@ -610,9 +471,6 @@ export async function main(argv: string[]): Promise<number> {
   switch (cmd) {
     case 'plan': return (await runPlan(ctx)).exitCode;
     case 'phase1': return (await runPhase1(ctx, { dryRun: flags.get('dry-run') === true })).exitCode;
-    case 'phase2-preview': return (await runPhase2Preview(ctx)).exitCode;
-    case 'phase2-confirm':
-      return (await runPhase2Confirm(ctx, { approvedPath: path.resolve(need('approved')), approvalCode: need('approval-code') })).exitCode;
     default: console.error(USAGE); return 1;
   }
 }

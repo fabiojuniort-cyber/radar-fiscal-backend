@@ -169,7 +169,7 @@ doe-sp;ATOS NORMATIVOS;De Homologação do Regimento Escolar;1;EXCLUDE_UNLESS_ST
 doe-sp;ATOS NORMATIVOS;Delegacia Geral de Polícia;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Delegacia Seccional de Polícia de Mogi das Cruzes;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Deliberação;17;KEEP_IF_TAX_TERM;2-generico
-doe-sp;ATOS NORMATIVOS;Deliberação Arsesp;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Deliberação Arsesp;2;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Deliberação Cepe a 21/2026;3;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Deliberação Ceter;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Deliberação Cetran Sp 13;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -213,7 +213,7 @@ doe-sp;ATOS NORMATIVOS;Despacho do Coordenador da Coordenadoria do Ribeira e Lit
 doe-sp;ATOS NORMATIVOS;Despacho do Coordenador Geral;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Despacho do Diretor Executivo;3;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Despacho do Diretor Geral;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Despacho do Governador;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Despacho do Governador;2;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Despacho do Presidente;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Despacho Nº Cpam;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Despacho Nº Cpam12 117/106/2026;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -244,7 +244,7 @@ doe-sp;ATOS NORMATIVOS;Errata da Portaria Pr/der 260/2026;1;EXCLUDE_UNLESS_STRON
 doe-sp;ATOS NORMATIVOS;Esclarecimento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Execução e Fiscalização;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Extrados dos Contrato Pregão Eletronico;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Extrato 37ª Sessão Ordinária;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Extrato 37ª Sessão Ordinária;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Extrato da 248ª Sessão Extraordinária do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Extrato da 249ª Sessão Extraordinária do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Extrato da 318ª Sessão Virtual do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -316,8 +316,8 @@ doe-sp;ATOS NORMATIVOS;Instrução Normativa;8;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Instrução Normativa Ceeteps Cgpep;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Instrução Normativa Dpcrd;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Instrução Normativa Nd;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Instrução Normativa Nº Intimação;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Instrução Normativa Nº Intimação 75/19/26;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Instrução Normativa Nº Intimação;2;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;Instrução Normativa Nº Intimação 75/19/26;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Instrução Normativa Nº Pd;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Instrução Normativa Sgd/sggd;3;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Instrução Normativa Sgp;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -352,7 +352,7 @@ doe-sp;ATOS NORMATIVOS;Pauta da 319ª Sessão Virtual do Conselho Superior da De
 doe-sp;ATOS NORMATIVOS;Pauta da 320ª Sessão Virtual do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Pauta da 321ª Sessão Virtual do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Pauta da 322ª Sessão Virtual do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Pauta da 38ª Sessão Ordinária;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Pauta da 38ª Sessão Ordinária;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Pauta da 945ª Sessão Ordinária do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Pauta da 946ª Sessão Ordinária do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Pauta da 947ª Sessão Ordinária do Conselho Superior da Defensoria Pública;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -613,5 +613,5 @@ dou;DO3;Resultado Julgamento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 dou;DO3;Resultados de Julgamento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 dou;DO3;Retificações;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 dou;DO3;Segundo Termo Aditivo Contrato;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-dou;DO1;Sessão Ordinária de Julgamento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+dou;DO1;Sessão Ordinária de Julgamento;1;KEEP_IF_TAX_TERM;2-generico
 dou;DO3;Termo de Apostilamento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario

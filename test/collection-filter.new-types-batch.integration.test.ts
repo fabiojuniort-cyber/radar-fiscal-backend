@@ -7,20 +7,21 @@ import test from 'node:test';
 import { Pool } from 'pg';
 import { buildApp } from '../src/app.js';
 import {
-  approvalCode, createApiClient, runPhase1, runPhase2Confirm, runPhase2Preview, runPlan,
-  type Ctx, type Phase2Approval,
+  createApiClient, runPhase1, runPlan,
+  type Ctx,
 } from '../ops/collection-filter/apply-new-types.js';
 
 const adminUrl = process.env.DATABASE_ADMIN_URL;
 if (!adminUrl) throw new Error('DATABASE_ADMIN_URL required: isolated PostgreSQL only');
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
-test('novos tipos em lote: plan, fase 1 (só salva), preview e confirmação aprovada da fase 2', async () => {
+test('novos tipos em lote: plan e fase 1 salvam regras dos três modos sem apagar nenhuma publicação', async () => {
   const owner = new Pool({ connectionString: adminUrl, max: 1 });
   const app = await buildApp();
   const tag = 'NTBATCH' + randomUUID().replaceAll('-', '').toUpperCase().slice(0, 12);
   const dir = await mkdtemp(path.join(tmpdir(), 'ntbatch-'));
   const calls: string[] = [];
+  const allCalls: string[] = [];
   try {
     await app.ready();
     await app.listen({ host: '127.0.0.1', port: 0 });
@@ -60,7 +61,7 @@ test('novos tipos em lote: plan, fase 1 (só salva), preview e confirmação apr
     const T = {
       keepA: tag + ' AVISO MANTER', keepB: tag + ' COMUNICADO CONDICIONAL',
       excA: tag + ' RELATORIO ROTINA', excB: tag + ' ATO ESTADUAL ROTINA', excC: tag + ' PARECER CRESCENTE',
-      liveOnly: tag + ' TIPO SO NO VIVO', csvOnly: tag + ' TIPO NAO EXISTE',
+      excD: tag + ' ATO DIRETO ROTINA', liveOnly: tag + ' TIPO SO NO VIVO', csvOnly: tag + ' TIPO NAO EXISTE',
     };
     for (let n = 0; n < 3; n++) await fixture('keepA' + n, 'dou', T.keepA);
     for (let n = 0; n < 2; n++) await fixture('keepB' + n, 'dou', T.keepB);
@@ -72,6 +73,8 @@ test('novos tipos em lote: plan, fase 1 (só salva), preview e confirmação apr
     for (let n = 0; n < 2; n++) excB.push(await fixture('excB' + n, 'doe-sp', T.excB));
     const excC: string[] = [];
     for (let n = 0; n < 2; n++) excC.push(await fixture('excC' + n, 'dou', T.excC));
+    const excD: string[] = [];
+    for (let n = 0; n < 2; n++) excD.push(await fixture('excD' + n, 'dou', T.excD));
     const liveOnly = await fixture('liveOnly', 'dou', T.liveOnly);
     const company = (await owner.query<{ id: string }>('INSERT INTO companies(tenant_id,legal_name,head_office_cnpj) VALUES($1,$2,$3) RETURNING id', [account.tenant.id, tag, String(BigInt('0x' + randomUUID().replaceAll('-', '').slice(0, 11))).padStart(14, '0')])).rows[0]!.id;
     await owner.query('INSERT INTO company_publications(company_id,publication_id) VALUES($1,$2)', [company, companyProtected]);
@@ -79,7 +82,7 @@ test('novos tipos em lote: plan, fase 1 (só salva), preview e confirmação apr
     // Cliente HTTP real (loopback) com registro das chamadas; credenciais só em memória.
     const client = createApiClient({
       baseUrl, credentials: async () => ({ email, password }),
-      fetchImpl: async (url, init) => { calls.push((init?.method ?? 'GET') + ' ' + new URL(String(url)).pathname); return fetch(url, init); },
+      fetchImpl: async (url, init) => { const c = (init?.method ?? 'GET') + ' ' + new URL(String(url)).pathname; calls.push(c); allCalls.push(c); return fetch(url, init); },
     });
     const logs: string[] = [];
     const makeCtx = (out: string, csv: string, extra: Partial<Ctx> = {}): Ctx => ({
@@ -129,7 +132,7 @@ test('novos tipos em lote: plan, fase 1 (só salva), preview e confirmação apr
     assert.equal(plan.plan.totals.unmatchedCsv, 1);
     const kinds = (k: string) => plan.plan.divergences.filter((d) => d.kind === k && d.tipo.toUpperCase().includes(tag)).map((d) => ({ ...d, tipo: d.tipo.toUpperCase() }));
     assert.deepEqual(kinds('CSV_WITHOUT_LIVE_ITEM').map((d) => d.tipo), [T.csvOnly]);
-    assert.deepEqual(kinds('LIVE_NOT_IN_CSV').map((d) => d.tipo), [T.liveOnly]);
+    assert.deepEqual(kinds('LIVE_NOT_IN_CSV').map((d) => d.tipo).sort(), [T.excD, T.liveOnly].sort());
     assert.deepEqual(kinds('COUNT_DIFFERENCE').map((d) => d.tipo), [T.excC]);
     for (const f of ['plan.json', 'divergences.csv', 'divergences.md']) assert.ok((await readFile(path.join(planOut, f), 'utf8')).length > 0);
     assert.ok((await readFile(path.join(planOut, 'divergences.md'), 'utf8')).toUpperCase().includes(T.csvOnly));
@@ -140,103 +143,73 @@ test('novos tipos em lote: plan, fase 1 (só salva), preview e confirmação apr
     assert.equal(await ruleCount(), 0, 'plan não escreve regras');
 
     // ----------------------------------------------------------------- fase 1
+    const idsBefore = (await owner.query<{ id: string }>('SELECT id FROM publications WHERE id=ANY($1::uuid[]) ORDER BY id', [ids])).rows.map((r) => r.id);
+    assert.equal(idsBefore.length, totalPubs);
     const p1Out = path.join(dir, 'p1');
     const rev0 = await revision();
     calls.length = 0;
     const dry = await runPhase1(makeCtx(p1Out, csvPath, { allowDivergences: true }), { dryRun: true });
     assert.equal(dry.saved, 0);
-    assert.equal(dry.dry.length, 2);
-    assert.ok(!calls.some((c) => c.includes('/save') || c.includes('/confirm')));
+    assert.equal(dry.dry.length, 5, 'dry-run faz preview dos três modos');
+    assert.ok(calls.every((c) => c === 'POST /auth/login' || c.includes('/new-types') || c.endsWith('/direct-rule/preview')), 'dry-run só lê');
     assert.equal(await revision(), rev0, 'dry-run não altera a política');
     assert.equal(await ruleCount(), 0);
+    const dryBy = Object.fromEntries(dry.dry.map((d) => [String(d.canonicalType).toUpperCase(), d]));
+    assert.equal(dryBy[T.excA]!.previewCount, 3, 'regra EXCLUDE descartaria 3 (1 de empresa e 1 de outra origem protegidas)');
+    assert.equal(dryBy[T.excB]!.previewCount, 2);
+    assert.equal(dryBy[T.excC]!.previewCount, 2);
+    assert.ok(Object.values(dryBy).filter((d) => d.mode === 'EXCLUDE_UNLESS_STRONG').every((d) => Number(d.previewCount) > 0));
 
     calls.length = 0;
     const p1 = await runPhase1(makeCtx(p1Out, csvPath, { allowDivergences: true }), { dryRun: false });
-    assert.deepEqual([p1.saved, p1.skipped, p1.exitCode], [2, 0, 0]);
-    assert.ok(!calls.some((c) => c.includes('/confirm')), 'fase 1 nunca chama confirm');
-    assert.equal(calls.filter((c) => c.endsWith('/direct-rule/save')).length, 2);
-    assert.equal(await pubCount(), totalPubs, 'fase 1 não apaga nada');
-    assert.equal(await ruleCount(), 2);
-    assert.equal(await revision(), rev0 + 2, 'cada save sobe a revisão');
+    assert.deepEqual([p1.saved, p1.skipped, p1.exitCode], [5, 0, 0]);
+    const seq = calls.filter((c) => c.includes('/direct-rule/')).map((c) => c.split('/').pop());
+    assert.deepEqual(seq, ['preview', 'save', 'preview', 'save', 'preview', 'save', 'preview', 'save', 'preview', 'save'], 'preview novo antes de cada save');
+    assert.equal(await revision(), rev0 + 5, 'cada save sobe a revisão');
+    assert.equal(await ruleCount(), 5);
     const modes = (await owner.query<{ canonical_type: string; mode: string }>('SELECT canonical_type,mode FROM collection_filter_type_rules WHERE policy_id=$1 AND canonical_type ILIKE $2', [policy.id, tag + '%'])).rows;
-    assert.deepEqual(Object.fromEntries(modes.map((m) => [m.canonical_type.toUpperCase(), m.mode])), { [T.keepA]: 'KEEP_ALWAYS', [T.keepB]: 'KEEP_IF_TAX_TERM' });
+    assert.deepEqual(Object.fromEntries(modes.map((m) => [m.canonical_type.toUpperCase(), m.mode])), {
+      [T.keepA]: 'KEEP_ALWAYS', [T.keepB]: 'KEEP_IF_TAX_TERM',
+      [T.excA]: 'EXCLUDE_UNLESS_STRONG', [T.excB]: 'EXCLUDE_UNLESS_STRONG', [T.excC]: 'EXCLUDE_UNLESS_STRONG',
+    });
+    const idsAfter = (await owner.query<{ id: string }>('SELECT id FROM publications WHERE id=ANY($1::uuid[]) ORDER BY id', [ids])).rows.map((r) => r.id);
+    assert.deepEqual(idsAfter, idsBefore, 'nenhuma publicação foi apagada (mesmos ids)');
+    assert.equal(await pubCount(), totalPubs);
+    assert.equal(await count('SELECT count(*) AS n FROM publications WHERE id=ANY($1::uuid[])', [[...excA, ...excB, ...excC, companyProtected, originProtected]]), 9, 'as apagáveis seguem todas lá');
+    assert.ok(logs.includes('nenhuma publicação foi apagada (rotina só usa /save)'));
+    const report = await readFile(path.join(p1Out, 'phase1-report.csv'), 'utf8');
+    assert.ok(/NAO_sao_apagadas_por_esta_rotina/.test(report));
     const state = JSON.parse(await readFile(path.join(p1Out, 'phase1.state.json'), 'utf8')) as { saved: Record<string, unknown> };
-    assert.equal(Object.keys(state.saved).length, 2);
-    // Retomada: segunda execução é no-op.
+    assert.equal(Object.keys(state.saved).length, 5);
+
+    // Segunda execução é no-op.
     calls.length = 0;
     const p1b = await runPhase1(makeCtx(p1Out, csvPath, { allowDivergences: true }), { dryRun: false });
-    assert.deepEqual([p1b.saved, p1b.skipped, p1b.exitCode], [0, 2, 0]);
-    assert.ok(!calls.some((c) => c.includes('/save') || c.includes('/preview') || c.includes('/confirm')));
-    assert.equal(await revision(), rev0 + 2);
-
-    // ------------------------------------------------------- fase 2: preview
-    const p2Out = path.join(dir, 'p2');
-    const rev1 = await revision();
-    calls.length = 0;
-    const pv = await runPhase2Preview(makeCtx(p2Out, csvPath, { allowDivergences: true }));
-    assert.ok(!calls.some((c) => c.includes('/save') || c.includes('/confirm')), 'preview só lê');
-    assert.equal(await revision(), rev1, 'preview não altera a política');
-    assert.equal(await ruleCount(), 2);
+    assert.deepEqual([p1b.saved, p1b.skipped, p1b.exitCode], [0, 5, 0]);
+    assert.ok(!calls.some((c) => c.includes('/save') || c.includes('/preview')));
+    assert.equal(await revision(), rev0 + 5);
     assert.equal(await pubCount(), totalPubs);
-    const byType = Object.fromEntries(pv.approval.items.map((i) => [i.canonicalType.toUpperCase(), i]));
-    assert.deepEqual(Object.keys(byType).sort(), [T.excA, T.excB, T.excC].sort(), 'só EXCLUDE, só os com item vivo');
-    assert.deepEqual([byType[T.excA]!.count, byType[T.excA]!.blockedCompany, byType[T.excA]!.blockedOtherSource], [3, 1, 1]);
-    assert.deepEqual([byType[T.excB]!.count, byType[T.excB]!.blockedCompany, byType[T.excB]!.blockedOtherSource], [2, 0, 0]);
-    assert.equal(byType[T.excC]!.count, 2);
-    assert.ok(byType[T.excA]!.sampleTitles.length >= 1 && byType[T.excA]!.sampleTitles.length <= 3);
-    assert.equal(pv.approval.totals.totalToDelete, 7);
-    assert.equal(pv.approval.unmatchedCsv.length, 1);
-    const approvedPath = path.join(p2Out, 'phase2-preview.json');
-    assert.equal(pv.code, approvalCode(await readFile(approvedPath)));
-    assert.ok((await readFile(path.join(p2Out, 'phase2-preview.md'), 'utf8')).includes(pv.code));
-    assert.ok(logs.some((l) => l.includes('PARE: aprovação do Fábio necessária')));
 
-    // ---------------------------------------------------- fase 2: confirmação
-    const confOut = path.join(dir, 'p2-confirm');
-    calls.length = 0;
-    await assert.rejects(runPhase2Confirm(makeCtx(confOut, csvPath), { approvedPath, approvalCode: '000000000000' }), /codigo_de_aprovacao_invalido/);
-    assert.equal(calls.length, 0, 'código errado não faz nenhuma chamada');
+    // /save direto no servidor, regra EXCLUDE com count > 0: não destrutivo.
+    const sec = sectionOf(T.excD);
+    const rule = { sourceCode: sec.source_code, section: sec.section, canonicalType: sec.act_name, mode: 'EXCLUDE_UNLESS_STRONG' };
+    allCalls.push('POST /api/v1/admin/collection-filter/direct-rule/preview');
+    const pvRes = await app.inject({ method: 'POST', url: '/api/v1/admin/collection-filter/direct-rule/preview', headers, payload: rule });
+    assert.equal(pvRes.statusCode, 200, pvRes.body);
+    const pv = pvRes.json<{ count: number; token: string; confirmationToken: string; policyRevision: number }>();
+    assert.ok(pv.count > 0, 'a regra descartaria publicações numa limpeza futura');
+    allCalls.push('POST /api/v1/admin/collection-filter/direct-rule/save');
+    const sv = await app.inject({ method: 'POST', url: '/api/v1/admin/collection-filter/direct-rule/save', headers,
+      payload: { ...rule, expectedCount: pv.count, previewToken: pv.token, confirmationToken: pv.confirmationToken, policyRevision: pv.policyRevision } });
+    assert.equal(sv.statusCode, 200, sv.body);
+    assert.equal(sv.json<{ deletedCount: number }>().deletedCount, 0);
+    assert.equal(await count('SELECT count(*) AS n FROM publications WHERE id=ANY($1::uuid[])', [excD]), 2, 'save direto não apagou nada');
     assert.equal(await pubCount(), totalPubs);
-    assert.equal(await ruleCount(), 2);
+    assert.equal(await ruleCount(), 6);
 
-    // O acervo cresce depois do preview aprovado: o tipo C não pode ser apagado.
-    const grown = await fixture('excC-grown', 'dou', T.excC);
-    const rev2 = await revision();
-    const res = await runPhase2Confirm(makeCtx(confOut, csvPath), { approvedPath, approvalCode: pv.code });
-    assert.equal(res.exitCode, 1, 'tipo que cresceu é reportado');
-    const alive = async (list: string[]) => count('SELECT count(*) AS n FROM publications WHERE id=ANY($1::uuid[])', [list]);
-    assert.equal(await alive(excA), 0, 'A: exatamente as 3 aprovadas apagadas');
-    assert.equal(await alive([companyProtected, originProtected]), 2, 'protegidas (empresa/outra origem) mantidas');
-    assert.equal(await alive(excB), 0, 'B apagadas');
-    assert.equal(await alive([...excC, grown]), 3, 'C intacto (cresceu além do aprovado)');
-    assert.equal(await alive([liveOnly]), 1, 'tipo fora do arquivo aprovado intocado');
-    assert.equal(await count('SELECT count(*) AS n FROM publications WHERE id=ANY($1::uuid[])', [ids]), totalPubs + 1 - 5, 'total: exatamente 5 apagadas (3 de A + 2 de B)');
-    assert.equal(await ruleCount(), 4, 'regras A e B salvas; C não');
-    assert.equal(await count("SELECT count(*) AS n FROM collection_filter_type_rules WHERE policy_id=$1 AND upper(canonical_type)=$2", [policy.id, T.excC]), 0);
-    assert.ok((await revision()) > rev2);
-    const st = JSON.parse(await readFile(path.join(confOut, 'phase2.state.json'), 'utf8')) as { types: Record<string, { status: string; deletedTotal: number }> };
-    const stByName = Object.fromEntries(Object.values(byType).map((i) => [i.canonicalType.toUpperCase(), st.types[i.key]!]));
-    assert.deepEqual([stByName[T.excA]!.status, stByName[T.excA]!.deletedTotal], ['DONE', 3]);
-    assert.deepEqual([stByName[T.excB]!.status, stByName[T.excB]!.deletedTotal], ['DONE', 2]);
-    assert.equal(stByName[T.excC]!.status, 'SKIPPED_EXCEEDS_APPROVED');
-
-    // Retomada: segunda execução não confirma nada de novo (A/B concluídos, C continua barrado).
-    calls.length = 0;
-    const again = await runPhase2Confirm(makeCtx(confOut, csvPath), { approvedPath, approvalCode: pv.code });
-    assert.equal(again.alreadyDone, 2);
-    assert.ok(!calls.some((c) => c.includes('/confirm') || c.includes('/save')));
-    assert.equal(await alive([...excC, grown]), 3);
-    assert.equal(await ruleCount(), 4);
-
-    // Arquivo adulterado muda o código: recusado.
-    const tampered = path.join(dir, 'tampered.json');
-    const body = JSON.parse(await readFile(approvedPath, 'utf8')) as Phase2Approval;
-    body.items[0]!.count += 100;
-    await writeFile(tampered, JSON.stringify(body, null, 2) + '\n');
-    await assert.rejects(runPhase2Confirm(makeCtx(path.join(dir, 'p2-tampered'), csvPath), { approvedPath: tampered, approvalCode: pv.code }), /codigo_de_aprovacao_invalido/);
-
-    // Nenhuma chamada deve ter ocorrido fora das rotas administrativas esperadas.
-    assert.ok(calls.every((c) => c.includes('/api/v1/admin/collection-filter/') || c === 'POST /auth/login'));
+    // Nenhuma chamada passou por /confirm e tudo ficou nas rotas administrativas esperadas.
+    assert.ok(!allCalls.some((c) => c.includes('/confirm')), 'nenhum caminho continha /confirm');
+    assert.ok(allCalls.every((c) => c.includes('/api/v1/admin/collection-filter/') || c === 'POST /auth/login'));
   } finally {
     await app.close();
     await owner.end();

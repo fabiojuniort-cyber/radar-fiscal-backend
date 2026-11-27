@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
-  ApiError, approvalCode, assertBaseUrl, createApiClient, dedupeRows, matchKey, matchRows, parseCsvText, parseSheet,
-  runPhase1, runPhase2Confirm, runPhase2Preview,
+  ApiError, assertBaseUrl, createApiClient, dedupeRows, matchKey, matchRows, parseCsvText, parseSheet,
+  runPhase1, PREVIEW_COLUMN,
   type ApiClient, type Ctx, type LiveItem,
 } from '../ops/collection-filter/apply-new-types.js';
 
@@ -70,16 +70,12 @@ test('URL base: https ou http somente em localhost', () => {
   assert.throws(() => assertBaseUrl('nao-e-url'));
 });
 
-test('código de aprovação: 12 hex do sha256 dos bytes', () => {
-  assert.match(approvalCode('abc'), /^ba7816bf8f01$/);
-});
-
 test('planilha real de novos tipos: 616 linhas válidas, sem conflitos', () => {
   const { rows, invalid } = parseSheet(readFileSync(new URL('../ops/collection-filter/novos-tipos-2026-11.csv', import.meta.url), 'utf8'));
   assert.equal(invalid.length, 0);
   assert.equal(rows.length, 616);
   const by = (m: string) => rows.filter((r) => r.mode === m).length;
-  assert.deepEqual([by('KEEP_ALWAYS'), by('KEEP_IF_TAX_TERM'), by('EXCLUDE_UNLESS_STRONG')], [19, 43, 554]);
+  assert.deepEqual([by('KEEP_ALWAYS'), by('KEEP_IF_TAX_TERM'), by('EXCLUDE_UNLESS_STRONG')], [19, 50, 547]);
   assert.equal(dedupeRows(rows).duplicates.filter((d) => d.kind === 'DUPLICATE_KEY_CONFLICT').length, 0);
 });
 
@@ -109,83 +105,60 @@ test('inventário em aquecimento nunca vira "sem tipos": espera READY e falha se
   await assert.rejects(runPhase1(fakeCtx(never, HEADER + '\ndou;DO3;Aviso;1;KEEP_ALWAYS;g\n').ctx, { dryRun: false }), /inventario_nao_ficou_pronto/);
 });
 
-test('fase 1: para no primeiro erro HTTP e retoma sem repetir o que já salvou', async () => {
+test('fase 1: cobre os três modos (EXCLUDE incluído), preview antes de cada save, para no primeiro erro e retoma', async () => {
   const posts: string[] = [];
+  const saves: Array<{ type: string; mode: string }> = [];
   let failB = true;
   const client: ApiClient = {
-    get: async () => ({ inventory: { status: 'READY' }, items: [item('A'), item('B'), item('C')] }),
+    get: async () => ({ inventory: { status: 'READY' }, items: [item('A'), item('B'), item('C'), item('D')] }),
     post: async (p, body) => {
-      posts.push(p.split('/').pop() + ':' + (body as { canonicalType: string }).canonicalType);
-      if (p.endsWith('/save') && (body as { canonicalType: string }).canonicalType === 'B' && failB) throw new ApiError(409, null, 'HTTP 409');
+      const b = body as { canonicalType: string; mode: string };
+      posts.push(p.split('/').pop() + ':' + b.canonicalType);
+      if (p.endsWith('/save') && b.canonicalType === 'B' && failB) throw new ApiError(409, null, 'HTTP 409');
+      if (p.endsWith('/save')) saves.push({ type: b.canonicalType, mode: b.mode });
       return p.endsWith('/preview') ? prev(4) : { revision: 9, deletedCount: 0, historicalPurgeRequired: true };
     },
   };
-  const { ctx } = fakeCtx(client, HEADER + '\ndou;DO3;A;1;KEEP_ALWAYS;g\ndou;DO3;B;1;KEEP_IF_TAX_TERM;g\ndou;DO3;C;1;KEEP_ALWAYS;g\ndou;DO3;D;1;EXCLUDE_UNLESS_STRONG;g\n');
+  const { ctx, logs } = fakeCtx(client, HEADER + '\ndou;DO3;A;1;KEEP_ALWAYS;g\ndou;DO3;B;1;KEEP_IF_TAX_TERM;g\ndou;DO3;C;1;EXCLUDE_UNLESS_STRONG;g\ndou;DO3;D;1;EXCLUDE_UNLESS_STRONG;g\n');
   const first = await runPhase1(ctx, { dryRun: false });
   assert.equal(first.exitCode, 1);
   assert.deepEqual(posts, ['preview:A', 'save:A', 'preview:B', 'save:B']);
   failB = false; posts.length = 0;
   const second = await runPhase1(ctx, { dryRun: false });
   assert.equal(second.exitCode, 0);
-  assert.deepEqual(posts, ['preview:B', 'save:B', 'preview:C', 'save:C']);
-  assert.ok(!posts.some((p) => p.startsWith('confirm')));
+  assert.deepEqual(posts, ['preview:B', 'save:B', 'preview:C', 'save:C', 'preview:D', 'save:D']);
+  assert.deepEqual(saves.map((x) => x.mode), ['KEEP_ALWAYS', 'KEEP_IF_TAX_TERM', 'EXCLUDE_UNLESS_STRONG', 'EXCLUDE_UNLESS_STRONG']);
+  // terceira execução: nada a fazer
+  posts.length = 0;
+  assert.equal((await runPhase1(ctx, { dryRun: false })).exitCode, 0);
+  assert.deepEqual(posts, []);
+  assert.ok(logs.includes('nenhuma publicação foi apagada (rotina só usa /save)'));
+  const report = readFileSync(path.join(ctx.outDir, 'phase1-report.csv'), 'utf8');
+  assert.ok(report.includes(PREVIEW_COLUMN) && /NAO_sao_apagadas/.test(PREVIEW_COLUMN));
+  assert.equal(report.split('\r\n').filter((l) => l.includes('EXCLUDE_UNLESS_STRONG')).length, 2);
 });
 
-test('fase 2: passos de 500 usam resume depois do primeiro e nunca passam do aprovado', async () => {
-  const sheet = HEADER + '\ndou;DO3;Grande;1200;EXCLUDE_UNLESS_STRONG;g\n';
-  let remaining = 1200;
-  const confirms: Array<Record<string, unknown>> = [];
+test('fase 1 --dry-run: só previews, para todos os modos', async () => {
+  const posts: string[] = [];
   const client: ApiClient = {
-    get: async () => ({ inventory: { status: 'READY' }, items: [item('Grande')] }),
-    post: async (p, body) => {
-      if (p.endsWith('/preview')) return prev(remaining);
-      assert.ok(p.endsWith('/confirm'));
-      confirms.push(body as Record<string, unknown>);
-      const step = Math.min(500, remaining); remaining -= step;
-      return { changed: false, apagadas: step, restantes: remaining, deletedCount: step, revision: 3 };
-    },
+    get: async () => ({ inventory: { status: 'READY' }, items: [item('A'), item('B')] }),
+    post: async (p) => { posts.push(p.split('/').pop()!); return prev(2); },
   };
-  const { ctx } = fakeCtx(client, sheet);
-  const pv = await runPhase2Preview(ctx);
-  assert.equal(pv.approval.totals.totalToDelete, 1200);
-  const approved = path.join(ctx.outDir, 'phase2-preview.json');
-  const done = await runPhase2Confirm(ctx, { approvedPath: approved, approvalCode: pv.code.toUpperCase() });
-  assert.deepEqual([done.exitCode, done.deleted], [0, 1200]);
-  assert.deepEqual(confirms.map((c) => c.resume), [undefined, true, true]);
-  assert.deepEqual(confirms.map((c) => c.expectedCount), [1200, 700, 200]);
+  const { ctx } = fakeCtx(client, HEADER + '\ndou;DO3;A;1;KEEP_ALWAYS;g\ndou;DO3;B;1;EXCLUDE_UNLESS_STRONG;g\n');
+  const r = await runPhase1(ctx, { dryRun: true });
+  assert.equal(r.dry.length, 2);
+  assert.deepEqual(posts, ['preview', 'preview']);
 });
 
-test('fase 2: progresso zero ou contagem alterada param o tipo sem nova tentativa', async () => {
-  const sheet = HEADER + '\ndou;DO3;Zero;5;EXCLUDE_UNLESS_STRONG;g\ndou;DO3;Mudou;5;EXCLUDE_UNLESS_STRONG;g\n';
-  const confirms: string[] = [];
-  const client: ApiClient = {
-    get: async () => ({ inventory: { status: 'READY' }, items: [item('Zero'), item('Mudou')] }),
-    post: async (p, body) => {
-      const name = (body as { canonicalType: string }).canonicalType;
-      if (p.endsWith('/preview')) return prev(5);
-      confirms.push(name);
-      return name === 'Zero' ? { changed: false, apagadas: 0, restantes: 5, deletedCount: 0 } : { changed: true, apagadas: 0, restantes: 5, deletedCount: 0 };
-    },
-  };
-  const { ctx } = fakeCtx(client, sheet);
-  const pv = await runPhase2Preview(ctx);
-  const r = await runPhase2Confirm(ctx, { approvedPath: path.join(ctx.outDir, 'phase2-preview.json'), approvalCode: pv.code });
-  assert.equal(r.exitCode, 1);
-  assert.deepEqual(confirms, ['Zero', 'Mudou']);
-});
-
-test('fase 2: aprovação de outro CSV ou item fora do escopo é recusada', async () => {
-  const client: ApiClient = { get: async () => ({ inventory: { status: 'READY' }, items: [item('X')] }), post: async () => prev(0) };
-  const { ctx, dir } = fakeCtx(client, HEADER + '\ndou;DO3;X;1;EXCLUDE_UNLESS_STRONG;g\n');
-  const pv = await runPhase2Preview(ctx);
-  const file = path.join(ctx.outDir, 'phase2-preview.json');
-  writeFileSync(ctx.csvPath, HEADER + '\ndou;DO3;X;2;EXCLUDE_UNLESS_STRONG;g\n');
-  await assert.rejects(runPhase2Confirm(ctx, { approvedPath: file, approvalCode: pv.code }), /csv_diferente/);
-  const bad = JSON.parse(readFileSync(file, 'utf8'));
-  bad.items[0].mode = 'KEEP_ALWAYS';
-  const badPath = path.join(dir, 'bad.json');
-  writeFileSync(badPath, JSON.stringify(bad));
-  await assert.rejects(runPhase2Confirm(ctx, { approvedPath: badPath, approvalCode: approvalCode(readFileSync(badPath)) }), /fora do escopo/);
+test('fonte da CLI não contém endpoint de confirmação nem fase 2', () => {
+  const src = readFileSync(new URL('../ops/collection-filter/apply-new-types.ts', import.meta.url), 'utf8');
+  assert.ok(!src.includes('direct-rule/confirm'));
+  assert.ok(!/\/confirm\b/.test(src));
+  assert.ok(!/phase2/i.test(src));
+  assert.ok(!/direct-rule\/(?!preview|save)/.test(src));
+  for (const f of ['NOVOS-TIPOS-RUNBOOK.md']) {
+    assert.ok(!readFileSync(new URL('../ops/collection-filter/' + f, import.meta.url), 'utf8').includes('direct-rule/confirm'));
+  }
 });
 
 test('cliente HTTP: 401 faz um único novo login; token e senha nunca aparecem em erros', async () => {
