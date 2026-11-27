@@ -15,6 +15,8 @@ on:
       - 'src/api/routes/collection-filter-admin.route.ts'
       - 'test/collection-filter.l15-scope-purge.integration.test.ts'
       - 'test/collection-filter.f3*.test.ts'
+      - 'test/collection-filter.new-types-batch.*.test.ts'
+      - 'ops/collection-filter/**'
       - '.github/workflows/l15-l10-pg18.yml'
 
 permissions:
@@ -66,3 +68,5 @@ jobs:
         run: npx tsx --test test/collection-filter.f3.integration.test.ts
       - name: F3 physical survivors across lists, detail, facets and public counters
         run: npx tsx --test test/collection-filter.f3-catalog.integration.test.ts
+      - name: Novos tipos em lote (CLI plan/fase 1, sem apagar) contra API real, dados sintéticos
+        run: npx tsx --test test/collection-filter.new-types-batch.integration.test.ts
