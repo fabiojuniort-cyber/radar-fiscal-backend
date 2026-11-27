@@ -1,0 +1,815 @@
+{
+  "schema": "e9-a2-completeness-proof/1",
+  "mandate": "COORD → EXEC F1 | E9-A2",
+  "base": "main d53fb3e2b8d34b9fbeda4da6c5fbdf25a24c19e9",
+  "registersNothing": true,
+  "engine": "4b96f97783631b77404493139c2c786554222deda2489e66d3b9c29be981d06a",
+  "whyCompleteIsNull": {
+    "readingCompleteOnlyForRfb": true,
+    "acceptedDerivedFromAcceptancesOnlyForRfb": true,
+    "literalAcceptedFalseStages": 8,
+    "rule": "buildMatrix: complete = null when every validated sample has readingComplete null/undefined; only the RFB branch of collectSamples assigns readingComplete and derives stages.accepted from e9-acceptances.json"
+  },
+  "cells": [
+    {
+      "cellId": "confaz--convenio-icms--grande",
+      "matrixComplete": null,
+      "matrixAccepted": false,
+      "samples": [
+        "http:M3: BLOQUEADA",
+        "http:M4: PARCIAL"
+      ],
+      "apt": []
+    },
+    {
+      "cellId": "confaz--ajuste-sinief--grande",
+      "matrixComplete": null,
+      "matrixAccepted": false,
+      "samples": [
+        "M5: PARCIAL",
+        "http:M5: PARCIAL"
+      ],
+      "apt": []
+    },
+    {
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "matrixComplete": null,
+      "matrixAccepted": false,
+      "samples": [
+        "ricms-art008: PARCIAL",
+        "ricms-art009: PARCIAL"
+      ],
+      "apt": []
+    },
+    {
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "matrixComplete": null,
+      "matrixAccepted": false,
+      "samples": [
+        "ricms-an1art041: PARCIAL",
+        "ricms-an2art003: PARCIAL",
+        "ricms-an2art039: PARCIAL",
+        "ricms-art007: PARCIAL"
+      ],
+      "apt": []
+    }
+  ],
+  "samples": [
+    {
+      "sampleId": "http:M3",
+      "cellId": "confaz--convenio-icms--grande",
+      "source": "CONFAZ",
+      "snapshot": "ops/anatomy/official-identification/e9-http/M3.html",
+      "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2018/CV142_18",
+      "capturedAt": "2026-11-07T03:52:05.2229768Z",
+      "provenance": {
+        "bytes": 931597,
+        "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+        "metaSha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+        "metaBytes": 931597,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "http:M3",
+          "sha256": "ae6540b124d1be3653d8ec46ce98be0de93c07d8cd457f1107d0cafe90f0d23a",
+          "profile": "CONFAZ",
+          "outputHash": "ed891bec4e28575c4b75aaf1e8940cae5b28d2b06564c13406c3f1dca253dccd",
+          "chars": 922008
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "22be87145072a513dd16eb5f2f32e2bed0fc93997faad5f968a99f8152560930"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "ed891bec4e28575c4b75aaf1e8940cae5b28d2b06564c13406c3f1dca253dccd",
+        "canonicalChars": 922008,
+        "recognizedChars": 0,
+        "accountedChars": 922008,
+        "parts": 2,
+        "partTypes": {
+          "document": 1,
+          "unidentified": 1
+        },
+        "unidentifiedParts": 1,
+        "unidentifiedChars": 922008,
+        "limitations": {
+          "html_complexity_limit": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 0,
+        "actSpan": [
+          0,
+          0
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 0,
+          "nonWhitespaceChars": 0,
+          "text": []
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 822879
+        }
+      },
+      "engineComplete": false,
+      "classification": "BLOQUEADA"
+    },
+    {
+      "sampleId": "http:M4",
+      "cellId": "confaz--convenio-icms--grande",
+      "source": "CONFAZ",
+      "snapshot": "ops/anatomy/official-identification/e9-http/M4.html",
+      "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/2017/CV190_17",
+      "capturedAt": "2026-11-07T03:52:05.3899783Z",
+      "provenance": {
+        "bytes": 234041,
+        "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+        "metaSha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+        "metaBytes": 234041,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "http:M4",
+          "sha256": "3573ee7d0738f092574804746828a2b57f051598756ba58a4da81a9931541e13",
+          "profile": "CONFAZ",
+          "outputHash": "b0938ef774ff8bc8d3e4837e5bfa56abb167569e249fd826487e64c74c1199f7",
+          "chars": 82809
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "d7316f71d69cccc73cf3ceac20adea987684c0a9115af1b3719b335b6a9949e8"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "b0938ef774ff8bc8d3e4837e5bfa56abb167569e249fd826487e64c74c1199f7",
+        "canonicalChars": 82809,
+        "recognizedChars": 52375,
+        "accountedChars": 82809,
+        "parts": 570,
+        "partTypes": {
+          "document": 1,
+          "unidentified": 158,
+          "epigraph": 1,
+          "editorial_note": 117,
+          "preamble": 1,
+          "clause": 26,
+          "caput": 26,
+          "paragraph": 75,
+          "inciso": 78,
+          "alinea": 3,
+          "body": 5,
+          "summary": 1,
+          "table": 2,
+          "row": 10,
+          "cell": 55,
+          "quoted_text": 11
+        },
+        "unidentifiedParts": 158,
+        "unidentifiedChars": 28454,
+        "limitations": {
+          "excluded_executable_content": 5,
+          "image_without_ocr": 1,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 0,
+        "actSpan": [
+          27622,
+          82809
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 18,
+          "nonWhitespaceChars": 1687,
+          "text": [
+            "Dispõe, nos termos autorizados na Lei Complementar nº 160, de 7 de agosto de 2017, sobre a remissão de créditos tributários, constituídos ou não, decorrentes das isenções, dos incentivos e dos benefíc",
+            "C O N V Ê N I O",
+            "ANEXO ÚNICO",
+            "(inciso I do caput da cláusula segunda)",
+            "RELAÇÃO DOS ATOS NORMATIVOS RELATIVOS ÀS ISENÇÕES, AOS INCENTIVOS E AOS BENEFÍCIOS FISCAIS OU FINANCEIROS-FISCAIS DE QUE TRATA O INCISO I DO CAPUT DO ART. 3º DA LEI COMPLEMENTAR Nº 160, DE 7 DE AGOSTO",
+            "Orientações para Preenchimento do ANEXO ÚNICO:",
+            "(1) Unidade federada: informar a unidade federada declarante",
+            "(2) Item: informar número sequencial em arábico",
+            "(3) Atos: informar a espécie do ato normativo, tais como: leis, decretos, portarias, resoluções",
+            "(4) Número: informar o número do ato normativo e das suas alterações",
+            "(5) Ementa ou assunto: informar a ementa do ato normativo ou o assunto na hipótese em que não haja ementa ou essa não seja suficiente para a identificação dos benefícios fiscais",
+            "(6) Dispositivo específico: na hipótese em que o benefício fiscal for instituído por legislação que trate de outra matéria, preencher este campo com o dispositivo específico da legislação que os insti",
+            "(7) Data da publicação no DOE: informar a data de publicação do ato no diário oficial da unidade federada declarante, no formato dd/mm/aaaa",
+            "(8) Termo Inicial: informar o termo inicial de produção de efeitos do ato normativo, no formato dd/mm/aaaa",
+            "(9) Observações Apêndice I: campo de livre preenchimento com informações adicionais prestadas a critério da unidade federada",
+            "(9) Termo Final Apêndice II: informar o termo final de produção de efeitos do ato normativo, no formato dd/mm/aaaa;",
+            "(10) Observações Apêndice II: campo de livre preenchimento com informações adicionais prestadas a critério da unidade federada.",
+            "RETIFICAÇÃO"
+          ]
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 26,
+          "nonWhitespaceChars": 5310
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    },
+    {
+      "sampleId": "M5",
+      "cellId": "confaz--ajuste-sinief--grande",
+      "source": "CONFAZ",
+      "snapshot": "ops/anatomy/official-identification/manual/M5.html",
+      "url": "https://www.confaz.fazenda.gov.br/legislacao/ajustes/2005/AJ007_05",
+      "capturedAt": null,
+      "provenance": {
+        "bytes": 205981,
+        "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+        "metaSha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+        "metaBytes": 205981,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "M5",
+          "sha256": "e4481fcdb285c3bebb6b5e962ddeadb9099abbb02de357eaf3b99aa314c96052",
+          "profile": "CONFAZ",
+          "outputHash": "bc3c95de928672dabb980bb9dcbc3bc09f4d46558e34df6f00d12db5c5d4e5c8",
+          "chars": 119687
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "231114e358f819a23173633b02c309741ac5949ec805524c9ac48527ec91c1e3"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "bc3c95de928672dabb980bb9dcbc3bc09f4d46558e34df6f00d12db5c5d4e5c8",
+        "canonicalChars": 119687,
+        "recognizedChars": 111240,
+        "accountedChars": 119687,
+        "parts": 1027,
+        "partTypes": {
+          "document": 1,
+          "unidentified": 130,
+          "epigraph": 1,
+          "editorial_note": 225,
+          "summary": 1,
+          "preamble": 1,
+          "clause": 46,
+          "caput": 46,
+          "inciso": 186,
+          "paragraph": 221,
+          "alinea": 55,
+          "body": 54,
+          "annex": 3,
+          "table": 3,
+          "row": 15,
+          "cell": 39
+        },
+        "unidentifiedParts": 130,
+        "unidentifiedChars": 6008,
+        "limitations": {
+          "excluded_executable_content": 11,
+          "image_without_ocr": 2,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 3,
+        "actSpan": [
+          6969,
+          119687
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 5,
+          "nonWhitespaceChars": 127,
+          "text": [
+            "A J U S T E",
+            "OBRIGATORIEDADE DE REGISTRO DE EVENTOS",
+            "REDAÇÃO ANTERIOR DO AJUSTE SINIEF 07/05",
+            "Voltar para o topo",
+            "Desenvolvido com o CMS de código aberto Plone"
+          ]
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 25,
+          "nonWhitespaceChars": 1136
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    },
+    {
+      "sampleId": "http:M5",
+      "cellId": "confaz--ajuste-sinief--grande",
+      "source": "CONFAZ",
+      "snapshot": "ops/anatomy/official-identification/e9-http/M5.html",
+      "url": "https://www.confaz.fazenda.gov.br/legislacao/ajustes/2005/AJ007_05",
+      "capturedAt": "2026-11-07T03:52:05.5794768Z",
+      "provenance": {
+        "bytes": 193059,
+        "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+        "metaSha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+        "metaBytes": 193059,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "http:M5",
+          "sha256": "9d32839ced73cf52080bbac160e96f8f7a7155fe385c6486fc2e7fb0e9521038",
+          "profile": "CONFAZ",
+          "outputHash": "44420fa75f7312807742bf5bc06045bc84e4ef763c83b943b594718033927979",
+          "chars": 119682
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "2bfdc872e91ade0bfa1201a04c1e03a62ffdec215b9d8ff3ca90d8568d60a07e"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "44420fa75f7312807742bf5bc06045bc84e4ef763c83b943b594718033927979",
+        "canonicalChars": 119682,
+        "recognizedChars": 111244,
+        "accountedChars": 119682,
+        "parts": 1016,
+        "partTypes": {
+          "document": 1,
+          "unidentified": 119,
+          "epigraph": 1,
+          "editorial_note": 225,
+          "summary": 1,
+          "preamble": 1,
+          "clause": 46,
+          "caput": 46,
+          "inciso": 186,
+          "paragraph": 221,
+          "alinea": 55,
+          "body": 54,
+          "annex": 3,
+          "table": 3,
+          "row": 15,
+          "cell": 39
+        },
+        "unidentifiedParts": 119,
+        "unidentifiedChars": 6002,
+        "limitations": {
+          "excluded_executable_content": 5,
+          "image_without_ocr": 1,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 3,
+        "actSpan": [
+          6972,
+          119682
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 5,
+          "nonWhitespaceChars": 127,
+          "text": [
+            "A J U S T E",
+            "OBRIGATORIEDADE DE REGISTRO DE EVENTOS",
+            "REDAÇÃO ANTERIOR DO AJUSTE SINIEF 07/05",
+            "Voltar para o topo",
+            "Desenvolvido com o CMS de código aberto Plone"
+          ]
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 26,
+          "nonWhitespaceChars": 1141
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    },
+    {
+      "sampleId": "ricms-art008",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "source": "SEFAZ-SP-PORTAL",
+      "snapshot": "ops/anatomy/official-identification/doesp-ricms/ricms-art008.html",
+      "url": "https://legislacao.fazenda.sp.gov.br/Paginas/art008.aspx",
+      "capturedAt": "2026-11-05T18:22:01.564Z",
+      "provenance": {
+        "bytes": 156994,
+        "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+        "metaSha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+        "metaBytes": 156994,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "ricms-art008",
+          "sha256": "992acb77fa739bb72e42f4bc7f4bbb698eda370403fc1658461d4342afeb001d",
+          "profile": "SEFAZ-SP-PORTAL",
+          "outputHash": "ff9bc4650f06698cab454d7a299044de13c6623fc0f028c8819a218f0c4badab",
+          "chars": 3219
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "c25a5101e768bef99e396d12094fbe59ca340236572ffe2d5da4134204742f93"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "ff9bc4650f06698cab454d7a299044de13c6623fc0f028c8819a218f0c4badab",
+        "canonicalChars": 3219,
+        "recognizedChars": 3172,
+        "accountedChars": 3219,
+        "parts": 29,
+        "partTypes": {
+          "document": 1,
+          "table": 1,
+          "row": 1,
+          "cell": 3,
+          "group": 1,
+          "unidentified": 1,
+          "editorial_note": 5,
+          "article": 3,
+          "caput": 3,
+          "paragraph": 3,
+          "quoted_text": 7
+        },
+        "unidentifiedParts": 1,
+        "unidentifiedChars": 1,
+        "limitations": {
+          "excluded_executable_content": 1,
+          "sefaz_sp_portal_local_preparation_only": 1,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 0,
+        "actSpan": [
+          36,
+          3219
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 0,
+          "nonWhitespaceChars": 0,
+          "text": []
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 18
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    },
+    {
+      "sampleId": "ricms-art009",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
+      "source": "SEFAZ-SP-PORTAL",
+      "snapshot": "ops/anatomy/official-identification/doesp-ricms/ricms-art009.html",
+      "url": "https://legislacao.fazenda.sp.gov.br/Paginas/art009.aspx",
+      "capturedAt": "2026-11-05T18:22:01.884Z",
+      "provenance": {
+        "bytes": 154921,
+        "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+        "metaSha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+        "metaBytes": 154921,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "ricms-art009",
+          "sha256": "12b04f67c9b81d6e272180d5e51375696133fa0c46eb13698ad33dad59a0b0b0",
+          "profile": "SEFAZ-SP-PORTAL",
+          "outputHash": "19a6719af5301edf9f2e7a0b883c3eaa4b0c464e23725d65cd3d704fa31074af",
+          "chars": 3340
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "42b2a5cbee6b961d466a85e4a1499a942a27ef9e54acd78a0c8437acd212744c"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "19a6719af5301edf9f2e7a0b883c3eaa4b0c464e23725d65cd3d704fa31074af",
+        "canonicalChars": 3340,
+        "recognizedChars": 3286,
+        "accountedChars": 3340,
+        "parts": 26,
+        "partTypes": {
+          "document": 1,
+          "table": 1,
+          "row": 1,
+          "cell": 3,
+          "group": 2,
+          "article": 4,
+          "caput": 4,
+          "inciso": 8,
+          "editorial_note": 1,
+          "paragraph": 1
+        },
+        "unidentifiedParts": 0,
+        "unidentifiedChars": 0,
+        "limitations": {
+          "excluded_executable_content": 1,
+          "sefaz_sp_portal_local_preparation_only": 1,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 0,
+        "actSpan": [
+          45,
+          3340
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 0,
+          "nonWhitespaceChars": 0,
+          "text": []
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 26
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    },
+    {
+      "sampleId": "ricms-an1art041",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "source": "SEFAZ-SP-PORTAL",
+      "snapshot": "ops/anatomy/official-identification/doesp-ricms/ricms-an1art041.html",
+      "url": "https://legislacao.fazenda.sp.gov.br/Paginas/an1art041.aspx",
+      "capturedAt": "2026-11-05T18:22:00.738Z",
+      "provenance": {
+        "bytes": 199138,
+        "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+        "metaSha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+        "metaBytes": 199138,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "ricms-an1art041",
+          "sha256": "ae7aaccb5dde46068ad3a5d5d8cd60188b116889ff0e88a388ae0e1254c5cd84",
+          "profile": "SEFAZ-SP-PORTAL",
+          "outputHash": "a57e5360147e0b2fcf36221e96b0327fb58ed405022d1ab028d9fa15cacef4b8",
+          "chars": 33383
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "cb15421aaf4132cfcff9ccd04d37d6782fa26edfd6e721557a94c8b71a86125a"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "a57e5360147e0b2fcf36221e96b0327fb58ed405022d1ab028d9fa15cacef4b8",
+        "canonicalChars": 33383,
+        "recognizedChars": 32966,
+        "accountedChars": 33383,
+        "parts": 149,
+        "partTypes": {
+          "document": 1,
+          "table": 1,
+          "row": 1,
+          "cell": 3,
+          "annex": 1,
+          "unidentified": 4,
+          "article": 1,
+          "caput": 1,
+          "editorial_note": 1,
+          "inciso": 44,
+          "quoted_text": 74,
+          "paragraph": 17
+        },
+        "unidentifiedParts": 4,
+        "unidentifiedChars": 70,
+        "limitations": {
+          "excluded_executable_content": 1,
+          "sefaz_sp_revogado_unidentified": 1,
+          "sefaz_sp_portal_local_preparation_only": 1,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 1,
+        "actSpan": [
+          36,
+          33383
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 47,
+          "text": [
+            "(isenções a que se refere o artigo 8º deste regulamento)"
+          ]
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 20
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    },
+    {
+      "sampleId": "ricms-an2art003",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "source": "SEFAZ-SP-PORTAL",
+      "snapshot": "ops/anatomy/official-identification/doesp-ricms/ricms-an2art003.html",
+      "url": "https://legislacao.fazenda.sp.gov.br/Paginas/an2art003.aspx",
+      "capturedAt": "2026-11-05T18:22:01.235Z",
+      "provenance": {
+        "bytes": 176447,
+        "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+        "metaSha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+        "metaBytes": 176447,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "ricms-an2art003",
+          "sha256": "fd16792a05c9f20a634793dc252fd533c12a85c2dd12c17c270b48d540a3f90f",
+          "profile": "SEFAZ-SP-PORTAL",
+          "outputHash": "8bb61d2e29e4faa8be47c69b517647abad1afd20b75b3386e478560275afcc44",
+          "chars": 20457
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "0d11cb958e6cbcdf6dfa07fbd3a03a73157acb1ea19d7bb0afbd0883f7992845"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "8bb61d2e29e4faa8be47c69b517647abad1afd20b75b3386e478560275afcc44",
+        "canonicalChars": 20457,
+        "recognizedChars": 20173,
+        "accountedChars": 20457,
+        "parts": 114,
+        "partTypes": {
+          "document": 1,
+          "table": 1,
+          "row": 1,
+          "cell": 3,
+          "annex": 1,
+          "unidentified": 2,
+          "article": 2,
+          "caput": 2,
+          "inciso": 55,
+          "editorial_note": 5,
+          "quoted_text": 22,
+          "paragraph": 19
+        },
+        "unidentifiedParts": 2,
+        "unidentifiedChars": 71,
+        "limitations": {
+          "excluded_executable_content": 1,
+          "sefaz_sp_portal_local_preparation_only": 1,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 1,
+        "actSpan": [
+          50,
+          20457
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 46,
+          "text": [
+            "(Relação a que se refere o artigo 51 deste regulamento)"
+          ]
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 31
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    },
+    {
+      "sampleId": "ricms-an2art039",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "source": "SEFAZ-SP-PORTAL",
+      "snapshot": "ops/anatomy/official-identification/doesp-ricms/ricms-an2art039.html",
+      "url": "https://legislacao.fazenda.sp.gov.br/Paginas/an2art039.aspx",
+      "capturedAt": "2026-11-05T01:50:01.645Z",
+      "provenance": {
+        "bytes": 168294,
+        "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+        "metaSha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+        "metaBytes": 168294,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "ricms-an2art039",
+          "sha256": "301757693f21db5ad8fd2f0435a5438972587952ce57b2bbcb8830eefcafcadb",
+          "profile": "SEFAZ-SP-PORTAL",
+          "outputHash": "ecdeb3ccd41921f86faa04b1fc96c34d443a1a16f848431d1be52891bfde21fa",
+          "chars": 12616
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "6a05e3db4cbef9cc187f61ba829120050170a610ba056c95b208c5597bdea677"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "ecdeb3ccd41921f86faa04b1fc96c34d443a1a16f848431d1be52891bfde21fa",
+        "canonicalChars": 12616,
+        "recognizedChars": 12337,
+        "accountedChars": 12616,
+        "parts": 91,
+        "partTypes": {
+          "document": 1,
+          "table": 1,
+          "row": 1,
+          "cell": 3,
+          "annex": 1,
+          "unidentified": 3,
+          "article": 1,
+          "caput": 1,
+          "editorial_note": 3,
+          "inciso": 20,
+          "paragraph": 16,
+          "quoted_text": 40
+        },
+        "unidentifiedParts": 3,
+        "unidentifiedChars": 68,
+        "limitations": {
+          "excluded_executable_content": 1,
+          "sefaz_sp_revogado_unidentified": 1,
+          "sefaz_sp_portal_local_preparation_only": 1,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 1,
+        "actSpan": [
+          50,
+          12616
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 46,
+          "text": [
+            "(Relação a que se refere o artigo 51 deste regulamento)"
+          ]
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 31
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    },
+    {
+      "sampleId": "ricms-art007",
+      "cellId": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
+      "source": "SEFAZ-SP-PORTAL",
+      "snapshot": "ops/anatomy/official-identification/doesp-ricms/ricms-art007.html",
+      "url": "https://legislacao.fazenda.sp.gov.br/Paginas/art007.aspx",
+      "capturedAt": "2026-11-05T01:50:01.212Z",
+      "provenance": {
+        "bytes": 165355,
+        "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+        "metaSha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+        "metaBytes": 165355,
+        "bytesEqualMeta": true,
+        "baseline": {
+          "id": "ricms-art007",
+          "sha256": "11c270fb39eb726b603fe2366405fef2324b3c229ec967cfea04e5ddb5d7dfb8",
+          "profile": "SEFAZ-SP-PORTAL",
+          "outputHash": "4371746b7d0da505c1daba1c658cc77a17b99038b82e6b7432ee1c155687f95e",
+          "chars": 11628
+        },
+        "bytesEqualBaseline": true,
+        "outputHashEqualBaseline": true,
+        "charsEqualBaseline": true,
+        "baselineEntrySha256": "1c8593689a3d59fbb8fb7f5969372f0ffa1d7557de6d3443b2670cd7d58e333e"
+      },
+      "reading": {
+        "status": "partial",
+        "outputHash": "4371746b7d0da505c1daba1c658cc77a17b99038b82e6b7432ee1c155687f95e",
+        "canonicalChars": 11628,
+        "recognizedChars": 11203,
+        "accountedChars": 11628,
+        "parts": 71,
+        "partTypes": {
+          "document": 1,
+          "table": 1,
+          "row": 1,
+          "cell": 3,
+          "group": 1,
+          "article": 1,
+          "caput": 1,
+          "editorial_note": 12,
+          "inciso": 19,
+          "quoted_text": 25,
+          "paragraph": 6
+        },
+        "unidentifiedParts": 0,
+        "unidentifiedChars": 0,
+        "limitations": {
+          "excluded_executable_content": 1,
+          "sefaz_sp_portal_local_preparation_only": 1,
+          "unidentified_content": 1
+        },
+        "legalStatusUnknown": true,
+        "annexParts": 0,
+        "actSpan": [
+          46,
+          11628
+        ],
+        "unrecognizedInsideAct": {
+          "segments": 0,
+          "nonWhitespaceChars": 0,
+          "text": []
+        },
+        "unrecognizedOutsideAct": {
+          "segments": 1,
+          "nonWhitespaceChars": 24
+        }
+      },
+      "engineComplete": false,
+      "classification": "PARCIAL"
+    }
+  ],
+  "proposedRecords": []
+}

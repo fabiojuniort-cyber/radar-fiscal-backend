@@ -1,0 +1,6 @@
+{
+  "schema": "e9-a2-proposed-acceptances/1",
+  "registered": false,
+  "note": "PROPOSTA VAZIA — nenhuma das 10 amostras das 4 células tem leitura completa no motor 4b96f977 (todas status partial; M3 sem leitura). Não há registro a propor. Ver e9a2-completeness-proof.json e README.md.",
+  "proposed": []
+}
