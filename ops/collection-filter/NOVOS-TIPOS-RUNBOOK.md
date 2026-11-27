@@ -1,6 +1,6 @@
 # Runbook — aplicação em lote de novos tipos do filtro de coleta
 
-Planilha: `ops/collection-filter/novos-tipos-2026-11.csv` (616 linhas: 21 `KEEP_ALWAYS`, 19 `KEEP_IF_TAX_TERM`, 576 `EXCLUDE_UNLESS_STRONG`).
+Planilha: `ops/collection-filter/novos-tipos-2026-11.csv` (616 linhas: 19 `KEEP_ALWAYS`, 43 `KEEP_IF_TAX_TERM`, 554 `EXCLUDE_UNLESS_STRONG`, após o ajuste de 2026-11-27 — ver `novos-tipos-2026-11-ajustes.md`).
 Ferramenta: `ops/collection-filter/apply-new-types.ts`. Usa somente as rotas administrativas já existentes do filtro de coleta
 (`new-types`, `direct-rule/preview|save|confirm`). **Não toca taxonomia**, não cria migrations e **não usa "Reaplicar filtro ao acervo"**.
 

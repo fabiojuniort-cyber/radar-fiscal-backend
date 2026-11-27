@@ -1,14 +1,14 @@
 ﻿fonte;secao;tipo;ocorrencias;modo;grupo
-doe-sp;ATOS NORMATIVOS;156/2026pand;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;16 de Novembro de;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;18 de Maio de;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;156/2026pand;1;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;16 de Novembro de;1;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;18 de Maio de;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;1ª Apostila do Ordenador de Despesas Para Reajuste de Aluguel 3º/5º Dp São Carlos;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;38ª Sessão Ordinária;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;39ª Sessão Ordinária;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;38ª Sessão Ordinária;1;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;39ª Sessão Ordinária;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;3º Conselho Permanente de Disciplina;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;3º Termo Prorrogação de Contrato;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;658/2026;5;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;9 de Novembro de;4;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;658/2026;5;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;9 de Novembro de;4;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Abertura;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Abertura Crimes de Estelionato;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Abertura Crimes de Furto, Roubo e Desvio de Carga;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -62,7 +62,7 @@ doe-sp;ATOS NORMATIVOS;Ata da 1218ª Reunião Ordinária do Conselho Diretor;1;E
 doe-sp;ATOS NORMATIVOS;Ata da 248ª Reunião Extraordinária do Conselho Diretor;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ata da 249ª Reunião Extraordinária do Conselho Diretor;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ata da 250ª Reunião Extraordinária do Conselho Diretor;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Ata da 374ª;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Ata da 374ª;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Ata da 7ª Reunião Plenária Extraordinária do Conseas/sp em;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ata da 8ª Reunião Plenária Extraordinária do Conseas/sp em;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ata da 8ª Reunião Plenária Ordinária do Conseas 2026;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -84,13 +84,13 @@ doe-sp;ATOS NORMATIVOS;Ato da Assessoria de Coordenadoria de Designações;2;EXC
 doe-sp;ATOS NORMATIVOS;Ato da Defensora Pública Geral do Estado;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ato da Presidência da Comissão Técnica de Avaliação de Resultados;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ato da Presidente do Conselho Superior;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Ato de Nulidade;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Ato de Nulidade;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Ato do Diretor Executivo de Administração;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ato do Segundo Subdefensor Público Geral do Estado;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ato do Terceiro Subdefensor Público Geral do Estado;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ato Normativo Dpg;3;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Auto de Infração;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Auto de Infração e Imposição de Penalidade de Multa;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Auto de Infração;1;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;Auto de Infração e Imposição de Penalidade de Multa;2;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Autorização de Despesa e Declaração de Dispensa de Licitação;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Autorização de Eventos Dppc;14;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Autorização de Funcionamento do Curso de Ensino Médio Colégio Panorama;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -100,8 +100,8 @@ doe-sp;ATOS NORMATIVOS;Autorização de Uso de Imóvel;6;EXCLUDE_UNLESS_STRONG;3
 doe-sp;ATOS NORMATIVOS;Autorização Para a Contratação Por Tempo Determinado;4;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Autorização Para Extração de Cópias;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Autorização Para Transferência de Valores de Apoio;3;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Autos de Infração Para Imposição de Penalidades;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Aviso;13;KEEP_ALWAYS;1-tributario
+doe-sp;ATOS NORMATIVOS;Autos de Infração Para Imposição de Penalidades;2;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;Aviso;13;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Aviso de Instauração de Procedimento Administrativo de Constatação de Nulidade da Inscrição Estadual;1;KEEP_ALWAYS;1-tributario
 doe-sp;ATOS NORMATIVOS;Aviso de Licitação;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Cancelamento Certificado de Estudante;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -161,8 +161,8 @@ doe-sp;ATOS NORMATIVOS;Decisão de Processo Administrativo Sancionatório;2;EXCL
 doe-sp;ATOS NORMATIVOS;Decisão de Processo Administrativo Sancionatório Sei;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Decisão de Processo Administrtaivo Sancionatório;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Decisão de Recurso Administrativo;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Decisão Nº Junta Técnica de Primeira Instância Parecer Técnico da Junta Técnica de Primeira Instância;43;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Decisão Nº Junta Técnica de Última Instância Parecer Técnico;4;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Decisão Nº Junta Técnica de Primeira Instância Parecer Técnico da Junta Técnica de Primeira Instância;43;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;Decisão Nº Junta Técnica de Última Instância Parecer Técnico;4;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Decisões da Diretora de Assuntos Jurídicos;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Deferimento de Inscrições;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;De Homologação do Regimento Escolar;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -335,7 +335,7 @@ doe-sp;ATOS NORMATIVOS;Multa Contratual;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Norma de Procedimento Cgpep;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Normativa;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Nota de Repúdio Contra a Reabertura de Hospitais Psiquiátricos na Região de Sorocaba;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Notificação;3;KEEP_ALWAYS;1-tributario
+doe-sp;ATOS NORMATIVOS;Notificação;3;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Nova Correção da Portaria Externa do Diretor de Fiscalização;1;KEEP_ALWAYS;1-tributario
 doe-sp;ATOS NORMATIVOS;Oficina do Projeto Com Vivências;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ofício;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -403,19 +403,19 @@ doe-sp;ATOS NORMATIVOS;Publicação;5;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Publicação Apostilamento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Publicação da Portaria de Renovação;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Publicação de Afastamento;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Publicação de Autos de Infração e Imposição da Penalidade de Multa;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Publicação de Comunicado;8;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Publicação de Autos de Infração e Imposição da Penalidade de Multa;1;KEEP_IF_TAX_TERM;2-generico
+doe-sp;ATOS NORMATIVOS;Publicação de Comunicado;8;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Publicação de Danos ao Patrimônio;23;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Publicação de Programação de Desembolso;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Publicação Despacho Chefe de Departamento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Publicação de Tca;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Publicação Doe;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Publicação dos Autos de Infração e Imposição da Penalidade de Multa;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Publicação dos Autos de Infração e Imposição da Penalidade de Multa;2;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Publicação Incorporação de Bens Patrimoniais;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Publicação Pd's Outubro de;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Publicação Pd's Outubro de;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Publicação Preliminar das Inscrições Habilitadas e Inabilitadas do Prêmio São Paulo de Literatura;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Publicação Relatório Mensal;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Publicação Silvio Renato F. de Almeida Cpf 01x.xxx.xxx 08;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Publicação Silvio Renato F. de Almeida Cpf 01x.xxx.xxx 08;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Quarta Apostila de Reajuste do Contrato;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Quarto Termo de Aditamento ao Contrato;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Ratificação;6;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -463,7 +463,7 @@ doe-sp;ATOS NORMATIVOS;Republicação da Deliberação Cib;1;EXCLUDE_UNLESS_STRO
 doe-sp;ATOS NORMATIVOS;Resolução;4;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Resolução Coip;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Resolução Gr;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
-doe-sp;ATOS NORMATIVOS;Resolução Pge;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Resolução Pge;2;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Resolução Sap;2;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Resolução Sde;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Resolução Ss;4;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -495,7 +495,7 @@ doe-sp;ATOS NORMATIVOS;Superintendência de Transporte Coletivo;2;EXCLUDE_UNLESS
 doe-sp;ATOS NORMATIVOS;Suspensão Curso Intermediário Meios Digitais;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Suspensão da Eficácia da Inscrição Estadual;2;KEEP_ALWAYS;1-tributario
 doe-sp;ATOS NORMATIVOS;Suspensão da Eficácia de Inscrição Estadual;6;KEEP_ALWAYS;1-tributario
-doe-sp;ATOS NORMATIVOS;Tabela de Preços Unitários do;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+doe-sp;ATOS NORMATIVOS;Tabela de Preços Unitários do;1;KEEP_IF_TAX_TERM;2-generico
 doe-sp;ATOS NORMATIVOS;Termo;6;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Termo Aditamento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 doe-sp;ATOS NORMATIVOS;Termo de Aditamento;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
@@ -547,7 +547,7 @@ dou;DO3;Avisos de Retificação;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 dou;DO3;Avisos de Revogações;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 dou;DO1;Decisões;1;KEEP_IF_TAX_TERM;2-generico
 dou;DO1;Despachos;5;KEEP_IF_TAX_TERM;2-generico
-dou;DO1;Despachos do Presidente da República;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
+dou;DO1;Despachos do Presidente da República;1;KEEP_IF_TAX_TERM;2-generico
 dou;DO1;Despachos do Superintendente Geral;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 dou;DO1;Despachos Sg;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario
 dou;DO3;Editais;1;EXCLUDE_UNLESS_STRONG;3-nao-tributario

@@ -79,7 +79,7 @@ test('planilha real de novos tipos: 616 linhas válidas, sem conflitos', () => {
   assert.equal(invalid.length, 0);
   assert.equal(rows.length, 616);
   const by = (m: string) => rows.filter((r) => r.mode === m).length;
-  assert.deepEqual([by('KEEP_ALWAYS'), by('KEEP_IF_TAX_TERM'), by('EXCLUDE_UNLESS_STRONG')], [21, 19, 576]);
+  assert.deepEqual([by('KEEP_ALWAYS'), by('KEEP_IF_TAX_TERM'), by('EXCLUDE_UNLESS_STRONG')], [19, 43, 554]);
   assert.equal(dedupeRows(rows).duplicates.filter((d) => d.kind === 'DUPLICATE_KEY_CONFLICT').length, 0);
 });
 
