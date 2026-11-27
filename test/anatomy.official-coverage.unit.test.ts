@@ -43,7 +43,13 @@ test('E9 motor R3: measured layouts, complete readings and acceptance remain dis
     'dou--decreto--pequeno', 'dou--decreto--grande', 'dou--portaria--pequeno', 'dou--portaria--medio',
     'dou--resolucao--pequeno', 'dou--resolucao--grande', 'planalto--lei--pequeno', 'planalto--lei--medio', 'planalto--lei--grande', 'normas-leg-br--lei--grande'].sort());
   for (const id of ['M14', 'M16', 'M18', 'M19', 'M20', 'M21', 'M23', 'M24', 'M25', 'M26', 'M28', 'M29', 'M30', 'M32', 'M33', 'M34']) {
-    const x = real.find((s) => s.id === id)!; assert.deepEqual([x.stages.validated, x.readingComplete, x.stages.accepted], [true, completePortalSamples.has(id), completePortalSamples.has(id)], id);
+    const x = real.find((s) => s.id === id)!;
+    assert.deepEqual([x.stages.validated, x.readingComplete, x.stages.accepted],
+      [true, completePortalSamples.has(id) || id === 'M21', completePortalSamples.has(id)], id);
+  }
+  for (const id of ['M5', 'http:M5']) {
+    const sample = real.find((candidate) => candidate.id === id)!;
+    assert.deepEqual([sample.stages.validated, sample.readingComplete, sample.stages.accepted], [true, true, false], id);
   }
   for (const id of ['M10', 'M12']) {
     const x = real.find((s) => s.id === id)!;
@@ -328,7 +334,7 @@ test('E9 acceptance B4: the committed file is the append-only union with #305/#3
   const file = JSON.parse(readFileSync(new URL('../docs/anatomy/e9-acceptances.json', import.meta.url), 'utf8')) as { acceptances: { sampleId: string; engineBuildHash: string; cellId: string; entrySha256: string; revalidates?: string }[] };
   // composition gate (tribusca-control#116, after c.6965245285): append-only — the 2026-11-11 Portaria record at 0e009431 is
   // PRESERVED and a revalidation record pins the composed engine; only the record on the current engine makes it accepted
-  assert.equal(file.acceptances.length, 126, '122 prior records and 4 appended for R6b');
+  assert.equal(file.acceptances.length, 157, '126 prior records and 31 revalidations appended for R7');
   assert.deepEqual(file.acceptances.slice(18, 26).map((r) => r.sampleId).sort(), r2AcceptedSampleIds);
   assert.ok(file.acceptances.slice(18, 26).every((r) => r.engineBuildHash === r2Engine));
   assert.deepEqual(file.acceptances.slice(0, 12).map((r) => r.sampleId.replace(/-2002|-2003/u, '')).filter((x, i, a) => a.indexOf(x) === i), ['lei-10637-atualizada', 'lei-10833-atualizada']);
@@ -550,12 +556,13 @@ test('E9-M1 non-RFB acceptance: right digest/engine/cell on a complete reading i
   assert.deepEqual([unvalidated.readingComplete, unvalidated.stages.accepted, unvalidated.notes], [null, false, []], 'only validated samples are assessed');
   const approvedNonRfb = acceptedSampleIds.filter(id => !id.startsWith('rfb:'));
   const nonRfb = real.filter((s) => s.source !== 'RFB' && s.stages.validated);
-  assert.deepEqual(nonRfb.filter((s) => s.readingComplete).map((s) => s.id).sort(), [...approvedNonRfb, 'ricms-an1art041', 'ricms-art007'].sort());
+  assert.deepEqual(nonRfb.filter((s) => s.readingComplete).map((s) => s.id).sort(),
+    [...approvedNonRfb, 'M21', 'M5', 'http:M5', 'ricms-an1art041', 'ricms-art007'].sort());
   assert.ok(nonRfb.every((s) => s.stages.accepted === approvedNonRfb.includes(s.id) && (s.readingComplete || /^partial reading/u.test(s.notes[0]!))));
   assert.equal(samplesBaseline(real).samples.length, nonRfb.length, 'partial notes do not drop samples from the baseline');
   const mx = buildMatrix(real);
   for (const id of ['confaz--convenio-icms--grande', 'confaz--ajuste-sinief--grande', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno', 'sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio']) {
-    const hasPartial = id.startsWith('confaz--');
+    const hasPartial = id === 'confaz--convenio-icms--grande';
     const c = mx.cells.find((x) => x.id === id)!; assert.deepEqual([c.status, c.complete, c.accepted, c.partialSamples.length > 0], ['covered', true, true, hasPartial], id);
   }
 });

@@ -58,7 +58,8 @@ export function prepareOfficialAct(source: PortalSource, resourceId: string, htm
 
   const visible = measure(act.children);
   if (!visible || (epigraph && !matchesEpigraph(source, visible.slice(0, 1600), epigraph)
-    && !(source === 'DOU' && matchesDouCgsnEpigraph(act, epigraph)))) return null;
+    && !(source === 'DOU' && matchesDouCgsnEpigraph(act, epigraph))
+    && !(source === 'CONFAZ' && matchesConfazLegacyTitle(act, epigraph)))) return null;
   const result = Object.freeze({ source, resourceId, start: act.startIndex, end: act.endIndex + 1, chars: visible.length });
   if (epigraph) issued.set(result, html);
   return result;
@@ -85,6 +86,21 @@ function measure(nodes: ReturnType<typeof parseDocument>['children']): string {
 }
 
 const normalizeText = (text: string) => text.normalize('NFC').replace(/\s+/gu, ' ').trim();
+
+// Legacy Plone titles may pad the agreement number or print the date with an ordinal day.
+// Require the first visible child to be the sole explicit title, so a citation cannot prove the act.
+function matchesConfazLegacyTitle(act: PortalElement, expected: string): boolean {
+  const key = /^(AJUSTE SINIEF|PROTOCOLO ICMS)\s+0*(\d+)\s*\/\s*(\d{2})$/iu.exec(normalizeText(expected));
+  if (!key) return false;
+  const titles = DomUtils.findAll((node) => node.name === 'p' && (hasClass(node.attribs.class, 'TituloAcordo')
+    || hasClass(node.attribs.class, 'A1-1TituloAcordo')) && measure([node]) !== '', act.children);
+  const first = act.children.find((node) => measure([node]));
+  const soleTitle = titles[0];
+  if (!soleTitle || titles.length !== 1 || first !== soleTitle || !hasClass(soleTitle.attribs.class, 'TituloAcordo')) return false;
+  const title = /^(AJUSTE SINIEF|PROTOCOLO ICMS)\s+0*(\d+)(?:\s*\/\s*(\d{2}))?,\s+DE\s+(?:0?[1-9]|[12]\d|3[01])[º°]?\s+DE\s+\p{L}+\s+DE\s+20(\d{2})$/iu.exec(measure([soleTitle]));
+  return !!title && key[1]!.toUpperCase() === title[1]!.toUpperCase()
+    && key[2] === title[2] && key[3] === title[4] && (title[3] === undefined || title[3] === title[4]);
+}
 
 // The metadata can put CGSN in the resolution title while the portal prints the issuer separately.
 function matchesDouCgsnEpigraph(act: PortalElement, expected: string): boolean {

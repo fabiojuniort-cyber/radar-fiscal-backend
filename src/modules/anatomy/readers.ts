@@ -695,6 +695,32 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
   const spProven = input.source === 'SEFAZ-SP-PORTAL';
   const spPortalWrapper = (node: Node) => spProven && node.attrs['data-sefaz-sp-portal'] === 'legislacao-consolidada'
     && dom.children.length === 1 && dom.children[0] === node;
+  const confazVisibleChildren = portal?.source === 'CONFAZ'
+    ? dom.children.find(node => node.start === 0 && node.attrs.id === 'parent-fieldname-text')
+      ?.children.filter(node => !node.blocked && matchText(node).trim()) ?? []
+    : [];
+  const confazSignatureCorrection = new Map<Node, Descriptor>();
+  if (confazVisibleChildren.length >= 6) {
+    const blocks = confazVisibleChildren.slice(-6);
+    if (blocks.every(node => node.tag === 'p' && !node.children.some(child => child.tag === 'img'))) {
+      const [title, publication, intro, earlier, replacement, signature] = blocks as [Node, Node, Node, Node, Node, Node];
+      const ownClass = (node: Node, cls: string) => (node.attrs.class ?? '').split(/\s+/u).includes(cls);
+      if (ownClass(title, 'Subtitulo') && /^RETIFICAÇÃO$/iu.test(matchText(title).trim())
+        && ownClass(publication, 'DataPublicao') && /^Publicada no DOU de \d{2}\.\d{2}\.\d{2}\.$/iu.test(matchText(publication).trim())
+        && [intro, earlier, replacement, signature].every(node => ownClass(node, 'TextoAcordo'))
+        && /^Na lista de assinatura do Protocolo ICMS\s+\d+\/\d{2},\s+de\b/iu.test(matchText(intro).trim())
+        && /^onde se lê:\s*“.+”\s*[,.;]?$/isu.test(matchText(earlier).trim())
+        && /^leia-se:\s*“.+”\s*[,.;]?$/isu.test(matchText(replacement).trim())
+        && /^(?:\p{Lu}[\p{Lu}\p{M}]+\s+){2,}\p{Lu}[\p{Lu}\p{M}]+$/u.test(matchText(signature).trim())) {
+        for (const node of [title, intro]) confazSignatureCorrection.set(node,
+          { type: 'editorial_note', context: 'prohibited', reason: 'confaz_plone_signature_rectification', rank: 100 });
+        for (const node of [earlier, replacement]) confazSignatureCorrection.set(node,
+          { type: 'quoted_text', context: 'prohibited', reason: 'confaz_plone_signature_rectification_quote', rank: 100 });
+        confazSignatureCorrection.set(signature,
+          { type: 'signature', context: 'prohibited', reason: 'confaz_plone_signature_rectification_signature', rank: 100 });
+      }
+    }
+  }
   let planaltoPrevious: { node: Node; reason: string; rank: number } | undefined;
   const walk = (node: Node, inheritedContext: DomContext = 'operative_candidate', quotedAncestor = false, rfbSeg: RfbSeg | null = null, spPortal = false): void => {
     if (node.blocked || node.text !== null) return;
@@ -753,14 +779,30 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
       }
       if (portal?.source === 'CONFAZ' && !wasQuoted && !openQuotation) {
         const classes = classesOf(node);
-        if (classes.includes('A1-1TituloAcordo')) {
+        const correction = confazSignatureCorrection.get(node);
+        // A terminal link to a separate earlier wording is an editorial reference. A
+        // heading preceding further text would require an independent scope proof.
+        const earlierLink = node === confazVisibleChildren.at(-1) && ownClasses.includes('TabelaSubtitulo')
+          && /^REDAÇÃO ANTERIOR DO AJUSTE SINIEF\s+0*(\d+)\/(\d{2})$/iu.exec(text);
+        if (correction) {
+          descriptor = correction;
+        } else if (classes.includes('A1-1TituloAcordo')) {
           descriptor = { type: 'epigraph', context: 'prohibited', reason: 'confaz_plone_epigraph', rank: 100 };
         } else if (classes.includes('A3Ementa')) {
           descriptor = { type: 'summary', context: 'prohibited', reason: 'confaz_plone_summary', rank: 100 };
         } else if (classes.includes('A5-2NovaRedacao')) {
           descriptor = { type: 'quoted_text', context: 'prohibited', reason: 'confaz_plone_cited_wording', rank: 100 };
-        } else if (classes.includes('A4AcordoTipo') && /^(CONVÊNIO|AJUSTE|PROTOCOLO)(?:SINIEF|ICMS)?$/iu.test(text.replace(/\s/gu, ''))) {
+        } else if ((classes.includes('A4AcordoTipo') || ownClasses.includes('AcordoTipo')) && /^(CONVÊNIO|AJUSTE|PROTOCOLO)(?:SINIEF|ICMS)?$/iu.test(text.replace(/\s/gu, ''))) {
           descriptor = { type: 'epigraph', context: 'prohibited', reason: 'confaz_plone_act_kind', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && node.tag === 'p' && earlierLink
+          && node.children.some(child => child.tag === 'a' && child.attrs.href
+            === 'https://www.confaz.fazenda.gov.br/legislacao/ajustes/20' + earlierLink[2]
+              + '/AJ' + earlierLink[1]!.padStart(3, '0') + '_' + earlierLink[2] + '_anterior')) {
+          descriptor = { type: 'editorial_note', context: 'prohibited', reason: 'confaz_plone_earlier_wording_title', rank: 100 };
+        } else if (descriptor.type === 'unidentified' && node.tag === 'p' && insideAnnex()
+          && ((ownClasses.includes('A6-2SubtituloDP') && /^OBRIGATORIEDADE DE REGISTRO DE EVENTOS$/iu.test(text))
+            || (ownClasses.includes('A7-3Tabelaesquerda') && /^BEBIDAS NÃO ALCOÓLICAS CONSTANTES DOS ANEXOS IV E XVII$/iu.test(text)))) {
+          descriptor = { type: 'body', context: 'unknown', reason: 'confaz_plone_annex_subheading', rank: 100 };
         } else if (descriptor.type === 'unidentified' && /^ANEXO\s+(?:ÚNICO|UNICO)$/iu.test(text)) {
           descriptor = { type: 'annex', context: 'operative_candidate', reason: 'confaz_plone_sole_annex', rank: 2 };
         } else if (descriptor.type === 'unidentified' && classes.some((c) => c === 'A6-1Subtitulo' || c === 'A7-1TabelaSubtitulo' || c === 'A9-1TabelaSubtituloverde')) {
@@ -806,7 +848,7 @@ function readSnapshot(input: AnatomyReaderInput, seen: ReaderSignals): AnatomyRe
           if (/<(?:strike|s|del)\b/iu.test(raw.slice(node.start, node.end)) && hasSubstantivePlanaltoStrike(node)) {
             descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_historical_markup' };
           } else if ((descriptor.type === 'paragraph' || descriptor.type === 'inciso')
-            && /^(?:§\s*\d+[º°o]?|[IVXLCDM]+\s*[-–—])\s*\.?\s*\(Revogad[oa]\s+pel[ao]\s+[^()]+\)(?:\s*\(Vigência\))?\s*\.?$/iu.test(text)) {
+            && /^(?:§\s*\d+(?:\s*[º°o])?(?:-[A-Z])?\s*\.?|[IVXLCDM]+\s*[-–—])\s*\(\s*Revogad[oa](?:\s+pel[ao]\s+[^()]+)?\s*\)\s*[.;]?(?:\s*(?:\(Vigência\)|\(Redação dada pel[ao]\s+[^()]+\)|Produção de efeitos))?\s*\.?$/iu.test(text)) {
             descriptor = { ...descriptor, context: 'prohibited', reason: 'planalto_repealed_placeholder' };
           }
         }

@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { consultOfficial, rfbJsonIdAto, validateRfbJson, type FetchLike, type ManifestAct } from '../ops/anatomy/fetch-official-core.js';
 import { locateJsonHtmlSpan, prepareRfbRepresentation } from '../src/modules/anatomy/json-preparation.js';
 import { readAnatomyInput } from '../src/modules/anatomy/readers.js';
@@ -195,7 +196,7 @@ test('D03: binding of an RFB JSON sample goes through the prepared text, never t
 });
 
 test('D03: the four collected RFB JSON snapshots validate, match their recorded hashes and stay not promoted', () => {
-  const dir = new URL('../ops/anatomy/official-identification/rfb-normasinternet2/', import.meta.url).pathname;
+  const dir = fileURLToPath(new URL('../ops/anatomy/official-identification/rfb-normasinternet2/', import.meta.url));
   for (const id of [115131, 141910, 108391, 133898]) {
     const body = readFileSync(join(dir, `${id}.json`));
     const meta = JSON.parse(readFileSync(join(dir, `${id}.meta.json`), 'utf8')) as { sha256: string; bytes: number; promoted: boolean; url: string };
