@@ -1,0 +1,122 @@
+name: OPS-DL-01 DOU limits PostgreSQL 16/18
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'migrations/**'
+      - 'src/api/routes/platform-admin.route.ts'
+      - 'src/config/env.ts'
+      - 'src/infrastructure/database/**'
+      - 'src/modules/collection/dou*.ts'
+      - 'src/modules/collection/connector-registry.factory.ts'
+      - 'src/modules/collection/inlabs.client.ts'
+      - 'test/dou-*limits*.test.ts'
+      - 'test/support/dou-limits-*.sql'
+      - '.github/workflows/ops-dou-limits-pg-gate.yml'
+permissions:
+  contents: read
+jobs:
+  ops-pg:
+    if: ${{ !github.event.pull_request.draft }}
+    name: OPS / PG${{ matrix.pg }} / ${{ matrix.schema }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: [16, 18]
+        schema: [fresh, upgrade]
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}-bookworm
+        env:
+          POSTGRES_DB: radar_fiscal_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      MAIN_STATE_SHA: 1d7eb224cba5b1d0befd8e03fc3ec03cc45673ee
+      OPS_MIGRATION: 087_ops_dou_download_limits.sql
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/radar_fiscal_test
+      DATABASE_URL: postgresql://radar_app_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      OPS_TEST_WORKER_URL: postgresql://radar_worker_runtime:ci-runtime-password-with-at-least-32-chars@localhost:5432/radar_fiscal_test
+      DB_RUNTIME_PASSWORD: ci-runtime-password-with-at-least-32-chars
+      DB_CURATOR_RUNTIME_PASSWORD: ci-curator-password-with-at-least-32-chars
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-32-characters
+      AUTH_REFRESH_COOKIE_NAME: radar_refresh_token
+      PUBLIC_API_ALLOWED_ORIGINS: https://public.example
+      AUTH_PASSWORD_RESET_ENABLED: 'false'
+      DB_POOL_MAX: 2
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Assert the candidate adds only the OPS migration
+        run: |
+          set -euo pipefail
+          git diff --quiet "$MAIN_STATE_SHA" HEAD -- package-lock.json
+          test "$(git diff --name-status "$MAIN_STATE_SHA" HEAD -- migrations/)" = "$(printf 'A\tmigrations/%s' "$OPS_MIGRATION")"
+          psql -X "$DATABASE_ADMIN_URL" -tAc 'SHOW server_version'
+      - name: Apply the pinned main using its own runner
+        if: matrix.schema == 'upgrade'
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/ops-main-state" "$MAIN_STATE_SHA"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/ops-main-state/node_modules"
+          (cd "$RUNNER_TEMP/ops-main-state" && npm run build && npm run db:prepare)
+          psql -X "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -Atc \
+            'SELECT filename, checksum, applied_at FROM schema_migrations ORDER BY filename' > "$RUNNER_TEMP/ops-ledger-before"
+          psql -X "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -Atf \
+            test/support/dou-limits-catalog.sql > "$RUNNER_TEMP/ops-auth-before"
+      - name: Build the candidate
+        run: npm run build
+      - name: Configure the disposable OPS gateway
+        run: |
+          set -euo pipefail
+          key="$(openssl rand -hex 32)"
+          pass="$(openssl rand -hex 32)"
+          echo "::add-mask::$key"
+          echo "::add-mask::$pass"
+          echo "DOU_LIMITS_SIGNING_SECRET=$key" >> "$GITHUB_ENV"
+          echo "DB_DOU_LIMITS_PASSWORD=$pass" >> "$GITHUB_ENV"
+          echo "DATABASE_DOU_LIMITS_URL=postgresql://radar_dou_limits_runtime:$pass@localhost:5432/radar_fiscal_test" >> "$GITHUB_ENV"
+      - name: Prepare the candidate and verify the migration ledger
+        env:
+          SCHEMA_MODE: ${{ matrix.schema }}
+        run: |
+          set -euo pipefail
+          npm run db:prepare | tee "$RUNNER_TEMP/ops-prepare.log"
+          expected=$(git ls-tree --name-only HEAD migrations/ | grep -cE '^migrations/[0-9]{3}_.+\.sql$')
+          test "$(psql -X "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -tAc 'SELECT count(*) FROM schema_migrations')" = "$expected"
+          psql -X "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -Atc \
+            'SELECT filename, checksum, applied_at FROM schema_migrations ORDER BY filename' > "$RUNNER_TEMP/ops-ledger-after"
+          if [[ "$SCHEMA_MODE" == upgrade ]]; then
+            test "$(sed -n 's/^Applying migration: //p' "$RUNNER_TEMP/ops-prepare.log")" = "$OPS_MIGRATION"
+            grep -vF "$OPS_MIGRATION|" "$RUNNER_TEMP/ops-ledger-after" | diff -u "$RUNNER_TEMP/ops-ledger-before" -
+            psql -X "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -Atf \
+              test/support/dou-limits-catalog.sql | diff -u "$RUNNER_TEMP/ops-auth-before" -
+          fi
+          npm run db:migrate | tee "$RUNNER_TEMP/ops-migrate-again.log"
+          if grep -q '^Applying migration:' "$RUNNER_TEMP/ops-migrate-again.log"; then exit 1; fi
+          psql -X "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -Atc \
+            'SELECT filename, checksum, applied_at FROM schema_migrations ORDER BY filename' | diff -u "$RUNNER_TEMP/ops-ledger-after" -
+      - name: Verify effective OPS and AUTH privileges
+        run: psql -X "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -f test/support/dou-limits-assert-acl.sql
+      - name: Verify audit atomicity and worker access
+        run: npx tsx --test test/dou-limits-admin.integration.test.ts
+      - name: Verify AUTH queue health and retention in the composed schema
+        if: matrix.schema == 'upgrade'
+        run: npx tsx --test test/password-reset.r4.health-retention.integration.test.ts

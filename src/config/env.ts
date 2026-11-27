@@ -46,6 +46,8 @@ const envSchema = z.object({
   DATABASE_CURATOR_URL: databaseUrlSchema.optional(),
 
   DB_CURATOR_RUNTIME_PASSWORD: z.string().min(32).optional(),
+  DATABASE_DOU_LIMITS_URL: databaseUrlSchema.optional(),
+  DOU_LIMITS_SIGNING_SECRET: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 
   // Commit deployed by Railway; recorded on curated taxonomy releases.
   RAILWAY_GIT_COMMIT_SHA: z.string().optional(),

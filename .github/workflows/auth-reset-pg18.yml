@@ -92,7 +92,7 @@ jobs:
   reset-production-path:
     # COORD F2 (#9): production-path proof. The database is first brought to the exact state of main d53fb3e2
     # (its own migrations, including 083_onb02_r7_backfill_batch_stable_plan.sql, applied by main's own runner);
-    # then this PR's runner applies only the reset migrations (083_auth…, 084, 085) on top, as a production deploy would.
+    # then this PR's runner applies the exact forward delta, starting with the reset migrations (083_auth…, 084, 085).
     name: Production path (main d53fb3e2 → reset migrations) on PostgreSQL ${{ matrix.pg }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -158,14 +158,19 @@ jobs:
           echo "main state OK: $main_count migrations, 083_onb02 applied, no reset migration"
       - name: Typecheck and build (this PR)
         run: npm run typecheck && npm run build
-      - name: This PR's runner applies only the reset migrations on top of the main state
+      - name: This PR's runner applies exactly the forward delta starting with the reset migrations
         run: |
           set -euo pipefail
+          # Preserve the original reset ordering proof when later migrations compose with AUTH.
+          git diff --quiet --no-renames --diff-filter=CDMRTUXB "$MAIN_STATE_SHA" HEAD -- migrations/
+          git diff --name-only --diff-filter=A "$MAIN_STATE_SHA" HEAD -- migrations/ \
+            | sed -nE 's@^migrations/([0-9]{3}_.+\.sql)$@\1@p' | LC_ALL=C sort > "$RUNNER_TEMP/reset-expected-migrations"
+          printf '%s\n' 083_auth_password_reset.sql 084_auth_password_reset_r3.sql 085_auth_reset_health_retention_r4.sql \
+            | diff -u - <(head -n 3 "$RUNNER_TEMP/reset-expected-migrations")
           npm run db:prepare 2>&1 | tee "$RUNNER_TEMP/prepare.log"
           grep -F 'Migration already applied: 083_onb02_r7_backfill_batch_stable_plan.sql' "$RUNNER_TEMP/prepare.log"
-          applied=$(grep -oE 'Applying migration: [^ ]+' "$RUNNER_TEMP/prepare.log" | sed 's/Applying migration: //' | tr '\n' ' ')
-          echo "applied now: $applied"
-          test "$applied" = "083_auth_password_reset.sql 084_auth_password_reset_r3.sql 085_auth_reset_health_retention_r4.sql "
+          sed -n 's/^Applying migration: //p' "$RUNNER_TEMP/prepare.log" \
+            | diff -u "$RUNNER_TEMP/reset-expected-migrations" -
       - name: Ledger order — 083_onb02 applied before the reset migrations (production order)
         run: |
           set -euo pipefail
