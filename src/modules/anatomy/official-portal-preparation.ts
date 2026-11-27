@@ -92,10 +92,12 @@ const normalizeText = (text: string) => text.normalize('NFC').replace(/\s+/gu, '
 function matchesConfazLegacyTitle(act: PortalElement, expected: string): boolean {
   const key = /^(AJUSTE SINIEF|PROTOCOLO ICMS)\s+0*(\d+)\s*\/\s*(\d{2})$/iu.exec(normalizeText(expected));
   if (!key) return false;
-  const titles = DomUtils.findAll((node) => node.name === 'p' && hasClass(node.attribs.class, 'TituloAcordo') && measure([node]) !== '', act.children);
+  const titles = DomUtils.findAll((node) => node.name === 'p' && (hasClass(node.attribs.class, 'TituloAcordo')
+    || hasClass(node.attribs.class, 'A1-1TituloAcordo')) && measure([node]) !== '', act.children);
   const first = act.children.find((node) => measure([node]));
-  if (titles.length !== 1 || first !== titles[0]) return false;
-  const title = /^(AJUSTE SINIEF|PROTOCOLO ICMS)\s+0*(\d+)(?:\s*\/\s*(\d{2}))?,\s+DE\s+(?:0?[1-9]|[12]\d|3[01])[º°]?\s+DE\s+\p{L}+\s+DE\s+20(\d{2})$/iu.exec(measure([titles[0]!]));
+  const soleTitle = titles[0];
+  if (!soleTitle || titles.length !== 1 || first !== soleTitle || !hasClass(soleTitle.attribs.class, 'TituloAcordo')) return false;
+  const title = /^(AJUSTE SINIEF|PROTOCOLO ICMS)\s+0*(\d+)(?:\s*\/\s*(\d{2}))?,\s+DE\s+(?:0?[1-9]|[12]\d|3[01])[º°]?\s+DE\s+\p{L}+\s+DE\s+20(\d{2})$/iu.exec(measure([soleTitle]));
   return !!title && key[1]!.toUpperCase() === title[1]!.toUpperCase()
     && key[2] === title[2] && key[3] === title[4] && (title[3] === undefined || title[3] === title[4]);
 }

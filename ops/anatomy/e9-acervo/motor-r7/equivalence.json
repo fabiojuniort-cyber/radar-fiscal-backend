@@ -1,7 +1,7 @@
 {
   "base": "1d7eb224cba5b1d0befd8e03fc3ec03cc45673ee",
   "baseEngine": "a18cd9b134405013fa5dde485d9635829d99dbcaadd172c62ca80a238816366b",
-  "candidateEngine": "3642bb7aa561ca928f588a98cb84a6b07e3b4ff6ad054ab677d760080bcebd23",
+  "candidateEngine": "832d00a80f6f76d3f04c6c6cb5837cab8664cb6104e05c1d59ccab7b6f58aa9f",
   "cells": [
     {
       "accepted": true,
@@ -201,9 +201,9 @@
         "bytes": 238160,
         "cell": "planalto--lei--grande",
         "chars": 114163,
-        "entrySha256": "7fe91f513b006f497570733ea82dc928294183c3eedfb24df5916bf9ad1283d8",
+        "entrySha256": "9e9c605b44214afb1135c8950554bec41c9058865fc094e22ad89585705abcad",
         "notes": [],
-        "outputHash": "60ad2a825f4402802674b81e36dd54cdb51116d52a843ae75953ea15ab18a9ff",
+        "outputHash": "0864a971813e1801156f21443ef8356b329ca1c7d7f4ebf7e42a7a25add131b6",
         "preparation": null,
         "profile": "PLANALTO",
         "reading": {
@@ -257,11 +257,11 @@
         "bytes": 533449,
         "cell": "planalto--lei--grande",
         "chars": 256474,
-        "entrySha256": "d9d4f962a7892ee979fef5617eb4cafd46d91a6dd4f50e20f62b12e74f022836",
+        "entrySha256": "db55a8dbd513d8c409994e8d585deca2c0086aa6ba9b450202bd7724e7b7609a",
         "notes": [
           "partial reading — never accepted as complete: status partial; 5662 unidentified chars; limitations unidentified_content"
         ],
-        "outputHash": "7244413d7658f2f4fa18e00abebb3865061f44d3bc5f35d88873a3c868ce5b1e",
+        "outputHash": "7173378d87c72e8e600c738edd9c60b1fc5bb292545914604f1d6afed83c2904",
         "preparation": null,
         "profile": "PLANALTO",
         "reading": {
@@ -321,11 +321,11 @@
         "bytes": 931597,
         "cell": "confaz--convenio-icms--grande",
         "chars": 325058,
-        "entrySha256": "966478145b4808f5af8ef670912be4dcf659870c863044eced9e097bab1ca1f9",
+        "entrySha256": "2c560f1428b9bad5b732c9bd7cd3fc9cf604784cba2162a7556d2c6746310b73",
         "notes": [
           "partial reading — never accepted as complete: status partial; limitations entity_extraction_failed"
         ],
-        "outputHash": "a1325d5a01ebe860551ff3a89daa80a0383b60142f68cc00f6727794bdbde26d",
+        "outputHash": "02f4d2f77181a0f54cdd8fc4c188aea88d416b8501bd5a427c0390a0e1d4649a",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -390,9 +390,9 @@
         "bytes": 234041,
         "cell": "confaz--convenio-icms--grande",
         "chars": 54704,
-        "entrySha256": "58dde17e83a89ba070d45b38c2e825e98a450e549850e169a6080d3135a24b26",
+        "entrySha256": "98b4a8c153e09f0387d3aa3d0b3c1242916e1ef71939b81fb2236c268edcb022",
         "notes": [],
-        "outputHash": "14d9b7406fb1ffa36539b8100c53bb80d47735cf7920ede7eae379a3c36c011f",
+        "outputHash": "2ae4fbf09b4d4a73de1d7f5b2b058c6f6bd3be3e8ba0f60a0345942ab924e6fb",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -446,9 +446,9 @@
         "bytes": 193059,
         "cell": "confaz--ajuste-sinief--grande",
         "chars": 112225,
-        "entrySha256": "e332806f980941a37e00b3257318282a230aff4e2dabc485af586fb64aa2696f",
+        "entrySha256": "0a663e6011c05c7380b5c6b8f400ed2a4bb0df47ff30cb0479fa705c3a101b8d",
         "notes": [],
-        "outputHash": "ada2e22989d0f363a14a997e987df7ddb61d06ca277896acd2b347d717b0a03e",
+        "outputHash": "e60b91c316dfdb16d69162130bfb4de8670ece7bfdb6f2f8404a1fe6294e2684",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -603,11 +603,11 @@
         "bytes": 180179,
         "cell": "normas-leg-br--lei--grande",
         "chars": 74715,
-        "entrySha256": "f83ca9362e8b3923c4e886c70f427c3227459ecd7bb8dd8853fc2b75d226e0db",
+        "entrySha256": "843ed9ff79f96158af0a76740e06dfbe82a5257259a4033c595638c2a5e49772",
         "notes": [
           "partial reading — never accepted as complete: status partial; 1200 unidentified chars; limitations image_without_ocr, normas_leg_local_preparation_only, normas_leg_note_ambiguous, unidentified_content"
         ],
-        "outputHash": "1f6b4812ba49e46f463f10d47687dd1a2574fba10ecc4cae17113e182a2aeae8",
+        "outputHash": "e9f44a81fca3681b61e86a5791344b0fc78b8992c3bf6a1b53dbc4aec2774aad",
         "preparation": null,
         "profile": "NORMAS-LEG",
         "reading": {
@@ -737,11 +737,11 @@
         "bytes": 388543,
         "cell": "normas-leg-br--lei--grande",
         "chars": 167570,
-        "entrySha256": "c0b5448de699379f304be3246743ecd10deaca83916248997286f99299c9919e",
+        "entrySha256": "c3ec71aad494083e190277a73744ecd71cab94665c8f97666a3d87f0a5e546ed",
         "notes": [
           "partial reading — never accepted as complete: status partial; 908 unidentified chars; limitations image_without_ocr, normas_leg_local_preparation_only, normas_leg_note_ambiguous, unidentified_content"
         ],
-        "outputHash": "119f67b127d0e5af25302ee712ca1b8ee7e3cb0b9a2fb3b1d93279596f87845d",
+        "outputHash": "add125fc8dcc7ae9ba9344a33beff2060a4dc2ff3c725d3958f92a441f4d674c",
         "preparation": null,
         "profile": "NORMAS-LEG",
         "reading": {
@@ -871,9 +871,9 @@
         "bytes": 20282,
         "cell": "planalto--lei--pequeno",
         "chars": 9391,
-        "entrySha256": "de9429513aaf4759fe640256018df90e019e86be12586f8647ba9c9cdd20525f",
+        "entrySha256": "162fa2c7b6ec9035bfa880f2df68d4da23df54605ceb630df93be118ac1c6003",
         "notes": [],
-        "outputHash": "23d89969b587fc11ca0f48e367c8af47810adf2e34f8d37b8684500c87bf73b6",
+        "outputHash": "8b37c5498926f4fd810353935f5eb107e1ddd65fb1428937836e2b2e2c96ccae",
         "preparation": null,
         "profile": "PLANALTO",
         "reading": {
@@ -927,9 +927,9 @@
         "bytes": 77417,
         "cell": "planalto--lei--medio",
         "chars": 34582,
-        "entrySha256": "8a28cc55f26a52d1090c8cd74a97147c061d50da5b49ca5b22435aded8615e1d",
+        "entrySha256": "833c0864ba956296512817ced8048af3802627fbebc3c7727eb7668da63708b6",
         "notes": [],
-        "outputHash": "3ed70c43deee68c7c4d7818a58227d21160f0c0ca0db83a7d2cef216edb0691b",
+        "outputHash": "78845f1d9fc69114f3311a76c48e1b5cc4c4a451c79733d2bdd098cb34470c3a",
         "preparation": null,
         "profile": "PLANALTO",
         "reading": {
@@ -1157,9 +1157,9 @@
         "bytes": 113445,
         "cell": "confaz--convenio-icms--pequeno",
         "chars": 1657,
-        "entrySha256": "69eb560bc32143c7708260aaf3679e57121cc37dc88b8bf405da05299752aed4",
+        "entrySha256": "4cf6f160b4703075de6fa64d3c06f175b9f5102f50cd2e829b44cdfbae46e4de",
         "notes": [],
-        "outputHash": "ec85cfc5ca435d594096441589b75013722f56f8b75ceb7ffff619e8c8c3cd5b",
+        "outputHash": "c688fd03b64b26b8e07dc5aaa1ccfdbbbca68b060f65e1fd00d2f5df9d7b38ff",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -1213,9 +1213,9 @@
         "bytes": 130312,
         "cell": "confaz--convenio-icms--pequeno",
         "chars": 1814,
-        "entrySha256": "886002ccd02b405533ccfcb1dbd1a8ad2c137312cb762718ccdf2cad11ba0c1f",
+        "entrySha256": "df5e8ec42c930b82d96a9e39a57009969283a7c50acb5710774cc503f6a300f3",
         "notes": [],
-        "outputHash": "20c28338529a45602c67947299a92c0316d6682b5daba19a692231df5e1eace2",
+        "outputHash": "398ac250b9eabbc8ea55b83091d50fb00ccb1bf71753e3f1ebd02d0eda18cb97",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -1269,9 +1269,9 @@
         "bytes": 54672,
         "cell": "confaz--ajuste-sinief--pequeno",
         "chars": 1318,
-        "entrySha256": "162bcd2f4c818419693cfb08a59dfdf587f31881355a98115829dd640d8f6dd5",
+        "entrySha256": "fd3fbb421b936c83e555963f698d1999373f2b8e372a1cabf75230c32d35e536",
         "notes": [],
-        "outputHash": "43ef9e2c752140a5abb2eaa7d5fd784d9bfed7da9e6baeb83991855c05acac91",
+        "outputHash": "1f8c159f49ee9b040554d66ae0feccfb6263c297b77f45f3e10987582c4f8ab1",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -1325,9 +1325,9 @@
         "bytes": 124885,
         "cell": "confaz--ajuste-sinief--grande",
         "chars": 60404,
-        "entrySha256": "f994f176dbb4f9c251e4abc73d6ce93ca5ac82d809bdcfcd6b3bd83b33f5c5d9",
+        "entrySha256": "6b327690ef8e8ca486ce14cf6ee93f697443459ff1fce8fca0ed7ad52fb54213",
         "notes": [],
-        "outputHash": "162e856a4a08c9e2fd9e1d2b2427e3d1dfe94c1ee8c2d6301757e532e77ab710",
+        "outputHash": "85004780e34c12791663487cc8972c2b23afd6b625dbd6794c73cba864e96d93",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -1381,9 +1381,9 @@
         "bytes": 99999,
         "cell": "confaz--protocolo-icms--pequeno",
         "chars": 1244,
-        "entrySha256": "2fe0c8228283abfc73db6d400e353f7682d8252450424831b1f6a8fe4022e3aa",
+        "entrySha256": "fa7b7c096389f3e5ce79ef3d23e5b95fe7af58d80edd4a64d1d341daf1f708c7",
         "notes": [],
-        "outputHash": "4236e2f39cf513ac5d8e9b07940364210766a0750023abb4bf224e0a63074d05",
+        "outputHash": "3e780fdb896ecf8257f6af30edb9d54582940531ef434d1473a2689ae9e42e96",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -1437,9 +1437,9 @@
         "bytes": 83163,
         "cell": "confaz--protocolo-icms--pequeno",
         "chars": 7899,
-        "entrySha256": "748872bd4dcd6d884bbc5380dc584092a820b1dea4b88c741502ad2695196a62",
+        "entrySha256": "74ac7c1f7069c1784518e0fbd6bcbc6dca69a42288f275bb7964fe2f9984e69e",
         "notes": [],
-        "outputHash": "9c1a73b82e144db6522564ad301defbaf524e40b6e7991751504a7b9a4e09b2b",
+        "outputHash": "e44cd968eeab754d9250e2ce09460e604eb938c22d93181cdeb0929f69a94acc",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -1510,9 +1510,9 @@
         "bytes": 86545,
         "cell": "dou--instrucao-normativa--pequeno",
         "chars": 2056,
-        "entrySha256": "3672298af5a816c7d4c5d0f170e61a04df8ac72f3d2244d1a68c64c0464a5b41",
+        "entrySha256": "a9162caa4ca27cf6b9044539e5e4a4cb9d96a607c4fb783d3c4968da299b8fbc",
         "notes": [],
-        "outputHash": "27081351ba45e3519c1c8d60acf62d7b09146db39daf78b2865a5ce352f96037",
+        "outputHash": "d0edc848936f6e77f1e231e4f12ba35ffb937b150ad66258ee0d0b317616a319",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -1566,9 +1566,9 @@
         "bytes": 121219,
         "cell": "dou--instrucao-normativa--medio",
         "chars": 29447,
-        "entrySha256": "5f5840d50de6790e9411d45b1593a9638212ca8ea94c3ba549b8fa4929180355",
+        "entrySha256": "86ef1655f063a99055eb48f93cfd19b2167a082594445c9e781c4e0a588c3c86",
         "notes": [],
-        "outputHash": "c4c443fe7bbedab8d46ba724512ca0d1d1a824da04edf3f63c91588d253e1eaf",
+        "outputHash": "4945ade4021b2ced9616c80c30b7a3e573fecb239c8f44add7f9d284393e6024",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -1622,11 +1622,11 @@
         "bytes": 1800240,
         "cell": "dou--instrucao-normativa--grande",
         "chars": 1006011,
-        "entrySha256": "9db4a8e9b640bdc16910a6dd83afea4b04ebf581c35dd13268cdbb44f5c714ff",
+        "entrySha256": "03ac6ba372fc18f17a232378ee88dd86895825fceb5e510cae249e91dd449a8d",
         "notes": [
           "partial reading — never accepted as complete: status partial; 1006011 unidentified chars; limitations image_without_ocr, unidentified_content"
         ],
-        "outputHash": "b1da2e59879c6d6ed61acd3d0b1442f13242f4bf9d701de20f6c6340237401a4",
+        "outputHash": "b32e7a6791f766c19f366c20aeba9518657e7ebcef9498a8db5e46361fe296b2",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -1688,9 +1688,9 @@
         "bytes": 100726,
         "cell": "dou--decreto--pequeno",
         "chars": 7580,
-        "entrySha256": "211eda8ca51e03209d79021cbfe801d976be2c09fa25e4067c58f781bba7bc55",
+        "entrySha256": "529a1789e8956bacb5e8ce0cfc42f10acfd3380f9a32772b529266d1acadadf9",
         "notes": [],
-        "outputHash": "a47792e2ecdabec2bc8c1ad5ee568c73f8e6027f5e3401eb807af76c6fbce2f7",
+        "outputHash": "6cb510d1afeac6cd19f1764628b4e2a6fed63fd7dde8e40e75717423f5a97c9b",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -1744,9 +1744,9 @@
         "bytes": 1599964,
         "cell": "dou--decreto--grande",
         "chars": 1162423,
-        "entrySha256": "3be8be7b02e6ba68850fd481b8dc21ccd78679e98c8064dfecc2a49651ff70e0",
+        "entrySha256": "2d5ff2d630a0d1d2f9f7a9c0d175c5a5ef4900eff5c3e902c50108712786c0f4",
         "notes": [],
-        "outputHash": "7294ed56e4723014a4cc3c93390f10d36fbd267a6ad695e9d82e55cf25faa1aa",
+        "outputHash": "d13fe7724a8296cde7898f6f75ed7b3c85c0b175bca25b5de725751161aa449f",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -1800,9 +1800,9 @@
         "bytes": 89970,
         "cell": "dou--portaria--pequeno",
         "chars": 4833,
-        "entrySha256": "efe58ab63ee30d47af490079bed0824b177203ff3dbf6f6a0b55f0fdea00e73f",
+        "entrySha256": "62fd8497eb43f13fa35f0ff30fe22c36f8bc8e1bc220a14f078b7622241a0694",
         "notes": [],
-        "outputHash": "a12e02b7cbe43a8f361b40a48c13cfcde23cd8a516d93f3dd317d004ec62d0ad",
+        "outputHash": "6b5c377a0b2d20949e6c0c5d83660a0804798d79613accf59501397a933475c8",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -1856,9 +1856,9 @@
         "bytes": 109003,
         "cell": "dou--portaria--medio",
         "chars": 20539,
-        "entrySha256": "8146b9ea65672fc328231cfde36ca0b3d28755d7060421b095e83c5ce0c7a171",
+        "entrySha256": "11814a11a5966c4a6e6b5ad0b2318d537d396e5aec86772b217f44459142df67",
         "notes": [],
-        "outputHash": "6775be1d4e613695b2ba1326b62879ed47096f279a71218a64bbcc0382dcc9bb",
+        "outputHash": "a8dc78444ffb10b5d49e98c77ed7390739ffc1caadf37e7f26ea7cad93bbfc6d",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -1912,9 +1912,9 @@
         "bytes": 86811,
         "cell": "dou--resolucao--pequeno",
         "chars": 2255,
-        "entrySha256": "91f5f992b486c193eb85d60faa62cfb379f9b6d03b81177d84c1a3f62dc6e646",
+        "entrySha256": "958a40640e1f9da94f6580734b3eb331eea9b3c596079a187224cb8a9f826f61",
         "notes": [],
-        "outputHash": "c3c557e3f5e180907b04e355fd28cc2ef15fec708c6ff2d1223d1d369b73f4a4",
+        "outputHash": "59c6d57cae1493d49e5b16aedee37c967249369742cb5718ea2732ed00a46040",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -1968,9 +1968,9 @@
         "bytes": 86028,
         "cell": "dou--resolucao--pequeno",
         "chars": 1164,
-        "entrySha256": "b816b8da46e99ff3356fe225aa4606b82214f075a9297779dcd13a1a640de726",
+        "entrySha256": "2673792ff997ba66fba01284ddbac0d7cf33023649aca38bbf3671c3f2764c4d",
         "notes": [],
-        "outputHash": "77340e1c791e0a69bb9eb50c0b71122a10e377e1d4987fa4d6342293182001ff",
+        "outputHash": "90448c99f11a669aa3e7260cf16e4fdb0a36b48c7f6f9709c74e3adbf40eaaf7",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -2024,9 +2024,9 @@
         "bytes": 610084,
         "cell": "dou--resolucao--grande",
         "chars": 338990,
-        "entrySha256": "2f101b93a91d9e122523da48267646e2c633617085b2b5cbf137d4146f1bcb0e",
+        "entrySha256": "8d378100553e9e3bc7ee8912be669e53f89d8ec621d0d51dafd4086d0886b9ff",
         "notes": [],
-        "outputHash": "2bc1addedbbbccbd73e255ced7934c68c3025eac39285573c52a65295e3a217d",
+        "outputHash": "e094b302140337ba94912e82d6a9ad5110b04aeb14e7f7290ea840b6351c5f5b",
         "preparation": null,
         "profile": "DOU",
         "reading": {
@@ -2080,9 +2080,9 @@
         "bytes": 205981,
         "cell": "confaz--ajuste-sinief--grande",
         "chars": 112229,
-        "entrySha256": "a9724cd0794e2f3f64fe8ed1af2cc9c7fec2867943fd2c309ce5faba9cc6e183",
+        "entrySha256": "8c5c070c922b7feb2c6aa5b8cbd80ef0d61dacd13e79436c3eaaff4dd2c55b98",
         "notes": [],
-        "outputHash": "52a96ce98e03250587f15e5125b66bdecf42d58926ade8297224c60880902947",
+        "outputHash": "9b037bac10343a68fbcc75051c1af879ea0cfed9d409e321b2317fe769e64e4b",
         "preparation": null,
         "profile": "CONFAZ",
         "reading": {
@@ -2153,11 +2153,11 @@
         "bytes": 2285257,
         "cell": "rfb--instrucao-normativa--grande",
         "chars": 809136,
-        "entrySha256": "2b1727d67a684c2451abecb036af54a31eac692c204eeb0884a68bb17d6febbe",
+        "entrySha256": "228e26cb0a32fe4ff08c1a493c40a763bc6fc2928831ca7a5510aaa33c5db9f1",
         "notes": [
           "partial reading — never accepted as complete: status partial; 1819 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content"
         ],
-        "outputHash": "46fff1c510cc407d27614c3abc6fc270a9531956b46d584143e3a933e86ea96d",
+        "outputHash": "c3b77a17d06d25ecd05d8fa4deebbb294d3d01a18574e523b43af4a6414a5c80",
         "preparation": "23146b8a6ecdf5cc35ff7fd09ac9fe08ba0babf5d69e64333b480423769eaaca",
         "profile": "RFB",
         "reading": {
@@ -2223,9 +2223,9 @@
         "bytes": 7914,
         "cell": "rfb--instrucao-normativa--pequeno",
         "chars": 2003,
-        "entrySha256": "122033506dc16998eb8e1a2c6dee636f4bbe8a932ec40255ab41d6544a17a112",
+        "entrySha256": "433513838b5a1a4461c3a369e1254a2bf2df5ede3173f7c4c1b489b1fcd0de1e",
         "notes": [],
-        "outputHash": "14dad0e9349167e5511ffdcdbd0798efeece1572bc652cc83044a62712af99b4",
+        "outputHash": "9ebe2e8ec5000ec95c00117a45f8e136a95d376e0d88d1f16e417398efaf98f0",
         "preparation": "666f7a748813c8af26a6c0e9106a0115a89941dc2cce1727fe9d6696290b8504",
         "profile": "RFB",
         "reading": {
@@ -2279,9 +2279,9 @@
         "bytes": 234565,
         "cell": "rfb--instrucao-normativa--grande",
         "chars": 57179,
-        "entrySha256": "730c2128ea56ea1f99295fbd98a26420cd3d98c2d722dee22d4524b66078b61f",
+        "entrySha256": "e7b9f5c00532b231fd791b74a8aed90587d8634063c3ec96ed77ad9c166f2b34",
         "notes": [],
-        "outputHash": "089f959d101293aad96832cf22caa3fbcdbae8f177b2da156d321adb2d76304f",
+        "outputHash": "9115a8675b76365b251fdca8773c25a774c09a25456582253d789b68e1e71413",
         "preparation": "cf977ccf18f7397d7c8f823a061bda2ece7e487d5c62fb809303892bc30840ac",
         "profile": "RFB",
         "reading": {
@@ -2335,11 +2335,11 @@
         "bytes": 787461,
         "cell": "rfb--instrucao-normativa--grande",
         "chars": 151963,
-        "entrySha256": "05fa4dff61aca4edf436eb5f46d7355405296ca6a728d3bbb97a9deeb5d901e3",
+        "entrySha256": "3c33e01c04ac5d83d760196b450bb2632c6ff45259d4299c76f25f3291001c13",
         "notes": [
           "partial reading — never accepted as complete: status partial; 103 unidentified chars; 35 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_tachado_evidence, rfb_segment_type_conflict, unidentified_content; own annex completeness: ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo I: present, not read; Anexo II: present, not read; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; Anexo IX: present, not read; Anexo X: present, not read; Anexo XI: present, not read; Anexo XII (ambiguous) absent from the representation; Anexo VI: present, not read; Anexo VII: present, not read; Anexo VIII: present, not read; Anexo XIII (ambiguous) absent from the representation; Anexo XIV (ambiguous) absent from the representation; Anexo XV: present, not read; Anexo XVI (ambiguous) absent from the representation; Anexo XVII (ambiguous) absent from the representation; Anexo XVIII (ambiguous) absent from the representation; Anexo XIX (ambiguous) absent from the representation"
         ],
-        "outputHash": "9304ac556baf5e3ce36fb93943ee0673fc6e680a29ff2131f3d496b64d47a42c",
+        "outputHash": "4e40df7cb9603d37ee44ec6d54d817e5df59d90c6b617e2dce0984d5e357069c",
         "preparation": "527306ca00e6b6e3da77e96cf0b9f3479499376ccf44a26a7218adb28d0979d3",
         "profile": "RFB",
         "reading": {
@@ -2405,9 +2405,9 @@
         "bytes": 11110,
         "cell": "rfb--resolucao--pequeno",
         "chars": 2167,
-        "entrySha256": "50d8c3cc2ea4118097e09793e37ea62d618d6906faadaf471cab681168e23e04",
+        "entrySha256": "ec095a882baaf4b4e8dadb80a4ecafc66fdf8c1bfb8af7f6b3b38fd8234bb5df",
         "notes": [],
-        "outputHash": "281abe10402693f50c9b543689206cc5cb7c1b40737a82e1c527f9be81ece6da",
+        "outputHash": "383972f4bdb100d562a9b370218a070a6d30d52efe752604e7990d37b3be1988",
         "preparation": "ca7a127719047228d85dc98a622c34a0c906dfd2828b39fdefbdc78c5be07e2b",
         "profile": "RFB",
         "reading": {
@@ -2461,11 +2461,11 @@
         "bytes": 3530584,
         "cell": "rfb--instrucao-normativa--grande",
         "chars": 1009001,
-        "entrySha256": "c00e4be9f9f49e1aef3d27c996e0c27fdc5979e6550ba3bf5e82119bf3ff6dcd",
+        "entrySha256": "6993d25b3980b6a828fea0495fee339ac2414ee66492bb0e2343d8ca428614db",
         "notes": [
           "partial reading — never accepted as complete: status partial; 14 unidentified chars; 30 attachment(s) without content; limitations rfb_segment_type_unidentified_by_source, rfb_segment_type_conflict, rfb_quote_unclosed_resume_candidate, unidentified_content; own annex completeness: Anexo I: present, not read; Anexo II: present, not read; ambiguous annex mention without a label: association not provable; Anexo III: present, not read; Anexo IV: present, not read; Anexo V: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VI: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo VIII: present, not read; Anexo XXVI: present, not read; Anexo XXVII: present, not read; Anexo IX: present, not read; Anexo XXVIII: present, not read; Anexo XXIX: present, not read; ambiguous annex mention without a label: association not provable; Anexo X: present, not read; Anexo XII: present, not read; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XIII: present, not read; Anexo XIV: present, not read; Anexo XV: present, not read; ambiguous annex mention without a label: association not provable; own annex mention without a label: association not provable; ambiguous annex mention without a label: association not provable; Anexo XVI: present, not read; Anexo XVII: present, not read; Anexo XVIII: present, not read; Anexo XIX: present, not read; Anexo XX: present, not read; Anexo XXI: present, not read; Anexo XXIII: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXIV: present, not read; ambiguous annex mention without a label: association not provable; Anexo XXV: present, not read; Anexo VII: present, not read; Anexo XI: present, not read; Anexo XXII: present, not read"
         ],
-        "outputHash": "51ed070649bc623d2b66329aa2b04865d5d4ac8ba50e19abfd2e3f23e47c5c54",
+        "outputHash": "34a1cbe88d53276c8951f3ffeb607734184e824069b8ad23d49eb2b1ea7f4613",
         "preparation": "c223c99d03dc08bdcb53ddefbfc5e7624b011aa1c63aa21e93e0656a42455791",
         "profile": "RFB",
         "reading": {
@@ -2531,9 +2531,9 @@
         "bytes": 31143,
         "cell": "rfb--instrucao-normativa--pequeno",
         "chars": 4540,
-        "entrySha256": "db45123813f88f38b7e1504f56f07de436263da2adf27b17f8a1282b3f70b309",
+        "entrySha256": "d7e19f4956f814c462f8b422d02691e13da0145a69d823f6201886971669fed1",
         "notes": [],
-        "outputHash": "c267c46dd2febb629645b05d4670c2bf241f5ae7ad24ec58dc2a1e1abc11e55d",
+        "outputHash": "6040945e222abe1b7bd1b630a3fa3f413be74c2214d378ddc9e1c388ec19ba12",
         "preparation": "fd5532b65f3245f1853636e08e3ee4046594c048443d973e955dfa055ce0383b",
         "profile": "RFB",
         "reading": {
@@ -2587,9 +2587,9 @@
         "bytes": 144575,
         "cell": "rfb--instrucao-normativa--medio",
         "chars": 31389,
-        "entrySha256": "cc3ec39a52962a8a1f7416826338faf3520507c47abe1f57984ad9d0cbbd5507",
+        "entrySha256": "84fa956e5a6733e489f78bd7ce08fdf2482f7dc77ff124fb37ee0503e102a368",
         "notes": [],
-        "outputHash": "eecbe365b1275076f9c903360c621134b9512c1a324ef0421e16c12a3bc17eb9",
+        "outputHash": "6a5fe486517a8d17f0d1bc01b7c76a5571aba4aa9a687de6c4a5cca363326ea9",
         "preparation": "96fa2cdc42cfea85a5bc65f06d5cece9304713f7b091218d1e31bc351624fa6f",
         "profile": "RFB",
         "reading": {
@@ -2643,9 +2643,9 @@
         "bytes": 24241,
         "cell": "rfb--portaria--pequeno",
         "chars": 4699,
-        "entrySha256": "5db5ae572d65e0e34b876d3456caeb1d371e06bfe6a5f6960faa788f71aa8b3d",
+        "entrySha256": "9f630fdcd8e1da28463016d4556945aa7f2e6a9f7d87859cb22dd04938bd7eef",
         "notes": [],
-        "outputHash": "c80656710632386c67b5d1fc2e18dd6a31185aeb10f0e25369ff074f813ada7b",
+        "outputHash": "8c7fa67e5898408b8d3d72ec3c57e329fe6a9784715b1e9346d16b6b25ae07e7",
         "preparation": "90d35cd103a9bc7107124b887beb6c5929d0c2c11c293978f4d8fd2ae7a55b96",
         "profile": "RFB",
         "reading": {
@@ -2699,11 +2699,11 @@
         "bytes": 32477,
         "cell": "rfb--ato-declaratorio-executivo--medio",
         "chars": 10620,
-        "entrySha256": "5ba936597de67f2133bdaa4e2865aaa492ef1136055ac120945f1e2a66e0c45e",
+        "entrySha256": "101c7b9ab33f0b10765c138fa8536f58e8b553ee5a0a8b1bc7a855e88ebf9e83",
         "notes": [
           "partial reading — never accepted as complete: own annex completeness: Anexo Único (own) absent from the representation"
         ],
-        "outputHash": "c891371311820e61e83904dd77b83cf5691d4bde8440eb15728aaa69fff6322f",
+        "outputHash": "969b4893c0de5511b2063cd8cb4ba71a05ec54008e17a73e8b95228a5c11bda3",
         "preparation": "bb6b7ac3e00593d95f73248188c6839ccdc672d9cdebba3ec29a8b96fd31e5c2",
         "profile": "RFB",
         "reading": {
@@ -2759,9 +2759,9 @@
         "bytes": 11638,
         "cell": "rfb--ato-declaratorio-executivo--pequeno",
         "chars": 1140,
-        "entrySha256": "93c22685095b569e95d3ee35308a2ff0293182a7adb5b236ec4837e51fb3a5fc",
+        "entrySha256": "6b302ce653029631fdba1eed6495c53e6c93ef01680d7d4818f809daa23764d1",
         "notes": [],
-        "outputHash": "eff9b28373e2de869ca7c4343ba51d8f93b24153a64d6e3122281d4f68403bfa",
+        "outputHash": "fc9b00fd4cbb909819f4be435d5709b3e3d028540aabc5d146a4bb2ae4e7502f",
         "preparation": "35c3ee36dd403472450fa2c70b86e99ce2e1b3bae3d91d635a824f9c6a61333e",
         "profile": "RFB",
         "reading": {
@@ -2815,12 +2815,12 @@
         "bytes": 8185,
         "cell": null,
         "chars": null,
-        "entrySha256": "5ad7b4a1bc42586289e9979af725f1417a86a80ace05544689df887a2c8be4a7",
+        "entrySha256": "fce794668a912ebeff08712339ff562784f3924b4917d87bbfd09cbbb2a19b06",
         "notes": [
           "body in an attachment absent from the representation: size UNDETERMINED, never covers a size cell",
           "partial reading — never accepted as complete: 2 attachment(s) without content"
         ],
-        "outputHash": "7daff54959b1037388a7031bec82f6b86a42baa874de78c27e786b6c531196b3",
+        "outputHash": "4287431417f9cea310b38f97ffa8e7c61cc5715139911d9d6b89b7d774da28be",
         "preparation": "06db6d8aa008e3f9aacdcc5d7a7660260a9b537d6edaf7dbe5ce7b39ac38b116",
         "profile": "RFB",
         "reading": {
@@ -2877,9 +2877,9 @@
         "bytes": 73686,
         "cell": "rfb--portaria--medio",
         "chars": 20829,
-        "entrySha256": "b600bbd8d95cf369db492a3b575ee1352ab4e3fc054d2b991f7c05026a882223",
+        "entrySha256": "e7fa026a370d738917e8650d4d508591cbb928458bd807c0c1ff6b8345a3faa8",
         "notes": [],
-        "outputHash": "e6759ac1854324e9b96052ad44336a7dcb953d4b6dffdc631ee57c7450660536",
+        "outputHash": "6cce57bd0dd08a011ec7f4ff35a20b1cc049d3430d73140edc02306db5741976",
         "preparation": "196830e1b0ea8b83e45265ad3bcb743f5c54a6d9985f1498219f035752f9a595",
         "profile": "RFB",
         "reading": {
@@ -2933,9 +2933,9 @@
         "bytes": 11168,
         "cell": "rfb--ato-declaratorio-interpretativo--pequeno",
         "chars": 3106,
-        "entrySha256": "5c5b213425b11c5ec49dff3a3f1ad89ef0b8b60a669973bc09decebb35001297",
+        "entrySha256": "85e4de9fadd028b5f11e6802ebd2f497e0535b0bcaaedd625668fedb4557fbd5",
         "notes": [],
-        "outputHash": "23b02d6e0b692bd5b27a21107d308e3d706ae7df62f03cb7eec64c634dde6298",
+        "outputHash": "6ab5f6b996eed5d89b06c4ea04ea57a5f714749186a3c5900c87226254ff3ae1",
         "preparation": "5497716e92ccfe3067f84215b423b3d93a23c579f50a58f64293152534e10c01",
         "profile": "RFB",
         "reading": {
@@ -2989,9 +2989,9 @@
         "bytes": 199138,
         "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
         "chars": 33383,
-        "entrySha256": "036aff977d4ba0478051ccdad8b64323375a7d533d0231865374d213aa6c0aba",
+        "entrySha256": "61444fb470d16c68c5ea3da005f7a00e104f5cee5ea27f7d8ca1922be1b0f379",
         "notes": [],
-        "outputHash": "f4aa3768646695c121efa4d01ae837707e32b7eb49433cf6e6344de4370273ef",
+        "outputHash": "f279c6e3f88cc66b781225349a72ef9ace0cc3a633b7b2e534d5219ce8dc7945",
         "preparation": null,
         "profile": "SEFAZ-SP-PORTAL",
         "reading": {
@@ -3051,9 +3051,9 @@
         "bytes": 176447,
         "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
         "chars": 20457,
-        "entrySha256": "298e29ac7b9ba0e2773ad0711b04259f5104af81223d89804fe01551357c8f30",
+        "entrySha256": "0edc9a3c37d5754708718d3b5a72e6f18fadccac5a5dda0b3ba70ab41c263c7b",
         "notes": [],
-        "outputHash": "b2620dcfddcf7e1a9407d4f3063f6793ad7d29101b0edabf252c4b53367ebd59",
+        "outputHash": "f55083892098208900668eba2fa04516dbdce01fb1dc197bd113726db6a41206",
         "preparation": null,
         "profile": "SEFAZ-SP-PORTAL",
         "reading": {
@@ -3113,9 +3113,9 @@
         "bytes": 168294,
         "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
         "chars": 12616,
-        "entrySha256": "c2665ce4c8b6b70e7164338ba8be645efee3523d35ddacc569cf3a29368059b9",
+        "entrySha256": "4154ab6a79d28a670a4176d300b2a201736acfa2af23cb548ca8ca2353f5dada",
         "notes": [],
-        "outputHash": "804f7efd5b47f04cf7883741278724c7bf811c63b7d9f97d44cc7b37f5a45097",
+        "outputHash": "a1ff82995ab3f5777ffa5909f492be69eaee1c7d17194cb0b97176e94373f2f6",
         "preparation": null,
         "profile": "SEFAZ-SP-PORTAL",
         "reading": {
@@ -3175,9 +3175,9 @@
         "bytes": 165355,
         "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--medio",
         "chars": 11628,
-        "entrySha256": "dc1b957092905a7d67756485d28b779a8d79c4fbacf7d4fd6dae89b3bc55bf7d",
+        "entrySha256": "0a8118ec7ddf5e6549444c510c01f8bcfd1d6ccad0589f14cdf0152e3ab24b36",
         "notes": [],
-        "outputHash": "cb4e08d30cecb7a3d395fb28e03e050bc72797882c6e9ee7d93afb1b5b470e26",
+        "outputHash": "f048048fe70b3dbcfb24369947b6a27a3f68346141c3b74070d075ed5b39bbd4",
         "preparation": null,
         "profile": "SEFAZ-SP-PORTAL",
         "reading": {
@@ -3237,9 +3237,9 @@
         "bytes": 156994,
         "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
         "chars": 3219,
-        "entrySha256": "743d88299d79fb52e7f448f4d5440a8812dd33396c822679a0a082d5b07c8175",
+        "entrySha256": "80a8e9a7316887cbd83b6cb79916a504186e3a9baebbd04a225923d41b926aaa",
         "notes": [],
-        "outputHash": "2ac80dd83d34b4937e4563806d19251537f60e18cf9fb9b71fd1f652e8e3c8f3",
+        "outputHash": "a1530f1073c49c1df3a158148713ff8cd5e9597b78d4397ef6aef8eac9a281ac",
         "preparation": null,
         "profile": "SEFAZ-SP-PORTAL",
         "reading": {
@@ -3299,9 +3299,9 @@
         "bytes": 154921,
         "cell": "sefaz-sp-portal--decreto-consolidado-ricms-2000-artigo--pequeno",
         "chars": 3340,
-        "entrySha256": "fa621a1eb5ca069d4deaddf4a8202ab429d455fbc6637047b45c198ef1579ec3",
+        "entrySha256": "7b1ce28b288f78880ca9d92c7eb3eead672d6ddece79db79a4c2cd562f9283b4",
         "notes": [],
-        "outputHash": "7451dee9086242faec9142b332f37b1cc0f8f8b369b69037183a473d4e39b6f5",
+        "outputHash": "a1c326e8ec342595e888f05585d038a17bd1c99be99670615b6637878ba77b81",
         "preparation": null,
         "profile": "SEFAZ-SP-PORTAL",
         "reading": {

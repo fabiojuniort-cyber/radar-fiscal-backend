@@ -104,7 +104,9 @@ test('R7 CONFAZ legacy titles must settle the same number and year at the start 
     const result = typedPortal('CONFAZ', '<nav>Menu externo</nav>' + wrap(title + article), expected!);
     assert.match(result.canonicalText, /Teor preservado/u);
     assert.doesNotMatch(result.canonicalText, /Menu externo/u);
-    for (const altered of [title + title + article, article + title, title.replace('TituloAcordo', 'TextoAcordo') + article,
+    const competingTitle = '<p class="A1-1TituloAcordo">AJUSTE SINIEF 8/05</p>';
+    for (const altered of [title + title + article, title + competingTitle + article,
+      title + '<div>' + competingTitle + '</div>' + article, article + title, title.replace('TituloAcordo', 'TextoAcordo') + article,
       title.replace(/20\d\d/u, '2026') + article]) {
       assert.equal(prepareOfficialAct('CONFAZ', 'synthetic', wrap(altered), expected!), null);
     }

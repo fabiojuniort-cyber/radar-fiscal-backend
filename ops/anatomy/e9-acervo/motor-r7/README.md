@@ -14,6 +14,8 @@ Base `1d7eb224`, motor `a18cd9b1`. Trabalho offline com os bytes e metadados já
 
 Os números da tabela usam as notas da matriz, que somam spans das partes. `equivalence.json` mede os segmentos exclusivos de cobertura. Para `http:M2` são 5.806 caracteres na medida exclusiva. Nas duas leis de normas.leg.br, são 1.202 e 866, respectivamente.
 
+O caminho legado do CONFAZ exige que a epígrafe seja o primeiro bloco visível e o único título explícito em toda a região. A prova de unicidade conta as classes antiga e moderna, inclusive em elementos aninhados. Para M21, M5 e `http:M5`, a REV comparou o recorte com a epígrafe literal na base e obteve os mesmos offsets, hash da região e texto canônico.
+
 M12 mantém leitura completa. A mudança se limita aos 17 marcadores autônomos de revogação em incisos e parágrafos com sufixo editorial, incluindo `(Redação dada ...)` e `Produção de efeitos`. O texto canônico, os spans, a origem e o estado jurídico desconhecido permanecem preservados. As contraprovas cobrem dispositivos com texto substantivo junto de referência à revogação.
 
 Os 126 registros existentes são preservados. As 31 revalidações reproduzem as 26 células já aceitas e padronizam os limites no padrão E9-A1: escopo offline, evidência limitada à amostra/layout/porte, `legalStatus: unknown`, identidade do motor e condição para merge/produção. Os três resultados CONFAZ que saíram da leitura parcial continuam evidências complementares às amostras originalmente aceitas.
